@@ -9,7 +9,7 @@ CXX := g++
 CC := gcc
 LD := g++
 
-CXXFLAGS.debug := -Og -g -fstack-protector-all -fno-omit-frame-pointer
+CXXFLAGS.debug := -O0 -g -fstack-protector-all -fno-omit-frame-pointer
 CXXFLAGS.release := -O3 -DNDEBUG
 CXXFLAGS := -std=gnu++1z -march=native -pthread -W{all,extra,error,inline} -g -fmessage-length=0 ${CXXFLAGS.${BUILD}}
 
@@ -42,7 +42,8 @@ ${build_dir}/%.a : Makefile | ${build_dir}
 
 run_benchmarks : ${build_dir}/benchmarks
 	@echo "---- running $< ----"
-	sudo chrt -f 50 time --verbose $<
+	/usr/bin/time --verbose $<
+	# sudo chrt -f 50 time --verbose $<
 
 ${build_dir}/%.o : %.cc Makefile | ${build_dir}
 	$(strip ${COMPILE.CXX})

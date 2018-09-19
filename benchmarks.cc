@@ -12,6 +12,8 @@
 #include <regex>
 #include <fstream>
 
+#include <unistd.h>
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 using std::uint64_t;
@@ -36,6 +38,27 @@ double const CPU_FREQ = CPU_base_frequency();
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+auto constexpr STOP = static_cast<uint64_t>(-1);
+
+template<class Queue>
+struct Stopper {
+    std::atomic<unsigned> producer_count_;
+    unsigned const consumer_count_;
+
+    void operator()(Queue* const queue) {
+        if(1 == producer_count_.fetch_sub(1, std::memory_order_relaxed)) {
+            std::cout << "stopping\n";
+            for(unsigned i = consumer_count_; i--;) {
+                while(!queue->try_push(STOP))
+                    boost::atomics::detail::pause();
+            }
+            std::cout << consumer_count_ << " stopped\n";
+        }
+    }
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct Stats {
     uint64_t total_time = 0;
     double average = std::numeric_limits<double>::quiet_NaN();
@@ -56,7 +79,7 @@ struct Stats {
 };
 
 template<class Queue>
-void producer(unsigned N, Queue* queue, ::atomic_queue::Barrier* barrier, Stats* stats_result) {
+void producer(Stopper<Queue>* stop, unsigned N, Queue* queue, ::atomic_queue::Barrier* barrier, Stats* stats_result) {
     barrier->wait();
 
     Stats stats;
@@ -69,23 +92,30 @@ void producer(unsigned N, Queue* queue, ::atomic_queue::Barrier* barrier, Stats*
     }
     uint64_t end = __builtin_ia32_rdtsc();
 
+    (*stop)(queue);
+
     stats.total_time = end - start;
     *stats_result = stats;
 }
 
 template<class Queue>
-void consumer(unsigned N, Queue* queue, ::atomic_queue::Barrier* barrier, Stats* stats_result) {
+void consumer(Queue* queue, ::atomic_queue::Barrier* barrier, Stats* stats_result) {
     barrier->wait();
 
     Stats stats;
     uint64_t latency_sum = 0;
 
     uint64_t start = __builtin_ia32_rdtsc();
-    for(unsigned n = N; n--;) {
+    unsigned n = 0;
+    for(;; ++n) {
         uint64_t producer_now;
         while(!queue->try_pop(producer_now))
             ;
         uint64_t now = __builtin_ia32_rdtsc();
+        if(producer_now == STOP) {
+            std::cout << "consumer stopped\n";
+            break;
+        }
         auto latency = now - producer_now;
         latency_sum += latency;
         stats.update(latency);
@@ -93,22 +123,23 @@ void consumer(unsigned N, Queue* queue, ::atomic_queue::Barrier* barrier, Stats*
     uint64_t end = __builtin_ia32_rdtsc();
 
     stats.total_time = end - start;
-    stats.average = static_cast<double>(latency_sum) / N;
+    stats.average = static_cast<double>(latency_sum) / n;
 
     *stats_result = stats;
-};
+}
 
 void benchmark_latency(unsigned N, unsigned producer_count, unsigned consumer_count) {
-    using Queue = ::atomic_queue::AtomicQueue<uint64_t, 16384>;
+    using Queue = ::atomic_queue::AtomicQueue<uint64_t, 100000>;
     Queue queue;
     ::atomic_queue::Barrier barrier;
+    Stopper<Queue> stop{producer_count, consumer_count};
 
     std::vector<Stats> producer_stats(producer_count), consumer_stats(consumer_count);
     std::vector<std::thread> threads(producer_count + consumer_count);
     for(unsigned i = 0; i < producer_count; ++i)
-        threads[i] = std::thread(producer<Queue>, N / producer_count, &queue, &barrier, &producer_stats[i]);
+        threads[i] = std::thread(producer<Queue>, &stop, N / producer_count, &queue, &barrier, &producer_stats[i]);
     for(unsigned i = 0; i < consumer_count; ++i)
-        threads[producer_count + i] = std::thread(consumer<Queue>, N / consumer_count, &queue, &barrier, &consumer_stats[i]);
+        threads[producer_count + i] = std::thread(consumer<Queue>, &queue, &barrier, &consumer_stats[i]);
 
     barrier.release(producer_count + consumer_count);
 
@@ -130,10 +161,11 @@ void benchmark_latency(unsigned N, unsigned producer_count, unsigned consumer_co
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int main() {
+    std::cout << "pid: " << getpid() << '\n';
     std::cout << "CPU base frequence is " << CPU_FREQ << "GHz\n";
 
     int constexpr N = 1000000;
-    benchmark_latency(N, 1, 1);
+    benchmark_latency(N, 1, 2);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

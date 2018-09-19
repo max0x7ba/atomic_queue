@@ -46,7 +46,8 @@ public:
     bool try_pop(T& element) {
         auto tail = tail_.fetch_add(1, std::memory_order_acquire); // Grab the next index unconditionally.
         if(static_cast<int>(head_.load(std::memory_order_relaxed) - tail) > 0) {
-            do element = q_[tail % SIZE].exchange(NIL, std::memory_order_release); // (2) Wait for store (1) to complete.
+            auto index = tail % SIZE;
+            do element = q_[index].exchange(NIL, std::memory_order_release); // (2) Wait for store (1) to complete.
             while(element == NIL);
             return true;
         }
