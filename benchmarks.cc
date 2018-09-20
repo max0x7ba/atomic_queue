@@ -12,6 +12,8 @@
 #include <regex>
 #include <fstream>
 
+#include <boost/dynamic_bitset.hpp>
+
 #include <unistd.h>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -47,12 +49,9 @@ struct Stopper {
 
     void operator()(Queue* const queue) {
         if(1 == producer_count_.fetch_sub(1, std::memory_order_relaxed)) {
-            std::cout << "stopping\n";
-            for(unsigned i = consumer_count_; i--;) {
+            for(unsigned i = consumer_count_; i--;)
                 while(!queue->try_push(STOP))
                     boost::atomics::detail::pause();
-            }
-            std::cout << consumer_count_ << " stopped\n";
         }
     }
 };
@@ -112,10 +111,8 @@ void consumer(Queue* queue, ::atomic_queue::Barrier* barrier, Stats* stats_resul
         while(!queue->try_pop(producer_now))
             ;
         uint64_t now = __builtin_ia32_rdtsc();
-        if(producer_now == STOP) {
-            std::cout << "consumer stopped\n";
+        if(producer_now == STOP)
             break;
-        }
         auto latency = now - producer_now;
         latency_sum += latency;
         stats.update(latency);
@@ -132,7 +129,7 @@ void benchmark_latency(unsigned N, unsigned producer_count, unsigned consumer_co
     using Queue = ::atomic_queue::AtomicQueue<uint64_t, 100000>;
     Queue queue;
     ::atomic_queue::Barrier barrier;
-    Stopper<Queue> stop{producer_count, consumer_count};
+    Stopper<Queue> stop{{producer_count}, consumer_count};
 
     std::vector<Stats> producer_stats(producer_count), consumer_stats(consumer_count);
     std::vector<std::thread> threads(producer_count + consumer_count);
@@ -156,13 +153,46 @@ void benchmark_latency(unsigned N, unsigned producer_count, unsigned consumer_co
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// void fetch_add_test_thread(unsigned n, ::atomic_queue::Barrier* barrier, std::atomic<unsigned>* a, boost::dynamic_bitset<>* bitset) {
+//     barrier->wait();
+//     while(n--) {
+//         auto i = a->fetch_add(1, std::memory_order_acq_rel);
+//         bitset->set(i);
+//     }
+// }
+
+// void fetch_add_test() {
+//     unsigned constexpr N = 1000000;
+//     unsigned constexpr THREADS = 4;
+//     ::atomic_queue::Barrier barrier;
+//     std::atomic<unsigned> a{0};
+//     boost::dynamic_bitset<> bitsets[THREADS];
+//     std::vector<std::thread> threads;
+//     threads.reserve(THREADS);
+//     for(auto& b : bitsets) {
+//         b.resize(N * THREADS);
+//         threads.emplace_back(fetch_add_test_thread, N, &barrier, &a, &b);
+//     }
+//     barrier.release(THREADS);
+//     for(auto& thread : threads)
+//         thread.join();
+
+//     boost::dynamic_bitset<> u(N * THREADS);
+//     u.set();
+//     for(auto& b : bitsets)
+//         u &= b;
+//     std::cout << "fetch_add_test: " << u.any() << '\n';
+// }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 } // namespace
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int main() {
     std::cout << "pid: " << getpid() << '\n';
-    std::cout << "CPU base frequence is " << CPU_FREQ << "GHz\n";
+    std::cout << "CPU base frequency is " << CPU_FREQ << "GHz\n";
 
     int constexpr N = 1000000;
     benchmark_latency(N, 1, 2);
