@@ -1,18 +1,15 @@
 /* -*- mode: c++; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 4 -*- */
+#include "cpu_base_frequency.h"
 #include "atomic_queue.h"
 #include "barrier.h"
 
 #include <algorithm>
 #include <stdexcept>
+#include <iostream>
 #include <cstdint>
 #include <limits>
 #include <vector>
 #include <thread>
-#include <iostream>
-#include <regex>
-#include <fstream>
-
-#include <boost/dynamic_bitset.hpp>
 
 #include <unistd.h>
 
@@ -24,19 +21,7 @@ namespace {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-double CPU_base_frequency() {
-    std::regex re("model name\\s*:[^@]+@\\s*([0-9.]+)\\s*GHz");
-    std::ifstream cpuinfo("/proc/cpuinfo");
-    std::smatch m;
-    for(std::string line; getline(cpuinfo, line);) {
-        regex_match(line, m, re);
-        if(m.size() == 2)
-            return std::stod(line.substr(m[1].first - line.begin(), m[1].second - m[1].first));
-    }
-    return 1e9;
-}
-
-double const CPU_FREQ = CPU_base_frequency();
+double const CPU_FREQ = ::atomic_queue::cpu_base_frequency();
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -150,39 +135,6 @@ void benchmark_latency(unsigned N, unsigned producer_count, unsigned consumer_co
     for(auto const& stats : consumer_stats)
         std::cout << stats;
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// void fetch_add_test_thread(unsigned n, ::atomic_queue::Barrier* barrier, std::atomic<unsigned>* a, boost::dynamic_bitset<>* bitset) {
-//     barrier->wait();
-//     while(n--) {
-//         auto i = a->fetch_add(1, std::memory_order_acq_rel);
-//         bitset->set(i);
-//     }
-// }
-
-// void fetch_add_test() {
-//     unsigned constexpr N = 1000000;
-//     unsigned constexpr THREADS = 4;
-//     ::atomic_queue::Barrier barrier;
-//     std::atomic<unsigned> a{0};
-//     boost::dynamic_bitset<> bitsets[THREADS];
-//     std::vector<std::thread> threads;
-//     threads.reserve(THREADS);
-//     for(auto& b : bitsets) {
-//         b.resize(N * THREADS);
-//         threads.emplace_back(fetch_add_test_thread, N, &barrier, &a, &b);
-//     }
-//     barrier.release(THREADS);
-//     for(auto& thread : threads)
-//         thread.join();
-
-//     boost::dynamic_bitset<> u(N * THREADS);
-//     u.set();
-//     for(auto& b : bitsets)
-//         u &= b;
-//     std::cout << "fetch_add_test: " << u.any() << '\n';
-// }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

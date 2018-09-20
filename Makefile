@@ -9,9 +9,11 @@ CXX := g++
 CC := gcc
 LD := g++
 
-CXXFLAGS.debug := -O0 -g -fstack-protector-all -fno-omit-frame-pointer
+CXXFLAGS.debug := -O0 -fstack-protector-all -fno-omit-frame-pointer
 CXXFLAGS.release := -O3 -DNDEBUG
-CXXFLAGS := -std=gnu++1z -march=native -pthread -W{all,extra,error,inline} -g -fmessage-length=0 ${CXXFLAGS.${BUILD}}
+CXXFLAGS := -std=gnu++14 -march=native -pthread -W{all,extra,error,inline} -g -fmessage-length=0 ${CXXFLAGS.${BUILD}}
+
+CPPFLAGS :=
 
 LDFLAGS.debug :=
 LDFLAGS.release :=
@@ -28,7 +30,9 @@ all : ${build_dir}/benchmarks
 ${build_dir} :
 	mkdir $@
 
-# ${build_dir}/test : ${build_dir}/libmylib.a
+${build_dir}/libatomic_queue.a : ${build_dir}/cpu_base_frequency.o
+
+${build_dir}/benchmarks : ${build_dir}/libatomic_queue.a
 ${build_dir}/benchmarks : ${build_dir}/benchmarks.o Makefile | ${build_dir}
 	$(strip ${LINK.EXE})
 -include ${build_dir}/benchmarks.d
