@@ -20,6 +20,8 @@ LDFLAGS.release :=
 LDFLAGS := -g -pthread ${LDFLAGS.${BUILD}}
 LDLIBS :=
 
+-include local.mk
+
 COMPILE.CXX = ${CXX} -c -o $@ ${CPPFLAGS} -MD -MP ${CXXFLAGS} $<
 LINK.EXE = ${LD} -o $@ $(LDFLAGS) $(filter-out Makefile,$^) $(LDLIBS)
 LINK.SO = ${LD} -shared -o $@ $(LDFLAGS) $(filter-out Makefile,$^) $(LDLIBS)
