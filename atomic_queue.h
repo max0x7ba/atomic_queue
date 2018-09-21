@@ -36,26 +36,33 @@ public:
 
     bool try_push(T element) {
         assert(element != NIL);
-        auto head = head_.load(A);
-        if(head - tail_.load(X) < SIZE && head_.compare_exchange_strong(head, head + 1, X, X)) {
-            auto& q_element = q_[head % SIZE];
-            T expected;
-            do expected = NIL;
-            while(!q_element.compare_exchange_weak(expected, element, R, X)); // (1) Wait for store (2) to complete.
-            return true;
-        }
-        return false;
+
+        unsigned head;
+        do {
+            head = head_.load(A);
+            if(head - tail_.load(X) >= SIZE)
+                return false;
+        } while(!head_.compare_exchange_strong(head, head + 1, X, X));
+
+        auto& q_element = q_[head % SIZE];
+        T expected;
+        do expected = NIL;
+        while(!q_element.compare_exchange_weak(expected, element, R, X)); // (1) Wait for store (2) to complete.
+        return true;
     }
 
     bool try_pop(T& element) {
-        auto tail = tail_.load(A);
-        if(head_.load(X) != tail && tail_.compare_exchange_strong(tail, tail + 1, X, X)) {
-            auto& q_element = q_[tail % SIZE];
-            do element = q_element.exchange(NIL, R); // (2) Wait for store (1) to complete.
-            while(element == NIL);
-            return true;
-        }
-        return false;
+        unsigned tail;
+        do {
+            tail = tail_.load(A);
+            if(head_.load(X) == tail)
+                return false;
+        } while(!tail_.compare_exchange_strong(tail, tail + 1, X, X));
+
+        auto& q_element = q_[tail % SIZE];
+        do element = q_element.exchange(NIL, R); // (2) Wait for store (1) to complete.
+        while(element == NIL);
+        return true;
     }
 };
 
