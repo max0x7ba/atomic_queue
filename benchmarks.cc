@@ -25,7 +25,7 @@ namespace {
 
 double const CPU_FREQ = ::atomic_queue::cpu_base_frequency();
 double const CPU_FREQ_INV = 1 / CPU_FREQ;
-uint64_t const NS_100 = 100 * CPU_FREQ;
+uint64_t const NS_200 = 200 * CPU_FREQ;
 uint64_t const NS_1000 = 1000 * CPU_FREQ;
 double const NS_10_INV = 1 / (10 * CPU_FREQ);
 double const NS_100_INV = 1 / (100 * CPU_FREQ);
@@ -63,31 +63,31 @@ struct Bar {
 };
 
 struct Histogram {
-    unsigned bins_100[10] = {};
-    unsigned bins_1000[9] = {};
+    unsigned bins_200[20] = {};
+    unsigned bins_1000[8] = {};
     unsigned over_1000 = 0;
 
     void update(uint64_t sample) {
-        if(sample < NS_100)
-            ++bins_100[static_cast<unsigned>(sample * NS_10_INV)];
+        if(sample < NS_200)
+            ++bins_200[static_cast<unsigned>(sample * NS_10_INV)];
         else if(sample < NS_1000)
-            ++bins_1000[static_cast<unsigned>(sample * NS_100_INV) - 1];
+            ++bins_1000[static_cast<unsigned>(sample * NS_100_INV) - 2];
         else
             ++over_1000;
     }
 
     friend std::ostream& operator<<(std::ostream& s, Histogram const& histogram) {
         unsigned max = histogram.over_1000;
-        for(auto a : histogram.bins_100)
+        for(auto a : histogram.bins_200)
             max = std::max(max, a);
         for(auto a : histogram.bins_1000)
             max = std::max(max, a);
         double const bar_height = 100. / max;
 
-        for(unsigned i = 0; i < 10; ++i)
-            s << setw(5) << ((i + 1) * 10) << ' ' << setw(8) << histogram.bins_100[i] << ' ' << Bar{bar_height * histogram.bins_100[i]} << '\n';
-        for(unsigned i = 0; i < 9; ++i)
-            s << setw(5) << ((i + 2) * 100) << ' ' << setw(8) << histogram.bins_1000[i] << ' ' << Bar{bar_height * histogram.bins_1000[i]} << '\n';
+        for(unsigned i = 0; i < 20; ++i)
+            s << setw(5) << ((i + 1) * 10) << ' ' << setw(8) << histogram.bins_200[i] << ' ' << Bar{bar_height * histogram.bins_200[i]} << '\n';
+        for(unsigned i = 0; i < 8; ++i)
+            s << setw(5) << ((i + 3) * 100) << ' ' << setw(8) << histogram.bins_1000[i] << ' ' << Bar{bar_height * histogram.bins_1000[i]} << '\n';
         s << "1000+ " << setw(8) << histogram.over_1000 << ' ' << Bar{bar_height * histogram.over_1000} << '\n';
 
         return s;
@@ -127,10 +127,13 @@ void producer(Stopper<Queue>* stop, unsigned N, Queue* queue, ::atomic_queue::Ba
     Stats stats;
 
     uint64_t start = __builtin_ia32_rdtsc();
+    uint64_t now = __builtin_ia32_rdtsc();
     for(unsigned n = N; n--;) {
-        uint64_t now = __builtin_ia32_rdtsc();
         while(!queue->try_push(now))
             ;
+        auto now2 = __builtin_ia32_rdtsc();
+        stats.update(now2 - now);
+        now = now2;
     }
     uint64_t end = __builtin_ia32_rdtsc();
 
