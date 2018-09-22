@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <stdexcept>
 #include <iostream>
+#include <iomanip>
 #include <cstdint>
 #include <limits>
 #include <vector>
@@ -16,12 +17,18 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 using std::uint64_t;
+using std::setw;
 
 namespace {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 double const CPU_FREQ = ::atomic_queue::cpu_base_frequency();
+double const CPU_FREQ_INV = 1 / CPU_FREQ;
+uint64_t const NS_100 = 100 * CPU_FREQ;
+uint64_t const NS_1000 = 1000 * CPU_FREQ;
+double const NS_10_INV = 1 / (10 * CPU_FREQ);
+double const NS_100_INV = 1 / (100 * CPU_FREQ);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -43,24 +50,75 @@ struct Stopper {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+struct Bar {
+    unsigned width;
+
+    Bar(double width) : width(width + .5) {}
+
+    friend std::ostream& operator<<(std::ostream& s, Bar bar) {
+        while(bar.width--)
+            s.put('#');
+        return s;
+    }
+};
+
+struct Histogram {
+    unsigned bins_100[10] = {};
+    unsigned bins_1000[9] = {};
+    unsigned over_1000 = 0;
+
+    void update(uint64_t sample) {
+        if(sample < NS_100)
+            ++bins_100[static_cast<unsigned>(sample * NS_10_INV)];
+        else if(sample < NS_1000)
+            ++bins_1000[static_cast<unsigned>(sample * NS_100_INV) - 1];
+        else
+            ++over_1000;
+    }
+
+    friend std::ostream& operator<<(std::ostream& s, Histogram const& histogram) {
+        unsigned max = histogram.over_1000;
+        for(auto a : histogram.bins_100)
+            max = std::max(max, a);
+        for(auto a : histogram.bins_1000)
+            max = std::max(max, a);
+        double const bar_height = 100. / max;
+
+        for(unsigned i = 0; i < 10; ++i)
+            s << setw(5) << ((i + 1) * 10) << ' ' << setw(8) << histogram.bins_100[i] << ' ' << Bar{bar_height * histogram.bins_100[i]} << '\n';
+        for(unsigned i = 0; i < 9; ++i)
+            s << setw(5) << ((i + 2) * 100) << ' ' << setw(8) << histogram.bins_1000[i] << ' ' << Bar{bar_height * histogram.bins_1000[i]} << '\n';
+        s << "1000+ " << setw(8) << histogram.over_1000 << ' ' << Bar{bar_height * histogram.over_1000} << '\n';
+
+        return s;
+    }
+};
+
 struct Stats {
-    uint64_t total_time = 0;
-    double average = std::numeric_limits<double>::quiet_NaN();
+    alignas(64) Histogram histogram;
     uint64_t min = std::numeric_limits<uint64_t>::max();
     uint64_t max = std::numeric_limits<uint64_t>::min();
+    uint64_t total_time = 0;
+    double average = std::numeric_limits<double>::quiet_NaN();
 
-    void update(uint64_t a) {
-        min = std::min(a, min);
-        max = std::max(a, max);
+    void update(uint64_t sample) {
+        histogram.update(sample);
+        min = std::min(sample, min);
+        max = std::max(sample, max);
     }
 
     friend std::ostream& operator<<(std::ostream& s, Stats const& stats) {
-        return s
-            << "total time: " << uint64_t(stats.total_time / CPU_FREQ) << "ns "
-            << "latencies min/avg/max: " << stats.min / CPU_FREQ << '/' << stats.average / CPU_FREQ << '/' << stats.max / CPU_FREQ << "ns\n";
-            ;
+        s << "total time: " << std::fixed << std::setprecision(9) << stats.total_time / CPU_FREQ * 1e-9 << "ns\n"
+          << "latencies min/avg/max: "
+          << static_cast<unsigned>(stats.min / CPU_FREQ)
+          << '/' << static_cast<unsigned>(stats.average / CPU_FREQ)
+          << '/' << static_cast<unsigned>(stats.max / CPU_FREQ) << "ns\n"
+          << stats.histogram;
+        return s;
     }
 };
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<class Queue>
 void producer(Stopper<Queue>* stop, unsigned N, Queue* queue, ::atomic_queue::Barrier* barrier, Stats* stats_result) {
@@ -71,8 +129,8 @@ void producer(Stopper<Queue>* stop, unsigned N, Queue* queue, ::atomic_queue::Ba
     uint64_t start = __builtin_ia32_rdtsc();
     for(unsigned n = N; n--;) {
         uint64_t now = __builtin_ia32_rdtsc();
-        if(!queue->try_push(now))
-            throw std::runtime_error("Queue overflow.");
+        while(!queue->try_push(now))
+            ;
     }
     uint64_t end = __builtin_ia32_rdtsc();
 
