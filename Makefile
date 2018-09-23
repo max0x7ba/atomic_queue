@@ -48,8 +48,8 @@ ${build_dir}/%.a : Makefile | ${build_dir}
 
 run_benchmarks : ${build_dir}/benchmarks
 	@echo "---- running $< ----"
-	/usr/bin/time --verbose $<
-	# sudo chrt -f 50 time --verbose $<
+	# /usr/bin/time --verbose $<
+	sudo chrt -f 50 time --verbose $<
 
 ${build_dir}/%.o : %.cc Makefile | ${build_dir}
 	$(strip ${COMPILE.CXX})
@@ -57,13 +57,12 @@ ${build_dir}/%.o : %.cc Makefile | ${build_dir}
 clean :
 	rm -rf ${build_dir}
 
-governor_userspace:
-	sudo cpupower frequency-set --related --governor userspace
-	sudo cpupower frequency-set --related --freq 5GHz
+governor_performance:
+	sudo cpupower frequency-set --related --governor performance
 	sudo cpupower frequency-info
 
-governor_ondemand:
-	sudo cpupower frequency-set --related --governor ondemand
+governor_powersave:
+	sudo cpupower frequency-set --related --governor powersave
 	sudo cpupower frequency-info
 
 .PHONY : run_benchmarks clean all run_% governor_userspace governor_ondemand
