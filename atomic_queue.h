@@ -1,6 +1,6 @@
 /* -*- mode: c++; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 4 -*- */
-#ifndef ATOMIC_QUEUE_H_INCLUDED
-#define ATOMIC_QUEUE_H_INCLUDED
+#ifndef ATOMIC_QUEUE_ATOMIC_QUEUE_H_INCLUDED
+#define ATOMIC_QUEUE_ATOMIC_QUEUE_H_INCLUDED
 
 #include <boost/atomic/detail/pause.hpp>
 
@@ -116,4 +116,4 @@ public:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#endif // QUORUM_ATOMIC_QUEUE_H_INCLUDED
+#endif // ATOMIC_QUEUE_ATOMIC_QUEUE_H_INCLUDED

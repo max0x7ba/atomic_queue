@@ -1,6 +1,7 @@
 /* -*- mode: c++; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 4 -*- */
 #include "cpu_base_frequency.h"
 #include "atomic_queue.h"
+#include "atomic_queue_spin_lock.h"
 #include "barrier.h"
 
 #include <algorithm>
