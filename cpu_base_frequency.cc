@@ -14,7 +14,7 @@ double atomic_queue::cpu_base_frequency() {
     for(std::string line; getline(cpuinfo, line);) {
         regex_match(line, m, re);
         if(m.size() == 2)
-            return std::stod(line.substr(m[1].first - line.begin(), m[1].second - m[1].first));
+            return std::stod(m[1]);
     }
     return 1e9;
 }
