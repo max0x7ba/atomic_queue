@@ -112,6 +112,44 @@ public:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+template<class T, unsigned SIZE, T NIL = T{}>
+class BlockingAtomicQueue3 {
+    alignas(CACHE_LINE_SIZE) std::atomic<unsigned> head_ = {};
+    alignas(CACHE_LINE_SIZE) std::atomic<unsigned> tail_ = {}; // Invariant: (head_ - tail_) >= 0.
+    alignas(CACHE_LINE_SIZE) std::atomic<T> q_[SIZE] = {}; // Empty elements are NIL.
+
+public:
+    BlockingAtomicQueue3() {
+        assert(q_[0].is_lock_free());
+        if(T{} != NIL)
+            for(auto& element : q_)
+                element.store(NIL, X);
+    }
+
+    bool try_push(T element) {
+        assert(element != NIL);
+
+        unsigned i = head_.fetch_add(1, A) % SIZE;
+        for(T expected = NIL; !q_[i].compare_exchange_strong(expected, element, R, X); expected = NIL) // (1) Wait for store (2) to complete.
+            ::boost::atomics::detail::pause();
+        return true;
+    }
+
+    bool try_pop(T& element) {
+        unsigned i = tail_.fetch_add(1, A) % SIZE;
+        for(;;) {
+            element = q_[i].load(X);
+            if(element != NIL) {
+                q_[i].store(NIL, R); // (2) Mark the element as empty.
+                return true;
+            }
+            ::boost::atomics::detail::pause();
+        }
+    }
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 } // atomic_queue
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

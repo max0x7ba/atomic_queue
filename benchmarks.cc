@@ -70,9 +70,9 @@ struct Histogram {
 
     void update(uint64_t sample) {
         if(sample < NS_200)
-            ++bins_200[static_cast<unsigned>(sample * NS_10_INV)];
+            ++bins_200[static_cast<unsigned>(sample * NS_10_INV + .5)];
         else if(sample < NS_1000)
-            ++bins_1000[static_cast<unsigned>(sample * NS_100_INV) - 2];
+            ++bins_1000[static_cast<unsigned>(sample * NS_100_INV + .5) - 2];
         else
             ++over_1000;
     }
@@ -173,7 +173,10 @@ void consumer(Queue* queue, ::atomic_queue::Barrier* barrier, Stats* stats_resul
 }
 
 void benchmark_latency(unsigned N, unsigned producer_count, unsigned consumer_count) {
-    using Queue = ::atomic_queue::AtomicQueue<uint64_t, 100000>;
+    // using Queue = ::atomic_queue::AtomicQueue<uint64_t, 100000>;
+    using Queue = ::atomic_queue::AtomicQueue2<uint64_t, 100000>;
+    // using Queue = ::atomic_queue::BlockingAtomicQueue3<uint64_t, 100000>;
+    // using Queue = ::atomic_queue::AtomicQueueSpinLock<uint64_t, 100000>;
     Queue queue;
     ::atomic_queue::Barrier barrier;
     Stopper<Queue> stop{{producer_count}, consumer_count};
@@ -209,7 +212,7 @@ int main() {
     std::cout << "CPU base frequency is " << CPU_FREQ << "GHz\n";
 
     int constexpr N = 1000000;
-    benchmark_latency(N, 1, 2);
+    benchmark_latency(N, 2, 2);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
