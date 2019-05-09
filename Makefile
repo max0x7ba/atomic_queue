@@ -1,5 +1,6 @@
-# time make -rC ~/src/atomic_queue -j8
+# time make -rC ~/src/atomic_queue -j8 run_benchmarks
 # time make -rC ~/src/atomic_queue -j8 BUILD=debug run_benchmarks
+# time make -rC ~/src/atomic_queue -j8 TOOLSET=gcc-8 run_benchmarks
 
 SHELL := /bin/bash
 BUILD := release

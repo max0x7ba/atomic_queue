@@ -44,7 +44,7 @@ struct Stopper {
         if(1 == producer_count_.fetch_sub(1, std::memory_order_relaxed)) {
             for(unsigned i = consumer_count_; i--;)
                 while(!queue->try_push(STOP))
-                    boost::atomics::detail::pause();
+                    _mm_pause();
         }
     }
 };

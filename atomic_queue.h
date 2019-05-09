@@ -2,11 +2,11 @@
 #ifndef ATOMIC_QUEUE_ATOMIC_QUEUE_H_INCLUDED
 #define ATOMIC_QUEUE_ATOMIC_QUEUE_H_INCLUDED
 
-#include <boost/atomic/detail/pause.hpp>
-
 #include <cassert>
 #include <utility>
 #include <atomic>
+
+#include <emmintrin.h>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -86,7 +86,7 @@ public:
             auto e_index = index / BITS_PER_UNIT;
             auto bit = Unit{1} << (index % BITS_PER_UNIT);
             while(e_[e_index].load(std::memory_order_relaxed) & bit) // Spin-wait for mark element empty in (2) to complete.
-                ::boost::atomics::detail::pause();
+                _mm_pause();
             q_[index] = std::forward<U>(element);
             e_[e_index].fetch_or(bit, std::memory_order_release); // (1) Mark the element as occupied.
             return true;
@@ -101,7 +101,7 @@ public:
             auto e_index = index / BITS_PER_UNIT;
             auto bit = Unit{1} << (index % BITS_PER_UNIT);
             while(!(e_[e_index].load(std::memory_order_relaxed) & bit)) // Spin-wait for mark element occupied in (1) to complete.
-                ::boost::atomics::detail::pause();
+                _mm_pause();
             element = std::move(q_[index]);
             e_[e_index].fetch_xor(bit, std::memory_order_release); // (2) Mark the element as empty.
             return true;
@@ -131,7 +131,7 @@ public:
 
         unsigned i = head_.fetch_add(1, A) % SIZE;
         for(T expected = NIL; !q_[i].compare_exchange_strong(expected, element, R, X); expected = NIL) // (1) Wait for store (2) to complete.
-            ::boost::atomics::detail::pause();
+            _mm_pause();
         return true;
     }
 
@@ -143,7 +143,7 @@ public:
                 q_[i].store(NIL, R); // (2) Mark the element as empty.
                 return true;
             }
-            ::boost::atomics::detail::pause();
+            _mm_pause();
         }
     }
 };
