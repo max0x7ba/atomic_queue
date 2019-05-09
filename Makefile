@@ -55,7 +55,7 @@ PREPROCESS.CXX = ${CXX} -E -o $@ ${CPPFLAGS} ${CXXFLAGS} $(abspath $<)
 COMPILE.C = ${CC} -c -o $@ ${CPPFLAGS} -MD -MP ${CFLAGS} $(abspath $<)
 LINK.EXE = ${LD} -o $@ $(LDFLAGS) $(filter-out Makefile,$^) $(LDLIBS)
 LINK.SO = ${LD} -shared -o $@ $(LDFLAGS) $(filter-out Makefile,$^) $(LDLIBS)
-LINK.A = ${AR} rsc $@ $(filter-out Makefile,$^)
+LINK.A = ${AR} rscT $@ $(filter-out Makefile,$^)
 
 all : ${build_dir}/benchmarks
 
