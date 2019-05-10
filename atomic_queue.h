@@ -68,44 +68,14 @@ public:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<class T, class Base>
-struct TryDecorator : Base {
-    using Base::Base;
-
-    bool empty() const {
-        return this->head_.load(X) == this->tail_.load(X); // head_ may have increased during or after this expression evaluated.
-    }
-
-    bool full() const {
-        return this->head_.load(X) - this->tail_.load(X) >= this->capacity(); // head_ or tail_ may have increased during or after this expression evaluated.
-    }
-
-    bool try_push(T element) {
-        // if(this->full())
-        //     return false;
-        this->push(element);
-        return true;
-    }
-
-    bool try_pop(T& element) {
-        if(this->empty())
-            return false;
-        element = this->pop();
-        return true;
-    }
-};
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 template<class T, unsigned SIZE, T NIL = T{}>
-class BlockingAtomicQueue_ {
-protected:
+class BlockingAtomicQueue {
     alignas(CACHE_LINE_SIZE) std::atomic<unsigned> head_ = {};
     alignas(CACHE_LINE_SIZE) std::atomic<unsigned> tail_ = {}; // Invariant: (head_ - tail_) >= 0.
     alignas(CACHE_LINE_SIZE) std::atomic<T> q_[SIZE] = {}; // Empty elements are NIL.
 
 public:
-    BlockingAtomicQueue_() {
+    BlockingAtomicQueue() {
         assert(std::atomic<T>{NIL}.is_lock_free());
         if(T{} != NIL)
             for(auto& element : q_)
@@ -132,11 +102,16 @@ public:
         }
     }
 
-    static unsigned capacity() { return SIZE; }
-};
+    bool try_push(T element) {
+        this->push(element);
+        return true;
+    }
 
-template<class T, unsigned SIZE, T NIL = T{}>
-using BlockingAtomicQueue = TryDecorator<T, BlockingAtomicQueue_<T, SIZE, NIL>>;
+    bool try_pop(T& element) {
+        element = this->pop();
+        return true;
+    }
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -146,7 +121,7 @@ class AtomicQueue2 {
     static int constexpr BITS_PER_UNIT = sizeof(Unit) * 8;
     alignas(CACHE_LINE_SIZE) std::atomic<unsigned> head_ = {};
     alignas(CACHE_LINE_SIZE) std::atomic<unsigned> tail_ = {}; // Invariant: (head_ - tail_) >= 0.
-    alignas(CACHE_LINE_SIZE) std::atomic<unsigned> e_[(SIZE + BITS_PER_UNIT - 1) / BITS_PER_UNIT] = {};
+    alignas(CACHE_LINE_SIZE) std::atomic<unsigned> e_[(SIZE + BITS_PER_UNIT - 1) / BITS_PER_UNIT] = {}; // TODO: Reduce contention on the bits.
     alignas(CACHE_LINE_SIZE) T q_[SIZE] = {};
 
 public:
@@ -190,7 +165,7 @@ class BlockingAtomicQueue2 {
     static int constexpr BITS_PER_UNIT = sizeof(Unit) * 8;
     alignas(CACHE_LINE_SIZE) std::atomic<unsigned> head_ = {};
     alignas(CACHE_LINE_SIZE) std::atomic<unsigned> tail_ = {}; // Invariant: (head_ - tail_) >= 0.
-    alignas(CACHE_LINE_SIZE) std::atomic<unsigned> e_[(SIZE + BITS_PER_UNIT - 1) / BITS_PER_UNIT] = {};
+    alignas(CACHE_LINE_SIZE) std::atomic<unsigned> e_[(SIZE + BITS_PER_UNIT - 1) / BITS_PER_UNIT] = {}; // TODO: Reduce contention on the bits.
     alignas(CACHE_LINE_SIZE) std::atomic<T> q_[SIZE] = {}; // Empty elements are NIL.
 
 public:
@@ -214,10 +189,6 @@ public:
         T element{std::move(q_[index])};
         e_[e_index].fetch_xor(bit, std::memory_order_release); // (2) Mark the element as empty.
         return element;
-    }
-
-    bool empty() const {
-        return head_.load(X) == tail_.load(X); // head_ may have increased during or after this expression evaluated.
     }
 
     template<class U>

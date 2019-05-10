@@ -61,7 +61,7 @@ LINK.A = ${AR} rscT $@ $(filter-out Makefile,$^)
 all : ${build_dir}/benchmarks
 
 ${build_dir} :
-	mkdir $@
+	mkdir -p $@
 
 ${build_dir}/libatomic_queue.a : ${build_dir}/cpu_base_frequency.o
 
