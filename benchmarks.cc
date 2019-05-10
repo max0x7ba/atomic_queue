@@ -174,8 +174,9 @@ void consumer(Queue* queue, ::atomic_queue::Barrier* barrier, Stats* stats_resul
 
 void benchmark_latency(unsigned N, unsigned producer_count, unsigned consumer_count) {
     // using Queue = ::atomic_queue::AtomicQueue<uint64_t, 100000>;
-    using Queue = ::atomic_queue::AtomicQueue2<uint64_t, 100000>;
-    // using Queue = ::atomic_queue::BlockingAtomicQueue3<uint64_t, 100000>;
+    using Queue = ::atomic_queue::BlockingAtomicQueue<uint64_t, 100000>;
+    // using Queue = ::atomic_queue::AtomicQueue2<uint64_t, 100000>;
+    // using Queue = ::atomic_queue::BlockingAtomicQueue2<uint64_t, 100000>;
     // using Queue = ::atomic_queue::AtomicQueueSpinLock<uint64_t, 100000>;
     Queue queue;
     ::atomic_queue::Barrier barrier;

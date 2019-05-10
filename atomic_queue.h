@@ -28,8 +28,8 @@ class AtomicQueue {
 
 public:
     AtomicQueue() {
-        assert(q_[0].is_lock_free());
-        if(q_[0] != NIL)
+        assert(std::atomic<T>{NIL}.is_lock_free());
+        if(T{} != NIL)
             for(auto& element : q_)
                 element.store(NIL, X);
     }
@@ -65,6 +65,78 @@ public:
         return true;
     }
 };
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+template<class T, class Base>
+struct TryDecorator : Base {
+    using Base::Base;
+
+    bool empty() const {
+        return this->head_.load(X) == this->tail_.load(X); // head_ may have increased during or after this expression evaluated.
+    }
+
+    bool full() const {
+        return this->head_.load(X) - this->tail_.load(X) >= this->capacity(); // head_ or tail_ may have increased during or after this expression evaluated.
+    }
+
+    bool try_push(T element) {
+        // if(this->full())
+        //     return false;
+        this->push(element);
+        return true;
+    }
+
+    bool try_pop(T& element) {
+        if(this->empty())
+            return false;
+        element = this->pop();
+        return true;
+    }
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+template<class T, unsigned SIZE, T NIL = T{}>
+class BlockingAtomicQueue_ {
+protected:
+    alignas(CACHE_LINE_SIZE) std::atomic<unsigned> head_ = {};
+    alignas(CACHE_LINE_SIZE) std::atomic<unsigned> tail_ = {}; // Invariant: (head_ - tail_) >= 0.
+    alignas(CACHE_LINE_SIZE) std::atomic<T> q_[SIZE] = {}; // Empty elements are NIL.
+
+public:
+    BlockingAtomicQueue_() {
+        assert(std::atomic<T>{NIL}.is_lock_free());
+        if(T{} != NIL)
+            for(auto& element : q_)
+                element.store(NIL, X);
+    }
+
+    void push(T element) {
+        assert(element != NIL);
+
+        unsigned i = head_.fetch_add(1, A) % SIZE;
+        for(T expected = NIL; !q_[i].compare_exchange_strong(expected, element, R, X); expected = NIL) // (1) Wait for store (2) to complete.
+            _mm_pause();
+    }
+
+    T pop() {
+        unsigned i = tail_.fetch_add(1, A) % SIZE;
+        for(;;) {
+            T element = q_[i].load(X);
+            if(element != NIL) {
+                q_[i].store(NIL, R); // (2) Mark the element as empty.
+                return element;
+            }
+            _mm_pause();
+        }
+    }
+
+    static unsigned capacity() { return SIZE; }
+};
+
+template<class T, unsigned SIZE, T NIL = T{}>
+using BlockingAtomicQueue = TryDecorator<T, BlockingAtomicQueue_<T, SIZE, NIL>>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -112,39 +184,51 @@ public:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<class T, unsigned SIZE, T NIL = T{}>
-class BlockingAtomicQueue3 {
+template<class T, unsigned SIZE>
+class BlockingAtomicQueue2 {
+    using Unit = unsigned;
+    static int constexpr BITS_PER_UNIT = sizeof(Unit) * 8;
     alignas(CACHE_LINE_SIZE) std::atomic<unsigned> head_ = {};
     alignas(CACHE_LINE_SIZE) std::atomic<unsigned> tail_ = {}; // Invariant: (head_ - tail_) >= 0.
+    alignas(CACHE_LINE_SIZE) std::atomic<unsigned> e_[(SIZE + BITS_PER_UNIT - 1) / BITS_PER_UNIT] = {};
     alignas(CACHE_LINE_SIZE) std::atomic<T> q_[SIZE] = {}; // Empty elements are NIL.
 
 public:
-    BlockingAtomicQueue3() {
-        assert(q_[0].is_lock_free());
-        if(T{} != NIL)
-            for(auto& element : q_)
-                element.store(NIL, X);
+    template<class U>
+    void push(U&& element) {
+        auto index = head_.fetch_add(1, A) % SIZE;
+        auto e_index = index / BITS_PER_UNIT;
+        auto bit = Unit{1} << (index % BITS_PER_UNIT);
+        while(e_[e_index].load(std::memory_order_relaxed) & bit) // Spin-wait for mark element empty in (2) to complete.
+            _mm_pause();
+        q_[index] = std::forward<U>(element);
+        e_[e_index].fetch_or(bit, std::memory_order_release); // (1) Mark the element as occupied.
     }
 
-    bool try_push(T element) {
-        assert(element != NIL);
-
-        unsigned i = head_.fetch_add(1, A) % SIZE;
-        for(T expected = NIL; !q_[i].compare_exchange_strong(expected, element, R, X); expected = NIL) // (1) Wait for store (2) to complete.
+    T pop() {
+        auto index = tail_.fetch_add(1, A) % SIZE;
+        auto e_index = index / BITS_PER_UNIT;
+        auto bit = Unit{1} << (index % BITS_PER_UNIT);
+        while(!(e_[e_index].load(std::memory_order_relaxed) & bit)) // Spin-wait for mark element occupied in (1) to complete.
             _mm_pause();
+        T element{std::move(q_[index])};
+        e_[e_index].fetch_xor(bit, std::memory_order_release); // (2) Mark the element as empty.
+        return element;
+    }
+
+    bool empty() const {
+        return head_.load(X) == tail_.load(X); // head_ may have increased during or after this expression evaluated.
+    }
+
+    template<class U>
+    bool try_push(U&& element) {
+        this->push(std::forward<U>(element));
         return true;
     }
 
     bool try_pop(T& element) {
-        unsigned i = tail_.fetch_add(1, A) % SIZE;
-        for(;;) {
-            element = q_[i].load(X);
-            if(element != NIL) {
-                q_[i].store(NIL, R); // (2) Mark the element as empty.
-                return true;
-            }
-            _mm_pause();
-        }
+        element = this->pop();
+        return true;
     }
 };
 
