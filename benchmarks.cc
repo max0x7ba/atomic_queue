@@ -283,8 +283,8 @@ int main() {
     // std::cout << "CPU base frequency is " << CPU_FREQ << "GHz.\n";
 
     run_ping_pong_benchmarks<BlockingAdapter<unsigned, AtomicQueue <unsigned, 1>>>("AtomicQueue");
-    run_ping_pong_benchmarks<BlockingAdapter<unsigned, AtomicQueue2<unsigned, 1>>>("AtomicQueue2");
     run_ping_pong_benchmarks<BlockingAtomicQueue <unsigned, 1>>("BlockingAtomicQueue");
+    run_ping_pong_benchmarks<BlockingAdapter<unsigned, AtomicQueue2<unsigned, 1>>>("AtomicQueue2");
     run_ping_pong_benchmarks<BlockingAtomicQueue2<unsigned, 1>>("BlockingAtomicQueue2");
 
     // int constexpr N = 1000000;

@@ -29,7 +29,7 @@ LD := ${LD.${TOOLSET}}
 AR := ${AR.${TOOLSET}}
 
 CXXFLAGS.gcc.debug := -Og -fstack-protector-all -fno-omit-frame-pointer # -D_GLIBCXX_DEBUG
-CXXFLAGS.gcc.release := -O3 -march=native -ffast-math -DNDEBUG -falign-{functions,loops}=32
+CXXFLAGS.gcc.release := -DNDEBUG -O3 -march=native -ffast-math -falign-{functions,loops}=32
 CXXFLAGS.gcc := -pthread -std=gnu++1z -march=native -W{all,extra,error} -g -fmessage-length=0 ${CXXFLAGS.gcc.${BUILD}}
 CXXFLAGS.gcc-8 := ${CXXFLAGS.gcc}
 
@@ -79,8 +79,8 @@ ${build_dir}/%.a : Makefile | ${build_dir}
 
 run_benchmarks : ${build_dir}/benchmarks
 	@echo "---- running $< ----"
-#	sudo chrt -f 50 $<
-	sudo chrt -f 50 perf stat -d $<
+	sudo chrt -f 50 $<
+#	sudo chrt -f 50 perf stat -d $<
 
 ${build_dir}/%.o : %.cc Makefile | ${build_dir}
 	$(strip ${COMPILE.CXX})
