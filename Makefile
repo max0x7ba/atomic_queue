@@ -79,8 +79,8 @@ ${build_dir}/%.a : Makefile | ${build_dir}
 
 run_benchmarks : ${build_dir}/benchmarks
 	@echo "---- running $< ----"
-	sudo chrt -f 50 $<
-	# sudo chrt -f 50 perf stat -ddd $<
+#	sudo chrt -f 50 $<
+	sudo chrt -f 50 perf stat -d $<
 
 ${build_dir}/%.o : %.cc Makefile | ${build_dir}
 	$(strip ${COMPILE.CXX})

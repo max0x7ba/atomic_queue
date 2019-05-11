@@ -1,7 +1,7 @@
 /* -*- mode: c++; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 4 -*- */
+#include "atomic_queue_spin_lock.h"
 #include "cpu_base_frequency.h"
 #include "atomic_queue.h"
-#include "atomic_queue_spin_lock.h"
 #include "barrier.h"
 
 #include <algorithm>
@@ -9,16 +9,17 @@
 #include <iostream>
 #include <iomanip>
 #include <cstdint>
+#include <future>
 #include <limits>
 #include <vector>
 #include <thread>
-
-#include <unistd.h>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 using std::uint64_t;
 using std::setw;
+
+using namespace ::atomic_queue;
 
 namespace {
 
@@ -204,16 +205,91 @@ void benchmark_latency(unsigned N, unsigned producer_count, unsigned consumer_co
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+template<class Queue, bool Sender>
+uint64_t ping_pong_thread(Barrier* barrier, Queue* q1, Queue* q2, unsigned N) {
+    barrier->wait();
+
+    uint64_t t0 = __builtin_ia32_rdtsc();
+    for(unsigned i = 1, j = 0; j < N; ++i) {
+        if constexpr(Sender) {
+            q1->push(i);
+            j = q2->pop();
+        }
+        else {
+            j = q1->pop();
+            q2->push(i);
+        }
+    }
+    uint64_t t1 = __builtin_ia32_rdtsc();
+
+    return t1 - t0;
+}
+
+template<class Queue>
+inline std::array<uint64_t, 2> ping_pong_benchmark(unsigned N) {
+    Queue q1, q2;
+    Barrier barrier;
+    auto time1 = std::async(std::launch::async, ping_pong_thread<Queue, false>, &barrier, &q1, &q2, N);
+    auto time2 = std::async(std::launch::async, ping_pong_thread<Queue,  true>, &barrier, &q1, &q2, N);
+    barrier.release(2);
+    return {time1.get(), time2.get()};
+}
+
+template<class Queue>
+void run_ping_pong_benchmarks(char const* name) {
+    int constexpr N = 1000000;
+    int constexpr RUNS = 10;
+
+    // Select the best of RUNS runs.
+    std::array<uint64_t, 2> best_times = {std::numeric_limits<int64_t>::max(), std::numeric_limits<int64_t>::max()};
+    for(unsigned run = RUNS; run--;) {
+        auto times = ping_pong_benchmark<Queue>(N);
+        if(best_times[0] + best_times[1] > times[0] + times[1])
+            best_times = times;
+    }
+
+    auto avg_time = (best_times[0] + best_times[1]) / (2 * 1e9 * CPU_FREQ);
+    auto time_diff = static_cast<int64_t>(best_times[0] - best_times[1]) / (1e9 * CPU_FREQ);
+    auto round_trip_time = avg_time / N;
+    std::printf("%20s: %.9f seconds. Round trip time: %.9f seconds. Difference: %.9f seconds.\n", name, avg_time, round_trip_time, time_diff);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+template<class T, class Queue>
+struct BlockingAdapter : Queue {
+    using Queue::Queue;
+
+    void push(T element) {
+        while(!this->try_push(element))
+            _mm_pause();
+    }
+
+    T pop() {
+        T element;
+        while(!this->try_pop(element))
+            _mm_pause();
+        return element;
+    }
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 } // namespace
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int main() {
-    std::cout << "pid: " << getpid() << '\n';
-    std::cout << "CPU base frequency is " << CPU_FREQ << "GHz\n";
+    // std::cout << "CPU base frequency is " << CPU_FREQ << "GHz.\n";
 
-    int constexpr N = 1000000;
-    benchmark_latency(N, 2, 2);
+    run_ping_pong_benchmarks<BlockingAdapter<unsigned, AtomicQueue <unsigned, 1>>>("AtomicQueue");
+    run_ping_pong_benchmarks<BlockingAdapter<unsigned, AtomicQueue2<unsigned, 1>>>("AtomicQueue2");
+    run_ping_pong_benchmarks<BlockingAtomicQueue <unsigned, 1>>("BlockingAtomicQueue");
+    run_ping_pong_benchmarks<BlockingAtomicQueue2<unsigned, 1>>("BlockingAtomicQueue2");
+
+    // int constexpr N = 1000000;
+    // benchmark_latency(N, 2, 2);
+    static_cast<void>(benchmark_latency);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

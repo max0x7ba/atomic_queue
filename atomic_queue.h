@@ -84,7 +84,6 @@ public:
 
     void push(T element) {
         assert(element != NIL);
-
         unsigned i = head_.fetch_add(1, A) % SIZE;
         for(T expected = NIL; !q_[i].compare_exchange_strong(expected, element, R, X); expected = NIL) // (1) Wait for store (2) to complete.
             _mm_pause();
