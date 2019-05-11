@@ -323,6 +323,7 @@ void run_ping_pong_benchmarks() {
     run_ping_pong_benchmark<BlockingAtomicQueue <unsigned, C>>("BlockingAtomicQueue");
     run_ping_pong_benchmark<BlockingAdapter<unsigned, AtomicQueue2<unsigned, C>>>("AtomicQueue2");
     run_ping_pong_benchmark<BlockingAtomicQueue2<unsigned, C>>("BlockingAtomicQueue2");
+    run_ping_pong_benchmark<BlockingAdapter<unsigned, AtomicQueueSpinLock<unsigned, C>>>("pthread_spinlock_t");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
