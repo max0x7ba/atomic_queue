@@ -15,14 +15,15 @@ make -r run_benchmarks
 
 # Available Benchmarks
 ## Ping-pong benchmark
-One thread posts an integer to another thread and waits for the reply using two queues. The benchmarks measures the total time of 1,000,000 ping-pongs. Contention is minimal here to be able to achieve and measure the lowest latency. Reports the total time and the average round-trip time.
+One thread posts an integer to another thread and waits for the reply using two queues. The benchmarks measures the total time of 1,000,000 ping-pongs. Contention is minimal here to be able to achieve and measure the lowest latency. Reports the total time and the average round-trip time. Wait-free `boost::lockfree::spsc_queue` is used as reference benchmark.
 
 Results on Intel Core i7-7700K, Ubuntu 18.04.2 LTS:
 ```
-         AtomicQueue: 0.136999676 seconds. Round trip time: 0.000000137 seconds. Difference: -0.000000055 seconds.
- BlockingAtomicQueue: 0.130360431 seconds. Round trip time: 0.000000130 seconds. Difference: -0.000000016 seconds.
-        AtomicQueue2: 0.168053783 seconds. Round trip time: 0.000000168 seconds. Difference: -0.000000079 seconds.
-BlockingAtomicQueue2: 0.173906307 seconds. Round trip time: 0.000000174 seconds. Difference: -0.000000059 seconds.
+   boost::spsc_queue: 0.118124462 seconds. Round trip time: 0.000000118 seconds. Difference: -0.000000047 seconds.
+         AtomicQueue: 0.145098411 seconds. Round trip time: 0.000000145 seconds. Difference: -0.000000039 seconds.
+ BlockingAtomicQueue: 0.120760856 seconds. Round trip time: 0.000000121 seconds. Difference: -0.000000015 seconds.
+        AtomicQueue2: 0.178867058 seconds. Round trip time: 0.000000179 seconds. Difference: -0.000000051 seconds.
+BlockingAtomicQueue2: 0.173858355 seconds. Round trip time: 0.000000174 seconds. Difference: -0.000000041 seconds.
 
 ```
 # TODO

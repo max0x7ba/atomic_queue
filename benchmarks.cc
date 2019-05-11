@@ -4,11 +4,14 @@
 #include "atomic_queue.h"
 #include "barrier.h"
 
+#include <boost/lockfree/spsc_queue.hpp>
+
 #include <algorithm>
 #include <stdexcept>
 #include <iostream>
 #include <iomanip>
 #include <cstdint>
+#include <cstdlib>
 #include <future>
 #include <limits>
 #include <vector>
@@ -31,6 +34,24 @@ uint64_t const NS_200 = 200 * CPU_FREQ;
 uint64_t const NS_1000 = 1000 * CPU_FREQ;
 double const NS_10_INV = 1 / (10 * CPU_FREQ);
 double const NS_100_INV = 1 / (100 * CPU_FREQ);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// void set_affinity(char const* env_name) {
+//     char const* value = std::getenv(env_name);
+//     if(!value)
+//         return;
+//     unsigned affinity = std::stoi(value);
+//     if(affinity >= CPU_SETSIZE)
+//         throw;
+
+//     cpu_set_t cpuset;
+//     CPU_ZERO(&cpuset);
+//     CPU_SET(affinity, &cpuset);
+//     if(int e = pthread_setaffinity_np(pthread_self(), sizeof cpuset, &cpuset))
+//         throw std::system_error(e, std::system_category(), "pthread_setaffinity_np");
+//     // std::printf("affinity %u set.\n", affinity);
+// }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -207,6 +228,8 @@ void benchmark_latency(unsigned N, unsigned producer_count, unsigned consumer_co
 
 template<class Queue, bool Sender>
 uint64_t ping_pong_thread(Barrier* barrier, Queue* q1, Queue* q2, unsigned N) {
+    // set_affinity(Sender ? "AQT1" : "AQT2");
+
     barrier->wait();
 
     uint64_t t0 = __builtin_ia32_rdtsc();
@@ -227,7 +250,8 @@ uint64_t ping_pong_thread(Barrier* barrier, Queue* q1, Queue* q2, unsigned N) {
 
 template<class Queue>
 inline std::array<uint64_t, 2> ping_pong_benchmark(unsigned N) {
-    Queue q1, q2;
+    alignas(CACHE_LINE_SIZE) Queue q1;
+    alignas(CACHE_LINE_SIZE) Queue q2;
     Barrier barrier;
     auto time1 = std::async(std::launch::async, ping_pong_thread<Queue, false>, &barrier, &q1, &q2, N);
     auto time2 = std::async(std::launch::async, ping_pong_thread<Queue,  true>, &barrier, &q1, &q2, N);
@@ -236,7 +260,7 @@ inline std::array<uint64_t, 2> ping_pong_benchmark(unsigned N) {
 }
 
 template<class Queue>
-void run_ping_pong_benchmarks(char const* name) {
+void run_ping_pong_benchmark(char const* name) {
     int constexpr N = 1000000;
     int constexpr RUNS = 10;
 
@@ -275,17 +299,41 @@ struct BlockingAdapter : Queue {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+template<class T, class Queue>
+struct SpscAdapter : Queue {
+    void push(T element) {
+        while(!this->Queue::push(element))
+            _mm_pause();
+    }
+
+    T pop() {
+        T element;
+        while(!this->Queue::pop(element))
+            _mm_pause();
+        return element;
+    }
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void run_ping_pong_benchmarks() {
+    constexpr unsigned C = 4;
+    run_ping_pong_benchmark<SpscAdapter<unsigned, boost::lockfree::spsc_queue<unsigned, boost::lockfree::capacity<C>>>>("boost::spsc_queue");
+    run_ping_pong_benchmark<BlockingAdapter<unsigned, AtomicQueue <unsigned, C>>>("AtomicQueue");
+    run_ping_pong_benchmark<BlockingAtomicQueue <unsigned, C>>("BlockingAtomicQueue");
+    run_ping_pong_benchmark<BlockingAdapter<unsigned, AtomicQueue2<unsigned, C>>>("AtomicQueue2");
+    run_ping_pong_benchmark<BlockingAtomicQueue2<unsigned, C>>("BlockingAtomicQueue2");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 } // namespace
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int main() {
     // std::cout << "CPU base frequency is " << CPU_FREQ << "GHz.\n";
-
-    run_ping_pong_benchmarks<BlockingAdapter<unsigned, AtomicQueue <unsigned, 1>>>("AtomicQueue");
-    run_ping_pong_benchmarks<BlockingAtomicQueue <unsigned, 1>>("BlockingAtomicQueue");
-    run_ping_pong_benchmarks<BlockingAdapter<unsigned, AtomicQueue2<unsigned, 1>>>("AtomicQueue2");
-    run_ping_pong_benchmarks<BlockingAtomicQueue2<unsigned, 1>>("BlockingAtomicQueue2");
+    run_ping_pong_benchmarks();
 
     // int constexpr N = 1000000;
     // benchmark_latency(N, 2, 2);
