@@ -39,5 +39,4 @@ BlockingAtomicQueue2: Time: 0.176750451. Round trip time: 0.000000177.
 ```
 # TODO
 * More benchmarks.
-* Benchmarks that compares all variants automatically.
 * Documentation.
