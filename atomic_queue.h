@@ -27,6 +27,8 @@ class AtomicQueue {
     alignas(CACHE_LINE_SIZE) std::atomic<T> q_[SIZE] = {}; // Empty elements are NIL.
 
 public:
+    using value_type = T;
+
     AtomicQueue() {
         assert(std::atomic<T>{NIL}.is_lock_free());
         if(T{} != NIL)
@@ -75,6 +77,8 @@ class BlockingAtomicQueue {
     alignas(CACHE_LINE_SIZE) std::atomic<T> q_[SIZE] = {}; // Empty elements are NIL.
 
 public:
+    using value_type = T;
+
     BlockingAtomicQueue() {
         assert(std::atomic<T>{NIL}.is_lock_free());
         if(T{} != NIL)
@@ -100,16 +104,6 @@ public:
             _mm_pause();
         }
     }
-
-    bool try_push(T element) {
-        this->push(element);
-        return true;
-    }
-
-    bool try_pop(T& element) {
-        element = this->pop();
-        return true;
-    }
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -124,6 +118,8 @@ class AtomicQueue2 {
     alignas(CACHE_LINE_SIZE) T q_[SIZE] = {};
 
 public:
+    using value_type = T;
+
     template<class U>
     bool try_push(U&& element) {
         auto head = head_.load(A);
@@ -168,6 +164,8 @@ class BlockingAtomicQueue2 {
     alignas(CACHE_LINE_SIZE) std::atomic<T> q_[SIZE] = {}; // Empty elements are NIL.
 
 public:
+    using value_type = T;
+
     template<class U>
     void push(U&& element) {
         auto index = head_.fetch_add(1, A) % SIZE;
@@ -189,16 +187,26 @@ public:
         e_[e_index].fetch_xor(bit, std::memory_order_release); // (2) Mark the element as empty.
         return element;
     }
+};
 
-    template<class U>
-    bool try_push(U&& element) {
-        this->push(std::forward<U>(element));
-        return true;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+template<class Queue>
+struct BlockingAdapter : Queue {
+    using T = typename Queue::value_type;
+
+    using Queue::Queue;
+
+    void push(T element) {
+        while(!this->try_push(element))
+            _mm_pause();
     }
 
-    bool try_pop(T& element) {
-        element = this->pop();
-        return true;
+    T pop() {
+        T element;
+        while(!this->try_pop(element))
+            _mm_pause();
+        return element;
     }
 };
 

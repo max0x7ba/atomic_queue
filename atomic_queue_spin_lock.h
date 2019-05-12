@@ -23,6 +23,8 @@ class AtomicQueueSpinLock {
     using LockGuard = std::lock_guard<SpinLock>;
 
 public:
+    using value_type = T;
+
     template<class U>
     bool try_push(U&& element) {
         LockGuard lock(s_);

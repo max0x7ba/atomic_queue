@@ -8,19 +8,15 @@
 
 #include <algorithm>
 #include <stdexcept>
-#include <iostream>
-#include <iomanip>
 #include <cstdint>
 #include <cstdlib>
 #include <future>
 #include <limits>
 #include <vector>
-#include <thread>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 using std::uint64_t;
-using std::setw;
 
 using namespace ::atomic_queue;
 
@@ -35,23 +31,10 @@ uint64_t const NS_1000 = 1000 * CPU_FREQ;
 double const NS_10_INV = 1 / (10 * CPU_FREQ);
 double const NS_100_INV = 1 / (100 * CPU_FREQ);
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// void set_affinity(char const* env_name) {
-//     char const* value = std::getenv(env_name);
-//     if(!value)
-//         return;
-//     unsigned affinity = std::stoi(value);
-//     if(affinity >= CPU_SETSIZE)
-//         throw;
-
-//     cpu_set_t cpuset;
-//     CPU_ZERO(&cpuset);
-//     CPU_SET(affinity, &cpuset);
-//     if(int e = pthread_setaffinity_np(pthread_self(), sizeof cpuset, &cpuset))
-//         throw std::system_error(e, std::system_category(), "pthread_setaffinity_np");
-//     // std::printf("affinity %u set.\n", affinity);
-// }
+template<class T>
+inline double to_seconds(T tsc) {
+    return tsc / CPU_FREQ * 1e-9;
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -65,95 +48,101 @@ struct Stopper {
     void operator()(Queue* const queue) {
         if(1 == producer_count_.fetch_sub(1, std::memory_order_relaxed)) {
             for(unsigned i = consumer_count_; i--;)
-                while(!queue->try_push(STOP))
-                    _mm_pause();
+                queue->push(STOP);
         }
     }
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct Bar {
-    unsigned width;
+// struct Bar {
+//     unsigned width;
 
-    Bar(double width) : width(width + .5) {}
+//     Bar(double width) : width(width + .5) {}
 
-    friend std::ostream& operator<<(std::ostream& s, Bar bar) {
-        while(bar.width--)
-            s.put('#');
-        return s;
-    }
-};
+//     friend std::ostream& operator<<(std::ostream& s, Bar bar) {
+//         while(bar.width--)
+//             s.put('#');
+//         return s;
+//     }
+// };
 
-struct Histogram {
-    unsigned bins_200[20] = {};
-    unsigned bins_1000[8] = {};
-    unsigned over_1000 = 0;
+// struct Histogram {
+//     unsigned bins_200[20] = {};
+//     unsigned bins_1000[8] = {};
+//     unsigned over_1000 = 0;
 
-    void update(uint64_t sample) {
-        if(sample < NS_200)
-            ++bins_200[static_cast<unsigned>(sample * NS_10_INV + .5)];
-        else if(sample < NS_1000)
-            ++bins_1000[static_cast<unsigned>(sample * NS_100_INV + .5) - 2];
-        else
-            ++over_1000;
-    }
+//     void update(uint64_t sample) {
+//         if(sample < NS_200)
+//             ++bins_200[static_cast<unsigned>(sample * NS_10_INV + .5)];
+//         else if(sample < NS_1000)
+//             ++bins_1000[static_cast<unsigned>(sample * NS_100_INV + .5) - 2];
+//         else
+//             ++over_1000;
+//     }
 
-    friend std::ostream& operator<<(std::ostream& s, Histogram const& histogram) {
-        unsigned max = histogram.over_1000;
-        for(auto a : histogram.bins_200)
-            max = std::max(max, a);
-        for(auto a : histogram.bins_1000)
-            max = std::max(max, a);
-        double const bar_height = 100. / max;
+//     friend std::ostream& operator<<(std::ostream& s, Histogram const& histogram) {
+//         unsigned max = histogram.over_1000;
+//         for(auto a : histogram.bins_200)
+//             max = std::max(max, a);
+//         for(auto a : histogram.bins_1000)
+//             max = std::max(max, a);
+//         double const bar_height = 100. / max;
 
-        for(unsigned i = 0; i < 20; ++i)
-            s << setw(5) << ((i + 1) * 10) << ' ' << setw(8) << histogram.bins_200[i] << ' ' << Bar{bar_height * histogram.bins_200[i]} << '\n';
-        for(unsigned i = 0; i < 8; ++i)
-            s << setw(5) << ((i + 3) * 100) << ' ' << setw(8) << histogram.bins_1000[i] << ' ' << Bar{bar_height * histogram.bins_1000[i]} << '\n';
-        s << "1000+ " << setw(8) << histogram.over_1000 << ' ' << Bar{bar_height * histogram.over_1000} << '\n';
+//         for(unsigned i = 0; i < 20; ++i)
+//             s << setw(5) << ((i + 1) * 10) << ' ' << setw(8) << histogram.bins_200[i] << ' ' << Bar{bar_height * histogram.bins_200[i]} << '\n';
+//         for(unsigned i = 0; i < 8; ++i)
+//             s << setw(5) << ((i + 3) * 100) << ' ' << setw(8) << histogram.bins_1000[i] << ' ' << Bar{bar_height * histogram.bins_1000[i]} << '\n';
+//         s << "1000+ " << setw(8) << histogram.over_1000 << ' ' << Bar{bar_height * histogram.over_1000} << '\n';
 
-        return s;
-    }
-};
+//         return s;
+//     }
+// };
 
 struct Stats {
-    alignas(64) Histogram histogram;
+    // alignas(64) Histogram histogram;
     uint64_t min = std::numeric_limits<uint64_t>::max();
     uint64_t max = std::numeric_limits<uint64_t>::min();
     uint64_t total_time = 0;
-    double average = std::numeric_limits<double>::quiet_NaN();
+    double average = 0;
 
     void update(uint64_t sample) {
-        histogram.update(sample);
+        // histogram.update(sample);
         min = std::min(sample, min);
         max = std::max(sample, max);
     }
 
-    friend std::ostream& operator<<(std::ostream& s, Stats const& stats) {
-        s << "total time: " << std::fixed << std::setprecision(9) << stats.total_time / CPU_FREQ * 1e-9 << "ns\n"
-          << "latencies min/avg/max: "
-          << static_cast<unsigned>(stats.min / CPU_FREQ)
-          << '/' << static_cast<unsigned>(stats.average / CPU_FREQ)
-          << '/' << static_cast<unsigned>(stats.max / CPU_FREQ) << "ns\n"
-          << stats.histogram;
-        return s;
+    void merge(Stats const& b) {
+        min = std::min(min, b.min);
+        max = std::max(max, b.max);
+        total_time = (total_time + b.total_time) / 2;
+        average = (average + b.average) / 2;
     }
+
+    // friend std::ostream& operator<<(std::ostream& s, Stats const& stats) {
+    //     s << "Total time: " << std::fixed << std::setprecision(9) << stats.total_time / CPU_FREQ * 1e-9 << "ns. "
+    //       << "Latencies min/avg/max: "
+    //       << static_cast<unsigned>(stats.min / CPU_FREQ)
+    //       << '/' << static_cast<unsigned>(stats.average / CPU_FREQ)
+    //       << '/' << static_cast<unsigned>(stats.max / CPU_FREQ) << "ns\n"
+    //       // << stats.histogram
+    //         ;
+    //     return s;
+    // }
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<class Queue>
-void producer(Stopper<Queue>* stop, unsigned N, Queue* queue, ::atomic_queue::Barrier* barrier, Stats* stats_result) {
-    barrier->wait();
-
+Stats producer(Stopper<Queue>* stop, unsigned N, Queue* queue, ::atomic_queue::Barrier* barrier) {
     Stats stats;
 
+    barrier->wait();
+
     uint64_t start = __builtin_ia32_rdtsc();
-    uint64_t now = __builtin_ia32_rdtsc();
+    uint64_t now = start;
     for(unsigned n = N; n--;) {
-        while(!queue->try_push(now))
-            ;
+        queue->push(now);
         auto now2 = __builtin_ia32_rdtsc();
         stats.update(now2 - now);
         now = now2;
@@ -163,22 +152,22 @@ void producer(Stopper<Queue>* stop, unsigned N, Queue* queue, ::atomic_queue::Ba
     (*stop)(queue);
 
     stats.total_time = end - start;
-    *stats_result = stats;
+    stats.average = static_cast<double>(stats.total_time) / N;
+
+    return stats;
 }
 
 template<class Queue>
-void consumer(Queue* queue, ::atomic_queue::Barrier* barrier, Stats* stats_result) {
+Stats consumer(Queue* queue, ::atomic_queue::Barrier* barrier) {
+    Stats stats;
+
     barrier->wait();
 
-    Stats stats;
     uint64_t latency_sum = 0;
-
     uint64_t start = __builtin_ia32_rdtsc();
     unsigned n = 0;
     for(;; ++n) {
-        uint64_t producer_now;
-        while(!queue->try_pop(producer_now))
-            ;
+        uint64_t producer_now = queue->pop();
         uint64_t now = __builtin_ia32_rdtsc();
         if(producer_now == STOP)
             break;
@@ -191,45 +180,68 @@ void consumer(Queue* queue, ::atomic_queue::Barrier* barrier, Stats* stats_resul
     stats.total_time = end - start;
     stats.average = static_cast<double>(latency_sum) / n;
 
-    *stats_result = stats;
+    return stats;
 }
 
-void benchmark_latency(unsigned N, unsigned producer_count, unsigned consumer_count) {
-    // using Queue = ::atomic_queue::AtomicQueue<uint64_t, 100000>;
-    // using Queue = ::atomic_queue::BlockingAtomicQueue<uint64_t, 100000>;
-    using Queue = ::atomic_queue::AtomicQueue2<uint64_t, 100000>;
-    // using Queue = ::atomic_queue::BlockingAtomicQueue2<uint64_t, 100000>;
-    // using Queue = ::atomic_queue::AtomicQueueSpinLock<uint64_t, 100000>;
-    Queue queue;
-    ::atomic_queue::Barrier barrier;
+template<class Queue>
+std::array<Stats, 2> benchmark_latency(unsigned N, unsigned producer_count, unsigned consumer_count) {
+    alignas(CACHE_LINE_SIZE) Queue queue;
     Stopper<Queue> stop{{producer_count}, consumer_count};
 
-    std::vector<Stats> producer_stats(producer_count), consumer_stats(consumer_count);
-    std::vector<std::thread> threads(producer_count + consumer_count);
+    Barrier barrier;
+    std::vector<std::future<Stats>> producer_stats(producer_count), consumer_stats(consumer_count);
     for(unsigned i = 0; i < producer_count; ++i)
-        threads[i] = std::thread(producer<Queue>, &stop, N / producer_count, &queue, &barrier, &producer_stats[i]);
+        producer_stats[i] = std::async(std::launch::async, producer<Queue>, &stop, N / producer_count, &queue, &barrier);
     for(unsigned i = 0; i < consumer_count; ++i)
-        threads[producer_count + i] = std::thread(consumer<Queue>, &queue, &barrier, &consumer_stats[i]);
-
+        consumer_stats[i] = std::async(std::launch::async, consumer<Queue>, &queue, &barrier);
     barrier.release(producer_count + consumer_count);
 
-    for(auto& thread : threads)
-        thread.join();
+    std::array<Stats, 2> producer_consumer_stats;
+    for(unsigned i = 0; i < producer_count; ++i)
+        producer_consumer_stats[0].merge(producer_stats[i].get());
+    for(unsigned i = 0; i < consumer_count; ++i)
+        producer_consumer_stats[1].merge(consumer_stats[i].get());
 
-    std::cout << "Producer stats:\n";
-    for(auto const& stats : producer_stats)
-        std::cout << stats;
-    std::cout << "Consumer stats:\n";
-    for(auto const& stats : consumer_stats)
-        std::cout << stats;
+    return producer_consumer_stats;
+}
+
+template<class Queue>
+void run_latency_benchmark(char const* name) {
+    int constexpr N = 1000000;
+    int constexpr RUNS = 10;
+
+    std::array<Stats, 2> best_stats;
+    best_stats[0].total_time = std::numeric_limits<decltype(best_stats[0].total_time)>::max();
+    for(unsigned run = RUNS; run--;) {
+        auto stats = benchmark_latency<Queue>(N, 2, 2);
+        if(best_stats[0].total_time + best_stats[1].total_time > stats[0].total_time + stats[1].total_time)
+            best_stats = stats;
+    }
+
+    std::printf(
+        "%20s: "
+        "Producers | Consumers: Time: %.9f | %.9f. Latency min/avg/max: %.9f/%.9f/%.9f | %.9f/%.9f/%.9f.\n",
+        name,
+        to_seconds(best_stats[0].total_time), to_seconds(best_stats[1].total_time),
+        to_seconds(best_stats[0].min), to_seconds(best_stats[0].average), to_seconds(best_stats[0].max),
+        to_seconds(best_stats[1].min), to_seconds(best_stats[1].average), to_seconds(best_stats[1].max)
+        );
+}
+
+void run_latency_benchmarks() {
+    std::printf("Running latency and throughput benchmarks...\n");
+    int constexpr C = 10000;
+    run_latency_benchmark<BlockingAdapter<AtomicQueue<uint64_t, C>>>("AtomicQueue");
+    run_latency_benchmark<BlockingAtomicQueue<uint64_t, C>>("BlockingAtomicQueue");
+    run_latency_benchmark<BlockingAdapter<AtomicQueue2<uint64_t, C>>>("AtomicQueue2");
+    run_latency_benchmark<BlockingAtomicQueue2<uint64_t, C>>("BlockingAtomicQueue2");
+    run_latency_benchmark<BlockingAdapter<AtomicQueueSpinLock<uint64_t, C>>>("pthread_spinlock");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<class Queue, bool Sender>
 uint64_t ping_pong_thread(Barrier* barrier, Queue* q1, Queue* q2, unsigned N) {
-    // set_affinity(Sender ? "AQT1" : "AQT2");
-
     barrier->wait();
 
     uint64_t t0 = __builtin_ia32_rdtsc();
@@ -273,34 +285,19 @@ void run_ping_pong_benchmark(char const* name) {
     }
 
     auto avg_time = (best_times[0] + best_times[1]) / (2 * 1e9 * CPU_FREQ);
-    auto time_diff = static_cast<int64_t>(best_times[0] - best_times[1]) / (1e9 * CPU_FREQ);
+    // auto time_diff = static_cast<int64_t>(best_times[0] - best_times[1]) / (1e9 * CPU_FREQ);
     auto round_trip_time = avg_time / N;
-    std::printf("%20s: %.9f seconds. Round trip time: %.9f seconds. Difference: %.9f seconds.\n", name, avg_time, round_trip_time, time_diff);
+    std::printf("%20s: Time: %.9f. Round trip time: %.9f.\n", name, avg_time, round_trip_time);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<class T, class Queue>
-struct BlockingAdapter : Queue {
+template<class Queue>
+struct SpscAdapter : Queue {
+    using T = typename Queue::value_type;
+
     using Queue::Queue;
 
-    void push(T element) {
-        while(!this->try_push(element))
-            _mm_pause();
-    }
-
-    T pop() {
-        T element;
-        while(!this->try_pop(element))
-            _mm_pause();
-        return element;
-    }
-};
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-template<class T, class Queue>
-struct SpscAdapter : Queue {
     void push(T element) {
         while(!this->Queue::push(element))
             _mm_pause();
@@ -317,13 +314,14 @@ struct SpscAdapter : Queue {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void run_ping_pong_benchmarks() {
+    std::printf("Running ping-pong benchmarks...\n");
     constexpr unsigned C = 4;
-    run_ping_pong_benchmark<SpscAdapter<unsigned, boost::lockfree::spsc_queue<unsigned, boost::lockfree::capacity<C>>>>("boost::spsc_queue");
-    run_ping_pong_benchmark<BlockingAdapter<unsigned, AtomicQueue <unsigned, C>>>("AtomicQueue");
+    run_ping_pong_benchmark<SpscAdapter<boost::lockfree::spsc_queue<unsigned, boost::lockfree::capacity<C>>>>("boost::spsc_queue");
+    run_ping_pong_benchmark<BlockingAdapter<AtomicQueue <unsigned, C>>>("AtomicQueue");
     run_ping_pong_benchmark<BlockingAtomicQueue <unsigned, C>>("BlockingAtomicQueue");
-    run_ping_pong_benchmark<BlockingAdapter<unsigned, AtomicQueue2<unsigned, C>>>("AtomicQueue2");
+    run_ping_pong_benchmark<BlockingAdapter<AtomicQueue2<unsigned, C>>>("AtomicQueue2");
     run_ping_pong_benchmark<BlockingAtomicQueue2<unsigned, C>>("BlockingAtomicQueue2");
-    run_ping_pong_benchmark<BlockingAdapter<unsigned, AtomicQueueSpinLock<unsigned, C>>>("pthread_spinlock_t");
+    run_ping_pong_benchmark<BlockingAdapter<AtomicQueueSpinLock<unsigned, C>>>("pthread_spinlock");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -334,11 +332,12 @@ void run_ping_pong_benchmarks() {
 
 int main() {
     // std::cout << "CPU base frequency is " << CPU_FREQ << "GHz.\n";
+    // run_ping_pong_benchmarks();
+    run_latency_benchmarks();
     run_ping_pong_benchmarks();
 
-    // int constexpr N = 1000000;
-    // benchmark_latency(N, 2, 2);
-    static_cast<void>(benchmark_latency);
+    static_cast<void>(run_ping_pong_benchmarks);
+    static_cast<void>(run_latency_benchmarks);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
