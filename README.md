@@ -14,12 +14,13 @@ make -r run_benchmarks
 ```
 
 # Available Benchmarks
+Benchmarks report times in seconds.
 ## Latency and throughput benchmark
 Two producer threads post into one queue, two consumer threads drain the queue. Producer and consumer total times are measured. Producer latencies are times it takes to post one item. Consumer latencies are the time it took the item to arrive. These times include the price of rdtsc instruction.
 ## Ping-pong benchmark
 One thread posts an integer to another thread and waits for the reply using two queues. The benchmarks measures the total time of 1,000,000 ping-pongs, best of 10 runs. Contention is minimal here to be able to achieve and measure the lowest latency. Reports the total time and the average round-trip time. Wait-free `boost::lockfree::spsc_queue` and a pthread_spinlock-based queue are used as reference benchmarks.
 
-Results on Intel Core i7-7700K, Ubuntu 18.04.2 LTS:
+Results on Intel Core i7-7700K, Ubuntu 18.04.2 LTS (all times are in seconds):
 ```
 Running latency and throughput benchmarks...
          AtomicQueue: Producers | Consumers: Time: 0.040885450 | 0.040965850. Latency min/avg/max: 0.000000017/0.000000082/0.000019508 | 0.000000104/0.000305488/0.000560653.
