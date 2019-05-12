@@ -231,11 +231,11 @@ void run_latency_benchmark(char const* name) {
 void run_latency_benchmarks() {
     std::printf("Running latency and throughput benchmarks...\n");
     int constexpr C = 10000;
-    run_latency_benchmark<BlockingAdapter<AtomicQueue<uint64_t, C>>>("AtomicQueue");
-    run_latency_benchmark<BlockingAtomicQueue<uint64_t, C>>("BlockingAtomicQueue");
-    run_latency_benchmark<BlockingAdapter<AtomicQueue2<uint64_t, C>>>("AtomicQueue2");
-    run_latency_benchmark<BlockingAtomicQueue2<uint64_t, C>>("BlockingAtomicQueue2");
-    run_latency_benchmark<BlockingAdapter<AtomicQueueSpinLock<uint64_t, C>>>("pthread_spinlock");
+    run_latency_benchmark<RetryDecorator<AtomicQueue<uint64_t, C>>>("AtomicQueue");
+    run_latency_benchmark<AtomicQueue<uint64_t, C>>("BlockingAtomicQueue");
+    run_latency_benchmark<RetryDecorator<AtomicQueue2<uint64_t, C>>>("AtomicQueue2");
+    run_latency_benchmark<AtomicQueue2<uint64_t, C>>("BlockingAtomicQueue2");
+    run_latency_benchmark<RetryDecorator<AtomicQueueSpinLock<uint64_t, C>>>("pthread_spinlock");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -317,11 +317,11 @@ void run_ping_pong_benchmarks() {
     std::printf("Running ping-pong benchmarks...\n");
     constexpr unsigned C = 4;
     run_ping_pong_benchmark<SpscAdapter<boost::lockfree::spsc_queue<unsigned, boost::lockfree::capacity<C>>>>("boost::spsc_queue");
-    run_ping_pong_benchmark<BlockingAdapter<AtomicQueue <unsigned, C>>>("AtomicQueue");
-    run_ping_pong_benchmark<BlockingAtomicQueue <unsigned, C>>("BlockingAtomicQueue");
-    run_ping_pong_benchmark<BlockingAdapter<AtomicQueue2<unsigned, C>>>("AtomicQueue2");
-    run_ping_pong_benchmark<BlockingAtomicQueue2<unsigned, C>>("BlockingAtomicQueue2");
-    run_ping_pong_benchmark<BlockingAdapter<AtomicQueueSpinLock<unsigned, C>>>("pthread_spinlock");
+    run_ping_pong_benchmark<RetryDecorator<AtomicQueue <unsigned, C>>>("AtomicQueue");
+    run_ping_pong_benchmark<AtomicQueue <unsigned, C>>("BlockingAtomicQueue");
+    run_ping_pong_benchmark<RetryDecorator<AtomicQueue2<unsigned, C>>>("AtomicQueue2");
+    run_ping_pong_benchmark<AtomicQueue2<unsigned, C>>("BlockingAtomicQueue2");
+    run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinLock<unsigned, C>>>("pthread_spinlock");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
