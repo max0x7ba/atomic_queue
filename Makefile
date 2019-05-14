@@ -70,6 +70,11 @@ ${build_dir}/benchmarks : ${build_dir}/benchmarks.o Makefile | ${build_dir}
 	$(strip ${LINK.EXE})
 -include ${build_dir}/benchmarks.d
 
+${build_dir}/tests : LDLIBS += -lboost_unit_test_framework
+${build_dir}/tests : ${build_dir}/tests.o Makefile | ${build_dir}
+	$(strip ${LINK.EXE})
+-include ${build_dir}/tests.d
+
 ${build_dir}/%.so : CXXFLAGS += -fPIC
 ${build_dir}/%.so : Makefile | ${build_dir}
 	$(strip ${LINK.SO})
@@ -81,6 +86,10 @@ run_benchmarks : ${build_dir}/benchmarks
 	@echo "---- running $< ----"
 	sudo chrt -f 50 $<
 #	sudo chrt -f 50 perf stat -d $<
+
+run_tests : ${build_dir}/tests
+	@echo "---- running $< ----"
+	$<
 
 ${build_dir}/%.o : %.cc Makefile | ${build_dir}
 	$(strip ${COMPILE.CXX})
