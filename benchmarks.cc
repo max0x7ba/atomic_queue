@@ -25,11 +25,11 @@ namespace {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 double const CPU_FREQ = ::atomic_queue::cpu_base_frequency();
-double const CPU_FREQ_INV = 1 / CPU_FREQ;
-uint64_t const NS_200 = 200 * CPU_FREQ;
-uint64_t const NS_1000 = 1000 * CPU_FREQ;
-double const NS_10_INV = 1 / (10 * CPU_FREQ);
-double const NS_100_INV = 1 / (100 * CPU_FREQ);
+// double const CPU_FREQ_INV = 1 / CPU_FREQ;
+// uint64_t const NS_200 = 200 * CPU_FREQ;
+// uint64_t const NS_1000 = 1000 * CPU_FREQ;
+// double const NS_10_INV = 1 / (10 * CPU_FREQ);
+// double const NS_100_INV = 1 / (100 * CPU_FREQ);
 
 template<class T>
 inline double to_seconds(T tsc) {
@@ -246,7 +246,7 @@ uint64_t ping_pong_thread(Barrier* barrier, Queue* q1, Queue* q2, unsigned N) {
 
     uint64_t t0 = __builtin_ia32_rdtsc();
     for(unsigned i = 1, j = 0; j < N; ++i) {
-        if constexpr(Sender) {
+        if(Sender) {
             q1->push(i);
             j = q2->pop();
         }
