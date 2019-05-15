@@ -56,6 +56,14 @@ public:
         this->lock_.unlock();
         return result;
     }
+
+    bool was_empty() const noexcept {
+        return static_cast<int>(this->head_ - this->tail_) <= 0;
+    }
+
+    bool was_full() const noexcept {
+        return static_cast<int>(this->head_ - this->tail_) >= static_cast<int>(SIZE);
+    }
 };
 
 template<class T, unsigned SIZE>

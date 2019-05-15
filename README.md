@@ -1,17 +1,46 @@
 # atomic_queue
-Multiple producer multipe consumer C++ lock-free queues. They contain busy loops, so they are not wait-free.
+Multiple producer multipe consumer C++ *lock-free* queues. They contain busy loops, so they are not *wait-free*.
 Work in progress.
 Available containers are:
 * `AtomicQueue` - a fixed size ring-buffer for atomic elements.
-* `BlockingAtomicQueue`  - a faster fixed size ring-buffer for atomic elements which busy-waits when empty or full.
+* `BlockingAtomicQueue` - a faster fixed size ring-buffer for atomic elements which busy-waits when empty or full.
 * `AtomicQueue2` - a fixed size ring-buffer for non-atomic elements.
-* `BlockingAtomicQueue2`  - a faster fixed size ring-buffer for non-atomic elements which busy-waits when empty or full.
+* `BlockingAtomicQueue2` - a faster fixed size ring-buffer for non-atomic elements which busy-waits when empty or full.
+* `pthread_spinlock` - a fixed size ring-buffer for non-atomic elements, uses `pthread_spinlock_t` for locking.
+* `SpinlockHle` - a fixed size ring-buffer for non-atomic elements, uses a spinlock with Intel Hardware Lock Elision (only when compiling with gcc).
 
-# Instructions
+# Notes
+
+In a real-world multiple-producer-multiple-consumer scenario the ring-buffer size should be set to the maximum allowable queue size. When the buffer size is execeeded it means that the consumers cannot consume the elements fast enough, fixing which would require either of:
+
+* increasing the buffer size to be able to handle spikes of produced elements, or
+* increasing the number of consumers, or
+* decreasing the number of producers.
+
+All the available queues here use a ring-buffer array for storing queue elements.
+
+Using a power-of-2 ring-buffer array size allows for a couple of important optimizations:
+
+* The writer and reader indexes get mapped into the ring-buffer array index using modulo `% SIZE` binary operator (division and modulo are some of the most expensive operations). The array size `SIZE` is fixed at the compile time, so that the compiler may be able to turn the modulo operator into an assembly block of less expensive instructions. However, a power-of-2 size turns that modulo operator into one plain `and` instruction and that is as fast as it gets.
+* The *element index within the cache line* gets swapped with the *cache line index* within the *ring-buffer array element index*, so that logically subsequent elements reside in different cache lines. This eliminates contention between producers and consumers on the ring-buffer cache lines. Instead of N producers together with M consumers competing on the same ring-buffer array cache line in the worst case, it is only one producer competing with one comsumer.
+
+In other words, power-of-2 ring-buffer array size yeilds top performance.
+
+# API
+The containers support the following APIs:
+* `try_push` - Appends an element to the end of the queue. Returns `false` when the queue is full.
+* `try_pop` - Removes an element from the front of the queue. Returns `false` when the queue is empty.
+* `push` - Appends an element to the end of the queue. Busy waits when the queue is full. Faster than `try_push` when the queue is not full.
+* `pop` - Removes an element from the front of the queue. Busy waits when the queue is empty. Faster than `try_pop` when the queue is not empty.
+* `was_empty` - Returns `true` if the container was empty during the call. The state may have changed by the time the return value is examined.
+* `was_full` - Returns `true` if the container was full during the call. The state may have changed by the time the return value is examined.
+
+# Build and run instructions
 ```
+git clone git@github.com:max0x7ba/atomic_queue.git
 cd atomic_queue
-make -r run_tests
-make -r run_benchmarks
+make -r -j4 run_tests
+make -r -j4 run_benchmarks
 ```
 
 # Available Benchmarks
@@ -40,5 +69,6 @@ BlockingAtomicQueue2: Time: 0.136005360. Round trip time: 0.000000136.
     pthread_spinlock: Time: 0.296041086. Round trip time: 0.000000296.
 ```
 # TODO
+* CMake.
 * More benchmarks.
-* Documentation.
+* More Documentation.

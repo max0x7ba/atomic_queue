@@ -230,7 +230,7 @@ void run_latency_benchmark(char const* name) {
 
 void run_latency_benchmarks() {
     std::printf("Running latency and throughput benchmarks...\n");
-    int constexpr CAPACITY = 16384;
+    int constexpr CAPACITY = 65536;
     run_latency_benchmark<RetryDecorator<AtomicQueue<uint64_t, CAPACITY>>>("AtomicQueue");
     run_latency_benchmark<AtomicQueue<uint64_t, CAPACITY>>("BlockingAtomicQueue");
     run_latency_benchmark<RetryDecorator<AtomicQueue2<uint64_t, CAPACITY>>>("AtomicQueue2");
