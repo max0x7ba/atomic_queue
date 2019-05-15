@@ -59,6 +59,16 @@ BlockingAtomicQueue2:  88,649,348 msg/sec.
     pthread_spinlock:  38,080,075 msg/sec.
          SpinlockHle:  19,616,090 msg/sec.
 ```
+
+Results on Intel Xeon Gold 6132, Red Hat Enterprise Linux Server release 6.10 (Santiago) (all times are in seconds):
+```
+         AtomicQueue:  11,918,525 msg/sec.
+ BlockingAtomicQueue:  30,782,880 msg/sec.
+        AtomicQueue2:  12,799,875 msg/sec.
+BlockingAtomicQueue2:  27,159,887 msg/sec.
+    pthread_spinlock:  10,780,538 msg/sec.
+         SpinlockHle:   5,214,240 msg/sec.
+```
 ## Ping-pong benchmark
 One thread posts an integer to another thread and waits for the reply using two queues. The benchmarks measures the total time of 1,000,000 ping-pongs, best of 10 runs. Contention is minimal here to be able to achieve and measure the lowest latency. Reports the total time and the average round-trip time. Wait-free `boost::lockfree::spsc_queue` and a pthread_spinlock-based queue are used as reference benchmarks.
 
@@ -72,6 +82,18 @@ BlockingAtomicQueue2: 0.000000157 sec/round-trip.
     pthread_spinlock: 0.000000309 sec/round-trip.
          SpinlockHle: 0.000000245 sec/round-trip.
 ```
+
+Results on Intel Xeon Gold 6132, Red Hat Enterprise Linux Server release 6.10 (Santiago) (all times are in seconds):
+```
+   boost::spsc_queue: 0.000000249 sec/round-trip.
+         AtomicQueue: 0.000000360 sec/round-trip.
+ BlockingAtomicQueue: 0.000000216 sec/round-trip.
+        AtomicQueue2: 0.000000421 sec/round-trip.
+BlockingAtomicQueue2: 0.000000308 sec/round-trip.
+    pthread_spinlock: 0.000000723 sec/round-trip.
+         SpinlockHle: 0.000000266 sec/round-trip.
+```
+
 # TODO
 * CMake.
 * More benchmarks.
