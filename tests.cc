@@ -8,6 +8,7 @@
 #include "barrier.h"
 
 #include <numeric>
+#include <cstdint>
 #include <thread>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -20,7 +21,7 @@ namespace {
 
 // Check that all push'es are ever pop'ed once with multiple producer and multiple consumers.
 template<class Queue>
-void test_correctness() {
+void stress() {
     constexpr int PRODUCERS = 2;
     constexpr int CONSUMERS = 2;
     constexpr unsigned N = 1000000;
@@ -58,9 +59,10 @@ void test_correctness() {
     for(auto& t : consumers)
         t.join();
 
-    constexpr uint64_t expected_result = (N + 1) / 2. * N;
     uint64_t result = std::accumulate(results, results + CONSUMERS, uint64_t{});
-    BOOST_CHECK_EQUAL(expected_result, result / CONSUMERS);
+    constexpr uint64_t expected_result = (N + 1) / 2. * N;
+    int64_t result_diff = result / CONSUMERS - expected_result;
+    BOOST_CHECK_EQUAL(result_diff, 0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -69,26 +71,30 @@ void test_correctness() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-constexpr unsigned CAPACITY = 1000;
+constexpr unsigned CAPACITY = 1024;
 
-BOOST_AUTO_TEST_CASE(correctness_AtomicQueue) {
-    test_correctness<RetryDecorator<AtomicQueue <unsigned, CAPACITY>>>();
+BOOST_AUTO_TEST_CASE(stress_AtomicQueue) {
+    stress<RetryDecorator<AtomicQueue <unsigned, CAPACITY>>>();
 }
 
-BOOST_AUTO_TEST_CASE(correctness_BlockingAtomicQueue) {
-    test_correctness<AtomicQueue<unsigned, CAPACITY>>();
+BOOST_AUTO_TEST_CASE(stress_BlockingAtomicQueue) {
+    stress<AtomicQueue<unsigned, CAPACITY>>();
 }
 
-BOOST_AUTO_TEST_CASE(correctness_AtomicQueue2) {
-    test_correctness<RetryDecorator<AtomicQueue2<unsigned, CAPACITY>>>();
+BOOST_AUTO_TEST_CASE(stress_AtomicQueue2) {
+    stress<RetryDecorator<AtomicQueue2<unsigned, CAPACITY>>>();
 }
 
-BOOST_AUTO_TEST_CASE(correctness_BlockingAtomicQueue2) {
-    test_correctness<AtomicQueue2<unsigned, CAPACITY>>();
+BOOST_AUTO_TEST_CASE(stress_BlockingAtomicQueue2) {
+    stress<AtomicQueue2<unsigned, CAPACITY>>();
 }
 
-BOOST_AUTO_TEST_CASE(correctness_pthread_spinlock) {
-    test_correctness<RetryDecorator<AtomicQueueSpinLock<unsigned, CAPACITY>>>();
+BOOST_AUTO_TEST_CASE(stress_pthread_spinlock) {
+    stress<RetryDecorator<AtomicQueueSpinLock<unsigned, CAPACITY>>>();
+}
+
+BOOST_AUTO_TEST_CASE(stress_SpinLockHle) {
+    stress<RetryDecorator<AtomicQueueSpinLockHle<unsigned, CAPACITY>>>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
