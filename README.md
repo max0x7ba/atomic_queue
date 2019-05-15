@@ -9,6 +9,11 @@ Available containers are:
 * `SpinlockHle` - a fixed size ring-buffer for non-atomic elements, uses a spinlock with Intel Hardware Lock Elision (only when compiling with gcc).
 
 # Build and run instructions
+The containers provided are header-only class templates that require only `#include <atomic_queue/atomic_queue.h>`, no building/installing is necessary.
+
+Building is neccessary to run the tests and benchmarks.
+
+
 ```
 git clone git@github.com:max0x7ba/atomic_queue.git
 cd atomic_queue
