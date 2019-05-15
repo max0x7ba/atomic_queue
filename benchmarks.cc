@@ -236,6 +236,7 @@ void run_latency_benchmarks() {
     run_latency_benchmark<RetryDecorator<AtomicQueue2<uint64_t, C>>>("AtomicQueue2");
     run_latency_benchmark<AtomicQueue2<uint64_t, C>>("BlockingAtomicQueue2");
     run_latency_benchmark<RetryDecorator<AtomicQueueSpinLock<uint64_t, C>>>("pthread_spinlock");
+    run_latency_benchmark<RetryDecorator<AtomicQueueSpinLockHle<uint64_t, C>>>("SpinLockHle");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -322,6 +323,7 @@ void run_ping_pong_benchmarks() {
     run_ping_pong_benchmark<RetryDecorator<AtomicQueue2<unsigned, C>>>("AtomicQueue2");
     run_ping_pong_benchmark<AtomicQueue2<unsigned, C>>("BlockingAtomicQueue2");
     run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinLock<unsigned, C>>>("pthread_spinlock");
+    run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinLockHle<unsigned, C>>>("SpinLockHle");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
