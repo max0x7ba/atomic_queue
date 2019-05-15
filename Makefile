@@ -58,13 +58,10 @@ cppflags := ${CPPFLAGS}
 ldflags := -fuse-ld=gold -pthread -g ${ldflags.${BUILD}} ${ldflags.${TOOLSET}} ${LDFLAGS}
 ldlibs := -lrt ${LDLIBS}
 
-COMPILE.CXX = ${CXX} -o $@ -c ${cppflags} ${cxxflags} -MD -MP $(abspath $<)
-COMPILE.S = ${CXX} -o- -S -masm=intel ${cppflags} ${cxxflags} $(abspath $<) | c++filt > $@
-PREPROCESS.CXX = ${CXX} -o $@ -E ${cppflags} ${cxxflags} $(abspath $<)
-COMPILE.C = ${CC} -o $@ -c ${cppflags} ${cflags} -MD -MP $(abspath $<)
-LINK.EXE = ${LD} -o $@ $(ldflags) $(filter-out Makefile,$^) $(ldlibs)
-LINK.SO = ${LD} -o $@ -shared $(ldflags) $(filter-out Makefile,$^) $(ldlibs)
-LINK.A = ${AR} rscT $@ $(filter-out Makefile,$^)
+COMPILE.CXX = ${CXX} -c -o $@ ${cppflags} ${cxxflags} -MD -MP $(abspath $<)
+COMPILE.S = ${CXX} -S -masm=intel -o- ${cppflags} ${cxxflags} $(abspath $<) | c++filt > $@
+PREPROCESS.CXX = ${CXX} -E -o $@ ${cppflags} ${cxxflags} $(abspath $<)
+COMPILE.C = ${CC} -c -o $@ ${cppflags} ${cflags} -MD -MP $(abspath $<)
 
 all : benchmarks tests
 
