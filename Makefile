@@ -7,7 +7,7 @@ SHELL := /bin/bash
 BUILD := release
 
 TOOLSET := gcc
-build_dir := ${CURDIR}/${BUILD}/${TOOLSET}
+build_dir := ${BUILD}/${TOOLSET}
 
 cxx.gcc := g++
 cc.gcc := gcc
@@ -47,25 +47,29 @@ cxxflags.clang.release := -O3 -march=native -ffast-math -DNDEBUG
 cxxflags.clang := -pthread -std=gnu++14 -march=native -W{all,extra,error} -g -fmessage-length=0 ${cxxflags.clang.${BUILD}}
 cxxflags.clang-7 := ${cxxflags.clang}
 
-cxxflags := ${cxxflags.${TOOLSET}} ${CXXFLAGS}
-cflags := ${cflags.${TOOLSET}} ${CFLAGS}
-
-cppflags := ${CPPFLAGS}
-
 ldflags.debug :=
 ldflags.release :=
-ldflags := -fuse-ld=gold -pthread -g ${ldflags.${BUILD}} ${ldflags.${TOOLSET}}
+
+# Additional CPPFLAGS, CXXFLAGS, CFLAGS, LDLIBS, LDFLAGS can come from the command line, e.g. make CXXFLAGS='-march=skylake -mtune=skylake'.
+# However, a clean build is required when changing the flags in the command line.
+cxxflags := ${cxxflags.${TOOLSET}} ${CXXFLAGS}
+cflags := ${cflags.${TOOLSET}} ${CFLAGS}
+cppflags := ${CPPFLAGS}
+ldflags := -fuse-ld=gold -pthread -g ${ldflags.${BUILD}} ${ldflags.${TOOLSET}} ${LDFLAGS}
 ldlibs := -lrt ${LDLIBS}
 
-COMPILE.CXX = ${CXX} -c -o $@ ${cppflags} -MD -MP ${cxxflags} $(abspath $<)
-COMPILE.S = ${CXX} -S -masm=intel -o- ${cppflags} ${cxxflags} $(abspath $<) | c++filt > $@
-PREPROCESS.CXX = ${CXX} -E -o $@ ${cppflags} ${cxxflags} $(abspath $<)
-COMPILE.C = ${CC} -c -o $@ ${cppflags} -MD -MP ${cflags} $(abspath $<)
+COMPILE.CXX = ${CXX} -o $@ -c ${cppflags} ${cxxflags} -MD -MP $(abspath $<)
+COMPILE.S = ${CXX} -o- -S -masm=intel ${cppflags} ${cxxflags} $(abspath $<) | c++filt > $@
+PREPROCESS.CXX = ${CXX} -o $@ -E ${cppflags} ${cxxflags} $(abspath $<)
+COMPILE.C = ${CC} -o $@ -c ${cppflags} ${cflags} -MD -MP $(abspath $<)
 LINK.EXE = ${LD} -o $@ $(ldflags) $(filter-out Makefile,$^) $(ldlibs)
-LINK.SO = ${LD} -shared -o $@ $(ldflags) $(filter-out Makefile,$^) $(ldlibs)
+LINK.SO = ${LD} -o $@ -shared $(ldflags) $(filter-out Makefile,$^) $(ldlibs)
 LINK.A = ${AR} rscT $@ $(filter-out Makefile,$^)
 
-all : ${build_dir}/benchmarks ${build_dir}/tests
+all : benchmarks tests
+
+% : ${build_dir}/%
+	ln -sf $< $@
 
 ${build_dir} :
 	mkdir -p $@

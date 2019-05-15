@@ -8,11 +8,13 @@
 
 #include <algorithm>
 #include <stdexcept>
+#include <clocale>
 #include <cstdint>
 #include <cstdlib>
 #include <future>
 #include <limits>
 #include <vector>
+
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -209,34 +211,44 @@ template<class Queue>
 void run_latency_benchmark(char const* name) {
     int constexpr N = 1000000;
     int constexpr RUNS = 10;
+    int constexpr PRODUCERS = 2;
+    int constexpr CONSUMERS = 2;
 
     std::array<Stats, 2> best_stats;
     best_stats[0].total_time = std::numeric_limits<decltype(best_stats[0].total_time)>::max();
     for(unsigned run = RUNS; run--;) {
-        auto stats = benchmark_latency<Queue>(N, 2, 2);
+        auto stats = benchmark_latency<Queue>(N, PRODUCERS, CONSUMERS);
         if(best_stats[0].total_time + best_stats[1].total_time > stats[0].total_time + stats[1].total_time)
             best_stats = stats;
     }
 
-    std::printf(
-        "%20s: "
-        "Producers | Consumers: Time: %.9f | %.9f. Latency min/avg/max: %.9f/%.9f/%.9f | %.9f/%.9f/%.9f.\n",
-        name,
-        to_seconds(best_stats[0].total_time), to_seconds(best_stats[1].total_time),
-        to_seconds(best_stats[0].min), to_seconds(best_stats[0].average), to_seconds(best_stats[0].max),
-        to_seconds(best_stats[1].min), to_seconds(best_stats[1].average), to_seconds(best_stats[1].max)
-        );
+    double total_time = to_seconds(std::max(best_stats[0].total_time, best_stats[1].total_time));
+    unsigned msg_per_sec = N * PRODUCERS / total_time;
+    std::printf("%20s: %'11u msg/sec.\n", name, msg_per_sec);
+
+    // std::printf(
+    //     "%20s: "
+    //     "Producers | Consumers: Time: %.9f | %.9f. Latency min/avg/max: %.9f/%.9f/%.9f | %.9f/%.9f/%.9f.\n",
+    //     name,
+    //     to_seconds(best_stats[0].total_time), to_seconds(best_stats[1].total_time),
+    //     to_seconds(best_stats[0].min), to_seconds(best_stats[0].average), to_seconds(best_stats[0].max),
+    //     to_seconds(best_stats[1].min), to_seconds(best_stats[1].average), to_seconds(best_stats[1].max)
+    //     );
 }
 
 void run_latency_benchmarks() {
-    std::printf("Running latency and throughput benchmarks...\n");
-    int constexpr CAPACITY = 16384;
+    std::printf("---- Running latency and throughput benchmarks (higher is better) ----\n");
+
+    int constexpr CAPACITY = 65536;
+
     run_latency_benchmark<RetryDecorator<AtomicQueue<uint64_t, CAPACITY>>>("AtomicQueue");
     run_latency_benchmark<AtomicQueue<uint64_t, CAPACITY>>("BlockingAtomicQueue");
     run_latency_benchmark<RetryDecorator<AtomicQueue2<uint64_t, CAPACITY>>>("AtomicQueue2");
     run_latency_benchmark<AtomicQueue2<uint64_t, CAPACITY>>("BlockingAtomicQueue2");
     run_latency_benchmark<RetryDecorator<AtomicQueueSpinlock<uint64_t, CAPACITY>>>("pthread_spinlock");
     run_latency_benchmark<RetryDecorator<AtomicQueueSpinlockHle<uint64_t, CAPACITY>>>("SpinlockHle");
+
+    std::printf("\n");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -285,9 +297,8 @@ void run_ping_pong_benchmark(char const* name) {
     }
 
     auto avg_time = (best_times[0] + best_times[1]) / (2 * 1e9 * CPU_FREQ);
-    // auto time_diff = static_cast<int64_t>(best_times[0] - best_times[1]) / (1e9 * CPU_FREQ);
     auto round_trip_time = avg_time / N;
-    std::printf("%20s: Time: %.9f. Round trip time: %.9f.\n", name, avg_time, round_trip_time);
+    std::printf("%20s: %.9f sec/round-trip.\n", name, round_trip_time);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -314,7 +325,7 @@ struct SpscAdapter : Queue {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void run_ping_pong_benchmarks() {
-    std::printf("Running ping-pong benchmarks...\n");
+    std::printf("---- Running ping-pong benchmarks (lower is better) ----\n");
 
     // This benchmarks doesn't require queue capacity greater than 1, however, capacity of 1 elides
     // some instructions completely because of (x % 1) is always 0. Use something greater than 1 to
@@ -328,6 +339,8 @@ void run_ping_pong_benchmarks() {
     run_ping_pong_benchmark<AtomicQueue2<unsigned, CAPACITY>>("BlockingAtomicQueue2");
     run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinlock<unsigned, CAPACITY>>>("pthread_spinlock");
     run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinlockHle<unsigned, CAPACITY>>>("SpinlockHle");
+
+    std::printf("\n");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -337,6 +350,7 @@ void run_ping_pong_benchmarks() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int main() {
+    std::setlocale(LC_NUMERIC, "");
     // std::cout << "CPU base frequency is " << CPU_FREQ << "GHz.\n";
 
     run_latency_benchmarks();

@@ -115,6 +115,14 @@ public:
         auto tail = tail_.fetch_add(1, A);
         return static_cast<Derived&>(*this).do_pop(tail);
     }
+
+    bool was_empty() const noexcept {
+        return static_cast<int>(head_.load(X) - tail_.load(X)) <= 0;
+    }
+
+    bool was_full() const noexcept {
+        return static_cast<int>(head_.load(X) - tail_.load(X)) >= static_cast<int>(Derived::size);
+    }
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
