@@ -15,9 +15,9 @@ namespace atomic_queue {
 
 template<class T, unsigned SIZE, class SpinLock>
 class AtomicQueueSpinLock_ {
-    alignas(CACHE_LINE_SIZE) SpinLock s_;
-    alignas(CACHE_LINE_SIZE) unsigned head_ = 0;
-    alignas(CACHE_LINE_SIZE) unsigned tail_ = 0;
+    SpinLock s_;
+    unsigned head_ = 0;
+    unsigned tail_ = 0;
     alignas(CACHE_LINE_SIZE) T q_[SIZE] = {};
 
     using LockGuard = std::lock_guard<SpinLock>;

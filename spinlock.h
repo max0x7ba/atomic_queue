@@ -5,6 +5,7 @@
 #include <system_error>
 #include <mutex>
 
+#include <emmintrin.h>
 #include <pthread.h>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -33,6 +34,30 @@ public:
     void unlock() {
         if(int e = ::pthread_spin_unlock(&s_))
             throw std::system_error(e, std::system_category(), "SpinLock::unlock");
+    }
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+class SpinLockHle {
+    int lock_ = 0;
+
+#ifdef __gcc__
+    static constexpr int HLE_ACQUIRE = __ATOMIC_HLE_ACQUIRE;
+    static constexpr int HLE_RELEASE = __ATOMIC_HLE_RELEASE;
+#else
+    static constexpr int HLE_ACQUIRE = 0;
+    static constexpr int HLE_RELEASE = 0;
+#endif
+
+public:
+    void lock() {
+        for(int expected = 0; !__atomic_compare_exchange_n(&lock_, &expected, 1, false, __ATOMIC_ACQUIRE | HLE_ACQUIRE, __ATOMIC_RELAXED); expected = 0)
+            _mm_pause();
+    }
+
+    void unlock() {
+        __atomic_store_n(&lock_, 0, __ATOMIC_RELEASE | HLE_RELEASE);
     }
 };
 

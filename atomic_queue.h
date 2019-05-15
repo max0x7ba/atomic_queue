@@ -17,6 +17,7 @@ int constexpr CACHE_LINE_SIZE = 64;
 auto constexpr A = std::memory_order_acquire;
 auto constexpr R = std::memory_order_release;
 auto constexpr X = std::memory_order_relaxed;
+auto constexpr C = std::memory_order_seq_cst;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -29,11 +30,11 @@ protected:
 public:
     template<class T>
     bool try_push(T&& element) {
-        auto head = head_.load(A);
+        auto head = head_.load(X);
         do {
-            if(head - tail_.load(X) >= Derived::size)
+            if(static_cast<int>(head - tail_.load(X)) >= static_cast<int>(Derived::size))
                 return false;
-        } while(!head_.compare_exchange_strong(head, head + 1, X, X));
+        } while(!head_.compare_exchange_weak(head, head + 1, A, X));
 
         static_cast<Derived&>(*this).do_push(std::forward<T>(element), head);
         return true;
@@ -41,11 +42,11 @@ public:
 
     template<class T>
     bool try_pop(T& element) {
-        auto tail = tail_.load(A);
+        auto tail = tail_.load(X);
         do {
-            if(head_.load(X) == tail)
+            if(static_cast<int>(head_.load(X) - tail) <= 0)
                 return false;
-        } while(!tail_.compare_exchange_strong(tail, tail + 1, X, X));
+        } while(!tail_.compare_exchange_weak(tail, tail + 1, A, X));
 
         element = static_cast<Derived&>(*this).do_pop(tail);
         return true;
@@ -67,7 +68,7 @@ public:
 
 template<class T, unsigned SIZE, T NIL = T{}>
 class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL>> {
-    alignas(CACHE_LINE_SIZE) std::atomic<T> q_[SIZE] = {}; // Empty elements are NIL.
+    alignas(CACHE_LINE_SIZE) std::atomic<T> elements_[SIZE] = {}; // Empty elements are NIL.
 
     friend class AtomicQueueCommon<AtomicQueue<T, SIZE, NIL>>;
 
@@ -76,11 +77,9 @@ class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL>> {
     T do_pop(unsigned tail) {
         unsigned index = tail % SIZE;
         for(;;) {
-            T element = q_[index].load(X);
-            if(element != NIL) {
-                q_[index].store(NIL, R); // (2) Mark the element as empty.
+            T element = elements_[index].exchange(NIL, R);
+            if(element != NIL)
                 return element;
-            }
             _mm_pause();
         }
     }
@@ -88,7 +87,7 @@ class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL>> {
     void do_push(T element, unsigned head) {
         assert(element != NIL);
         unsigned index = head % SIZE;
-        for(T expected = NIL; !q_[index].compare_exchange_strong(expected, element, R, X); expected = NIL) // (1) Wait for store (2) to complete.
+        for(T expected = NIL; !elements_[index].compare_exchange_weak(expected, element, R, X); expected = NIL) // (1) Wait for store (2) to complete.
             _mm_pause();
     }
 
@@ -98,7 +97,7 @@ public:
     AtomicQueue() {
         assert(std::atomic<T>{NIL}.is_lock_free());
         if(T{} != NIL)
-            for(auto& element : q_)
+            for(auto& element : elements_)
                 element.store(NIL, X);
     }
 };
@@ -107,10 +106,14 @@ public:
 
 template<class T, unsigned SIZE>
 class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE>> {
-    using Unit = unsigned;
-    static int constexpr BITS_PER_UNIT = sizeof(Unit) * 8;
-    alignas(CACHE_LINE_SIZE) std::atomic<unsigned> e_[(SIZE + BITS_PER_UNIT - 1) / BITS_PER_UNIT] = {}; // TODO: Reduce contention on the bits.
-    alignas(CACHE_LINE_SIZE) T q_[SIZE] = {};
+    enum State : unsigned char {
+        EMPTY,
+        STORING,
+        STORED,
+        LOADING
+    };
+    std::atomic<unsigned char> states_[SIZE] = {};
+    alignas(CACHE_LINE_SIZE) T elements_[SIZE];
 
     friend class AtomicQueueCommon<AtomicQueue2<T, SIZE>>;
 
@@ -118,24 +121,29 @@ class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE>> {
 
     T do_pop(unsigned tail) {
         auto index = tail % SIZE;
-        auto e_index = index / BITS_PER_UNIT;
-        auto bit = Unit{1} << (index % BITS_PER_UNIT);
-        while(!(e_[e_index].load(std::memory_order_relaxed) & bit)) // Spin-wait for mark element occupied in (1) to complete.
+        for(;;) {
+            unsigned char expected = STORED;
+            if(states_[index].compare_exchange_weak(expected, LOADING, X, X)) {
+                T element{std::move(elements_[index])};
+                states_[index].store(EMPTY, R);
+                return element;
+            }
             _mm_pause();
-        T element{std::move(q_[index])};
-        e_[e_index].fetch_xor(bit, std::memory_order_release); // (2) Mark the element as empty.
-        return element;
+        }
     }
 
     template<class U>
     void do_push(U&& element, unsigned head) {
         auto index = head % SIZE;
-        auto e_index = index / BITS_PER_UNIT;
-        auto bit = Unit{1} << (index % BITS_PER_UNIT);
-        while(e_[e_index].load(std::memory_order_relaxed) & bit) // Spin-wait for mark element empty in (2) to complete.
+        for(;;) {
+            unsigned char expected = EMPTY;
+            if(states_[index].compare_exchange_weak(expected, STORING, X, X)) {
+                elements_[index] = std::forward<U>(element);
+                states_[index].store(STORED, R);
+                return;
+            }
             _mm_pause();
-        q_[index] = std::forward<U>(element);
-        e_[e_index].fetch_or(bit, std::memory_order_release); // (1) Mark the element as occupied.
+        }
     }
 
 public:

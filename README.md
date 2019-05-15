@@ -10,6 +10,7 @@ Available containers are:
 # Instructions
 ```
 cd atomic_queue
+make -r run_tests
 make -r run_benchmarks
 ```
 
