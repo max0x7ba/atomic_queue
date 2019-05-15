@@ -1,5 +1,5 @@
 # atomic_queue
-Multiple producer multipe consumer C++ *lock-free* queues. They contain busy loops, so they are not *wait-free*.
+Multiple producer multiple consumer C++ *lock-free* queues. They contain busy loops, so they are not *wait-free*.
 Available containers are:
 * `AtomicQueue` - a fixed size ring-buffer for atomic elements.
 * `BlockingAtomicQueue` - a faster fixed size ring-buffer for atomic elements which busy-waits when empty or full.
@@ -10,7 +10,7 @@ Available containers are:
 
 # Notes
 
-In a real-world multiple-producer-multiple-consumer scenario the ring-buffer size should be set to the maximum allowable queue size. When the buffer size is execeeded it means that the consumers cannot consume the elements fast enough, fixing which would require either of:
+In a real-world multiple-producer-multiple-consumer scenario the ring-buffer size should be set to the maximum allowable queue size. When the buffer size is exacted it means that the consumers cannot consume the elements fast enough, fixing which would require either of:
 
 * increasing the buffer size to be able to handle spikes of produced elements, or
 * increasing the number of consumers, or
@@ -21,9 +21,9 @@ All the available queues here use a ring-buffer array for storing queue elements
 Using a power-of-2 ring-buffer array size allows for a couple of important optimizations:
 
 * The writer and reader indexes get mapped into the ring-buffer array index using modulo `% SIZE` binary operator (division and modulo are some of the most expensive operations). The array size `SIZE` is fixed at the compile time, so that the compiler may be able to turn the modulo operator into an assembly block of less expensive instructions. However, a power-of-2 size turns that modulo operator into one plain `and` instruction and that is as fast as it gets.
-* The *element index within the cache line* gets swapped with the *cache line index* within the *ring-buffer array element index*, so that logically subsequent elements reside in different cache lines. This eliminates contention between producers and consumers on the ring-buffer cache lines. Instead of N producers together with M consumers competing on the same ring-buffer array cache line in the worst case, it is only one producer competing with one comsumer.
+* The *element index within the cache line* gets swapped with the *cache line index* within the *ring-buffer array element index*, so that logically subsequent elements reside in different cache lines. This eliminates contention between producers and consumers on the ring-buffer cache lines. Instead of N producers together with M consumers competing on the same ring-buffer array cache line in the worst case, it is only one producer competing with one consumer.
 
-In other words, power-of-2 ring-buffer array size yeilds top performance.
+In other words, power-of-2 ring-buffer array size yields top performance.
 
 # API
 The containers support the following APIs:
