@@ -7,7 +7,7 @@ SHELL := /bin/bash
 BUILD := release
 
 TOOLSET := gcc
-build_dir := ${BUILD}/${TOOLSET}
+build_dir := ${CURDIR}/${BUILD}/${TOOLSET}
 
 cxx.gcc := g++
 cc.gcc := gcc
@@ -62,14 +62,11 @@ COMPILE.CXX = ${CXX} -c -o $@ ${cppflags} ${cxxflags} -MD -MP $(abspath $<)
 COMPILE.S = ${CXX} -S -masm=intel -o- ${cppflags} ${cxxflags} $(abspath $<) | c++filt > $@
 PREPROCESS.CXX = ${CXX} -E -o $@ ${cppflags} ${cxxflags} $(abspath $<)
 COMPILE.C = ${CC} -c -o $@ ${cppflags} ${cflags} -MD -MP $(abspath $<)
+LINK.EXE = ${LD} -o $@ $(ldflags) $(filter-out Makefile,$^) $(ldlibs)
+LINK.SO = ${LD} -o $@ -shared $(ldflags) $(filter-out Makefile,$^) $(ldlibs)
+LINK.A = ${AR} rscT $@ $(filter-out Makefile,$^)
 
-all : benchmarks tests
-
-% : ${build_dir}/%
-	ln -sf $< $@
-
-${build_dir} :
-	mkdir -p $@
+all : ${build_dir}/benchmarks ${build_dir}/tests
 
 ${build_dir}/libatomic_queue.a : ${build_dir}/cpu_base_frequency.o
 
@@ -110,6 +107,9 @@ ${build_dir}/%.o : %.c Makefile | ${build_dir}
 
 %.I : %.cc
 	$(strip ${PREPROCESS.CXX})
+
+${build_dir} :
+	mkdir -p $@
 
 rtags : clean
 	${MAKE} -nk | rc -c -
