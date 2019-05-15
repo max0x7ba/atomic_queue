@@ -58,7 +58,7 @@ BlockingAtomicQueue2:  88,649,348 msg/sec.
          SpinlockHle:  19,616,090 msg/sec.
 ```
 
-Results on Intel Xeon Gold 6132, Red Hat Enterprise Linux Server release 6.10 (Santiago):
+Results on Intel Xeon Gold 6132, Red Hat Enterprise Linux Server release 6.10 (Santiago) (on one NUMA node):
 ```
          AtomicQueue:  11,918,525 msg/sec.
  BlockingAtomicQueue:  30,782,880 msg/sec.
@@ -81,7 +81,7 @@ BlockingAtomicQueue2: 0.000000157 sec/round-trip.
          SpinlockHle: 0.000000245 sec/round-trip.
 ```
 
-Results on Intel Xeon Gold 6132, Red Hat Enterprise Linux Server release 6.10 (Santiago):
+Results on Intel Xeon Gold 6132, Red Hat Enterprise Linux Server release 6.10 (Santiago) (on one NUMA node):
 ```
    boost::spsc_queue: 0.000000249 sec/round-trip.
          AtomicQueue: 0.000000360 sec/round-trip.
