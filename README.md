@@ -8,6 +8,14 @@ Available containers are:
 * `pthread_spinlock` - a fixed size ring-buffer for non-atomic elements, uses `pthread_spinlock_t` for locking.
 * `SpinlockHle` - a fixed size ring-buffer for non-atomic elements, uses a spinlock with Intel Hardware Lock Elision (only when compiling with gcc).
 
+# Build and run instructions
+```
+git clone git@github.com:max0x7ba/atomic_queue.git
+cd atomic_queue
+make -r -j4 run_tests
+make -r -j4 run_benchmarks
+```
+
 # Notes
 
 In a real-world multiple-producer-multiple-consumer scenario the ring-buffer size should be set to the maximum allowable queue size. When the buffer size is exacted it means that the consumers cannot consume the elements fast enough, fixing which would require either of:
@@ -33,14 +41,6 @@ The containers support the following APIs:
 * `pop` - Removes an element from the front of the queue. Busy waits when the queue is empty. Faster than `try_pop` when the queue is not empty.
 * `was_empty` - Returns `true` if the container was empty during the call. The state may have changed by the time the return value is examined.
 * `was_full` - Returns `true` if the container was full during the call. The state may have changed by the time the return value is examined.
-
-# Build and run instructions
-```
-git clone git@github.com:max0x7ba/atomic_queue.git
-cd atomic_queue
-make -r -j4 run_tests
-make -r -j4 run_benchmarks
-```
 
 # Benchmarks
 I have access to x86-64 hardware only. If you use a different architecture run tests a dozen times first and see if they pass. If they don't file an issue.
@@ -93,6 +93,6 @@ BlockingAtomicQueue2: 0.000000308 sec/round-trip.
 ```
 
 # TODO
-* CMake.
 * More benchmarks.
-* More Documentation.
+* More documentation.
+* Maybe CMake.
