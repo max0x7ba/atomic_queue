@@ -2,6 +2,7 @@
 #ifndef ATOMIC_QUEUE_ATOMIC_QUEUE_H_INCLUDED
 #define ATOMIC_QUEUE_ATOMIC_QUEUE_H_INCLUDED
 
+#include <type_traits>
 #include <cassert>
 #include <utility>
 #include <atomic>
@@ -21,6 +22,58 @@ auto constexpr C = std::memory_order_seq_cst;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+namespace details {
+
+template<unsigned N>
+struct IsPowerOf2 {
+    static bool constexpr value = !(N & (N - 1));
+};
+
+template<size_t elements_per_cache_line> struct GetCacheLineIndexBits { static int constexpr value = 0; };
+template<> struct GetCacheLineIndexBits<64> { static int constexpr value = 6; };
+template<> struct GetCacheLineIndexBits<32> { static int constexpr value = 5; };
+template<> struct GetCacheLineIndexBits<16> { static int constexpr value = 4; };
+template<> struct GetCacheLineIndexBits< 8> { static int constexpr value = 3; };
+template<> struct GetCacheLineIndexBits< 4> { static int constexpr value = 2; };
+template<> struct GetCacheLineIndexBits< 2> { static int constexpr value = 1; };
+
+template<bool minimize_contention, unsigned array_size, size_t elements_per_cache_line>
+struct GetIndexShuffleBits {
+    static int constexpr bits = GetCacheLineIndexBits<elements_per_cache_line>::value;
+    static unsigned constexpr min_size = 1u << (bits * 2);
+    static int constexpr value = array_size < min_size ? 0 : bits;
+    using type = std::integral_constant<int, value>;
+};
+
+template<unsigned array_size, size_t elements_per_cache_line>
+struct GetIndexShuffleBits<false, array_size, elements_per_cache_line> {
+    static int constexpr value = 0;
+    using type = std::integral_constant<int, value>;
+};
+
+constexpr unsigned remap_index(unsigned index, std::integral_constant<int, 0>) noexcept {
+    return index;
+}
+
+// Multiple writers/readers contend on the same cache line when storing/loading elements at
+// subsequent indexes, aka false sharing. For power of 2 ring buffer size it is possible to re-map
+// the index in such a way that each subsequent element resides on another cache line, which
+// minimizes contention. This is done by swapping the lowest order N bits (which are the index of
+// the element within the cache line) with the next N bits (which are the index of the cache line)
+// of the element index.
+template<int BITS>
+constexpr unsigned remap_index(unsigned index, std::integral_constant<int, BITS>) noexcept {
+    constexpr unsigned MASK = (1u << BITS) - 1;
+    unsigned part0 = (index >> BITS) & MASK;
+    unsigned part1 = (index & MASK) << BITS;
+    unsigned part2 = index & ~(MASK | MASK << BITS);
+    return part0 | part1 | part2;
+}
+
+} // details
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 template<class Derived>
 class AtomicQueueCommon {
 protected:
@@ -29,7 +82,7 @@ protected:
 
 public:
     template<class T>
-    bool try_push(T&& element) {
+    bool try_push(T&& element) noexcept {
         auto head = head_.load(X);
         do {
             if(static_cast<int>(head - tail_.load(X)) >= static_cast<int>(Derived::size))
@@ -41,7 +94,7 @@ public:
     }
 
     template<class T>
-    bool try_pop(T& element) {
+    bool try_pop(T& element) noexcept {
         auto tail = tail_.load(X);
         do {
             if(static_cast<int>(head_.load(X) - tail) <= 0)
@@ -53,12 +106,12 @@ public:
     }
 
     template<class T>
-    void push(T&& element) {
+    void push(T&& element) noexcept {
         auto head = head_.fetch_add(1, A);
         static_cast<Derived&>(*this).do_push(std::forward<T>(element), head);
     }
 
-    auto pop() {
+    auto pop() noexcept {
         auto tail = tail_.fetch_add(1, A);
         return static_cast<Derived&>(*this).do_pop(tail);
     }
@@ -66,16 +119,22 @@ public:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<class T, unsigned SIZE, T NIL = T{}>
+template<
+    class T,
+    unsigned SIZE,
+    T NIL = T{},
+    bool MinimizeContention = details::IsPowerOf2<SIZE>::value
+>
 class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL>> {
     alignas(CACHE_LINE_SIZE) std::atomic<T> elements_[SIZE] = {}; // Empty elements are NIL.
 
     friend class AtomicQueueCommon<AtomicQueue<T, SIZE, NIL>>;
 
     static constexpr auto size = SIZE;
+    using Remap = typename details::GetIndexShuffleBits<MinimizeContention, SIZE, CACHE_LINE_SIZE / sizeof(T)>::type;
 
-    T do_pop(unsigned tail) {
-        unsigned index = tail % SIZE;
+    T do_pop(unsigned tail) noexcept {
+        unsigned index = details::remap_index(tail % SIZE, Remap{});
         for(;;) {
             T element = elements_[index].exchange(NIL, R);
             if(element != NIL)
@@ -84,9 +143,9 @@ class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL>> {
         }
     }
 
-    void do_push(T element, unsigned head) {
+    void do_push(T element, unsigned head) noexcept {
         assert(element != NIL);
-        unsigned index = head % SIZE;
+        unsigned index = details::remap_index(head % SIZE, Remap{});
         for(T expected = NIL; !elements_[index].compare_exchange_weak(expected, element, R, X); expected = NIL) // (1) Wait for store (2) to complete.
             _mm_pause();
     }
@@ -94,7 +153,7 @@ class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL>> {
 public:
     using value_type = T;
 
-    AtomicQueue() {
+    AtomicQueue() noexcept {
         assert(std::atomic<T>{NIL}.is_lock_free());
         if(T{} != NIL)
             for(auto& element : elements_)
@@ -104,7 +163,11 @@ public:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<class T, unsigned SIZE>
+template<
+    class T,
+    unsigned SIZE,
+    bool MinimizeContention = details::IsPowerOf2<SIZE>::value
+    >
 class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE>> {
     enum State : unsigned char {
         EMPTY,
@@ -118,9 +181,10 @@ class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE>> {
     friend class AtomicQueueCommon<AtomicQueue2<T, SIZE>>;
 
     static constexpr auto size = SIZE;
+    using Remap = typename details::GetIndexShuffleBits<MinimizeContention, SIZE, CACHE_LINE_SIZE / sizeof(unsigned char)>::type;
 
-    T do_pop(unsigned tail) {
-        auto index = tail % SIZE;
+    T do_pop(unsigned tail) noexcept {
+        unsigned index = details::remap_index(tail % SIZE, Remap{});
         for(;;) {
             unsigned char expected = STORED;
             if(states_[index].compare_exchange_weak(expected, LOADING, X, X)) {
@@ -133,8 +197,8 @@ class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE>> {
     }
 
     template<class U>
-    void do_push(U&& element, unsigned head) {
-        auto index = head % SIZE;
+    void do_push(U&& element, unsigned head) noexcept {
+        unsigned index = details::remap_index(head % SIZE, Remap{});
         for(;;) {
             unsigned char expected = EMPTY;
             if(states_[index].compare_exchange_weak(expected, STORING, X, X)) {
@@ -158,12 +222,12 @@ struct RetryDecorator : Queue {
 
     using Queue::Queue;
 
-    void push(T element) {
+    void push(T element) noexcept {
         while(!this->try_push(element))
             _mm_pause();
     }
 
-    T pop() {
+    T pop() noexcept {
         T element;
         while(!this->try_pop(element))
             _mm_pause();

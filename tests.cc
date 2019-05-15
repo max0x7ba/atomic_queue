@@ -90,11 +90,11 @@ BOOST_AUTO_TEST_CASE(stress_BlockingAtomicQueue2) {
 }
 
 BOOST_AUTO_TEST_CASE(stress_pthread_spinlock) {
-    stress<RetryDecorator<AtomicQueueSpinLock<unsigned, CAPACITY>>>();
+    stress<RetryDecorator<AtomicQueueSpinlock<unsigned, CAPACITY>>>();
 }
 
-BOOST_AUTO_TEST_CASE(stress_SpinLockHle) {
-    stress<RetryDecorator<AtomicQueueSpinLockHle<unsigned, CAPACITY>>>();
+BOOST_AUTO_TEST_CASE(stress_SpinlockHle) {
+    stress<RetryDecorator<AtomicQueueSpinlockHle<unsigned, CAPACITY>>>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

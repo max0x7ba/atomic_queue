@@ -38,7 +38,7 @@ inline double to_seconds(T tsc) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-auto constexpr STOP = static_cast<uint64_t>(-1);
+auto constexpr STOP = static_cast<uint64_t>(1);
 
 template<class Queue>
 struct Stopper {
@@ -185,7 +185,7 @@ Stats consumer(Queue* queue, ::atomic_queue::Barrier* barrier) {
 
 template<class Queue>
 std::array<Stats, 2> benchmark_latency(unsigned N, unsigned producer_count, unsigned consumer_count) {
-    alignas(CACHE_LINE_SIZE) Queue queue;
+    Queue queue;
     Stopper<Queue> stop{{producer_count}, consumer_count};
 
     Barrier barrier;
@@ -230,13 +230,13 @@ void run_latency_benchmark(char const* name) {
 
 void run_latency_benchmarks() {
     std::printf("Running latency and throughput benchmarks...\n");
-    int constexpr C = 10000;
-    run_latency_benchmark<RetryDecorator<AtomicQueue<uint64_t, C>>>("AtomicQueue");
-    run_latency_benchmark<AtomicQueue<uint64_t, C>>("BlockingAtomicQueue");
-    run_latency_benchmark<RetryDecorator<AtomicQueue2<uint64_t, C>>>("AtomicQueue2");
-    run_latency_benchmark<AtomicQueue2<uint64_t, C>>("BlockingAtomicQueue2");
-    run_latency_benchmark<RetryDecorator<AtomicQueueSpinLock<uint64_t, C>>>("pthread_spinlock");
-    run_latency_benchmark<RetryDecorator<AtomicQueueSpinLockHle<uint64_t, C>>>("SpinLockHle");
+    int constexpr CAPACITY = 16384;
+    run_latency_benchmark<RetryDecorator<AtomicQueue<uint64_t, CAPACITY>>>("AtomicQueue");
+    run_latency_benchmark<AtomicQueue<uint64_t, CAPACITY>>("BlockingAtomicQueue");
+    run_latency_benchmark<RetryDecorator<AtomicQueue2<uint64_t, CAPACITY>>>("AtomicQueue2");
+    run_latency_benchmark<AtomicQueue2<uint64_t, CAPACITY>>("BlockingAtomicQueue2");
+    run_latency_benchmark<RetryDecorator<AtomicQueueSpinlock<uint64_t, CAPACITY>>>("pthread_spinlock");
+    run_latency_benchmark<RetryDecorator<AtomicQueueSpinlockHle<uint64_t, CAPACITY>>>("SpinlockHle");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -263,8 +263,7 @@ uint64_t ping_pong_thread(Barrier* barrier, Queue* q1, Queue* q2, unsigned N) {
 
 template<class Queue>
 inline std::array<uint64_t, 2> ping_pong_benchmark(unsigned N) {
-    alignas(CACHE_LINE_SIZE) Queue q1;
-    alignas(CACHE_LINE_SIZE) Queue q2;
+    Queue q1, q2;
     Barrier barrier;
     auto time1 = std::async(std::launch::async, ping_pong_thread<Queue, false>, &barrier, &q1, &q2, N);
     auto time2 = std::async(std::launch::async, ping_pong_thread<Queue,  true>, &barrier, &q1, &q2, N);
@@ -316,14 +315,19 @@ struct SpscAdapter : Queue {
 
 void run_ping_pong_benchmarks() {
     std::printf("Running ping-pong benchmarks...\n");
-    constexpr unsigned C = 4;
-    run_ping_pong_benchmark<SpscAdapter<boost::lockfree::spsc_queue<unsigned, boost::lockfree::capacity<C>>>>("boost::spsc_queue");
-    run_ping_pong_benchmark<RetryDecorator<AtomicQueue <unsigned, C>>>("AtomicQueue");
-    run_ping_pong_benchmark<AtomicQueue <unsigned, C>>("BlockingAtomicQueue");
-    run_ping_pong_benchmark<RetryDecorator<AtomicQueue2<unsigned, C>>>("AtomicQueue2");
-    run_ping_pong_benchmark<AtomicQueue2<unsigned, C>>("BlockingAtomicQueue2");
-    run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinLock<unsigned, C>>>("pthread_spinlock");
-    run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinLockHle<unsigned, C>>>("SpinLockHle");
+
+    // This benchmarks doesn't require queue capacity greater than 1, however, capacity of 1 elides
+    // some instructions completely because of (x % 1) is always 0. Use something greater than 1 to
+    // preclude aggressive optimizations.
+    constexpr unsigned CAPACITY = 8;
+
+    run_ping_pong_benchmark<SpscAdapter<boost::lockfree::spsc_queue<unsigned, boost::lockfree::capacity<CAPACITY>>>>("boost::spsc_queue");
+    run_ping_pong_benchmark<RetryDecorator<AtomicQueue <unsigned, CAPACITY>>>("AtomicQueue");
+    run_ping_pong_benchmark<AtomicQueue <unsigned, CAPACITY>>("BlockingAtomicQueue");
+    run_ping_pong_benchmark<RetryDecorator<AtomicQueue2<unsigned, CAPACITY>>>("AtomicQueue2");
+    run_ping_pong_benchmark<AtomicQueue2<unsigned, CAPACITY>>("BlockingAtomicQueue2");
+    run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinlock<unsigned, CAPACITY>>>("pthread_spinlock");
+    run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinlockHle<unsigned, CAPACITY>>>("SpinlockHle");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -334,7 +338,7 @@ void run_ping_pong_benchmarks() {
 
 int main() {
     // std::cout << "CPU base frequency is " << CPU_FREQ << "GHz.\n";
-    // run_ping_pong_benchmarks();
+
     run_latency_benchmarks();
     run_ping_pong_benchmarks();
 

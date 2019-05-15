@@ -3,7 +3,6 @@
 #define ATOMIC_QUEUE_SPIN_LOCK_H_INCLUDED
 
 #include <system_error>
-#include <mutex>
 
 #include <emmintrin.h>
 #include <pthread.h>
@@ -14,32 +13,32 @@ namespace atomic_queue {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-class SpinLock {
+class Spinlock {
     pthread_spinlock_t s_;
 public:
-    SpinLock() {
+    Spinlock() {
         if(int e = ::pthread_spin_init(&s_, 0))
-            throw std::system_error(e, std::system_category(), "SpinLock::SpinLock");
+            throw std::system_error(e, std::system_category(), "Spinlock::Spinlock");
     }
 
-    ~SpinLock() noexcept {
+    ~Spinlock() noexcept {
         ::pthread_spin_destroy(&s_);
     }
 
     void lock() {
         if(int e = ::pthread_spin_lock(&s_))
-            throw std::system_error(e, std::system_category(), "SpinLock::lock");
+            throw std::system_error(e, std::system_category(), "Spinlock::lock");
     }
 
     void unlock() {
         if(int e = ::pthread_spin_unlock(&s_))
-            throw std::system_error(e, std::system_category(), "SpinLock::unlock");
+            throw std::system_error(e, std::system_category(), "Spinlock::unlock");
     }
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-class SpinLockHle {
+class SpinlockHle {
     int lock_ = 0;
 
 #ifdef __gcc__
