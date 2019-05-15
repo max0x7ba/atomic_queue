@@ -45,12 +45,10 @@ make -r -j4 run_benchmarks
 # Benchmarks
 I have access to x86-64 hardware only. If you use a different architecture run tests a dozen times first and see if they pass. If they don't file an issue.
 
-All benchmarks report times in seconds.
-
 ## Latency and throughput benchmark
 Two producer threads post into one queue, two consumer threads drain the queue. Producer and consumer total times are measured. Producer latencies are times it takes to post one item. Consumer latencies are the time it took the item to arrive. These times include the price of rdtsc instruction.
 
-Results on Intel Core i7-7700K, Ubuntu 18.04.2 LTS (all times are in seconds):
+Results on Intel Core i7-7700K, Ubuntu 18.04.2 LTS:
 ```
          AtomicQueue:  45,693,411 msg/sec.
  BlockingAtomicQueue: 105,864,833 msg/sec.
@@ -60,7 +58,7 @@ BlockingAtomicQueue2:  88,649,348 msg/sec.
          SpinlockHle:  19,616,090 msg/sec.
 ```
 
-Results on Intel Xeon Gold 6132, Red Hat Enterprise Linux Server release 6.10 (Santiago) (all times are in seconds):
+Results on Intel Xeon Gold 6132, Red Hat Enterprise Linux Server release 6.10 (Santiago):
 ```
          AtomicQueue:  11,918,525 msg/sec.
  BlockingAtomicQueue:  30,782,880 msg/sec.
@@ -72,7 +70,7 @@ BlockingAtomicQueue2:  27,159,887 msg/sec.
 ## Ping-pong benchmark
 One thread posts an integer to another thread and waits for the reply using two queues. The benchmarks measures the total time of 1,000,000 ping-pongs, best of 10 runs. Contention is minimal here to be able to achieve and measure the lowest latency. Reports the total time and the average round-trip time. Wait-free `boost::lockfree::spsc_queue` and a pthread_spinlock-based queue are used as reference benchmarks.
 
-Results on Intel Core i7-7700K, Ubuntu 18.04.2 LTS (all times are in seconds):
+Results on Intel Core i7-7700K, Ubuntu 18.04.2 LTS:
 ```
    boost::spsc_queue: 0.000000114 sec/round-trip.
          AtomicQueue: 0.000000161 sec/round-trip.
@@ -83,7 +81,7 @@ BlockingAtomicQueue2: 0.000000157 sec/round-trip.
          SpinlockHle: 0.000000245 sec/round-trip.
 ```
 
-Results on Intel Xeon Gold 6132, Red Hat Enterprise Linux Server release 6.10 (Santiago) (all times are in seconds):
+Results on Intel Xeon Gold 6132, Red Hat Enterprise Linux Server release 6.10 (Santiago):
 ```
    boost::spsc_queue: 0.000000249 sec/round-trip.
          AtomicQueue: 0.000000360 sec/round-trip.
