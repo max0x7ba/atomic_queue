@@ -195,13 +195,13 @@ struct SpscAdapter : Queue {
 
     void push(T element) {
         while(!this->Queue::push(element))
-            _mm_pause();
+            /*_mm_pause()*/;
     }
 
     T pop() {
         T element;
         while(!this->Queue::pop(element))
-            _mm_pause();
+            /*_mm_pause()*/;
         return element;
     }
 };
