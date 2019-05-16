@@ -46,7 +46,7 @@ Using a power-of-2 ring-buffer array size allows a couple of optimizations:
 In other words, power-of-2 ring-buffer array size yields top performance.
 
 # Benchmarks
-I have access to x86-64 hardware only. If you use a different architecture run tests a dozen times first and see if they pass. If they don't file an issue.
+I have access to x86-64 hardware only. If you use a different architecture run tests and see if they pass. If they don't you may like to raise an issue.
 
 ## Throughput benchmark
 Two producer threads post into one queue, two consumer threads drain the queue. Each producer posts one million messages. Total time to send and receive the messages is measured.
