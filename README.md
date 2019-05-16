@@ -21,23 +21,6 @@ make -r -j4 run_tests
 make -r -j4 run_benchmarks
 ```
 
-# Notes
-
-In a real-world multiple-producer-multiple-consumer scenario the ring-buffer size should be set to the maximum allowable queue size. When the buffer size is exacted it means that the consumers cannot consume the elements fast enough, fixing which would require either of:
-
-* increasing the buffer size to be able to handle spikes of produced elements, or
-* increasing the number of consumers, or
-* decreasing the number of producers.
-
-All the available queues here use a ring-buffer array for storing queue elements.
-
-Using a power-of-2 ring-buffer array size allows for a couple of important optimizations:
-
-* The writer and reader indexes get mapped into the ring-buffer array index using modulo `% SIZE` binary operator (division and modulo are some of the most expensive operations). The array size `SIZE` is fixed at the compile time, so that the compiler may be able to turn the modulo operator into an assembly block of less expensive instructions. However, a power-of-2 size turns that modulo operator into one plain `and` instruction and that is as fast as it gets.
-* The *element index within the cache line* gets swapped with the *cache line index* within the *ring-buffer array element index*, so that logically subsequent elements reside in different cache lines. This eliminates contention between producers and consumers on the ring-buffer cache lines. Instead of N producers together with M consumers competing on the same ring-buffer array cache line in the worst case, it is only one producer competing with one consumer.
-
-In other words, power-of-2 ring-buffer array size yields top performance.
-
 # API
 The containers support the following APIs:
 * `try_push` - Appends an element to the end of the queue. Returns `false` when the queue is full.
@@ -47,11 +30,27 @@ The containers support the following APIs:
 * `was_empty` - Returns `true` if the container was empty during the call. The state may have changed by the time the return value is examined.
 * `was_full` - Returns `true` if the container was full during the call. The state may have changed by the time the return value is examined.
 
+# Notes
+In a real-world multiple-producer-multiple-consumer scenario the ring-buffer size should be set to the maximum allowable queue size. When the buffer size is exacted it means that the consumers cannot consume the elements fast enough, fixing which would require either of:
+
+* increasing the buffer size to be able to handle spikes of produced elements, or
+* increasing the number of consumers, or
+* decreasing the number of producers.
+
+All the available queues here use a ring-buffer array for storing queue elements.
+
+Using a power-of-2 ring-buffer array size allows a couple of optimizations:
+
+* The writer and reader indexes get mapped into the ring-buffer array index using modulo `% SIZE` binary operator and using a power-of-2 size turns that modulo operator into one plain `and` instruction and that is as fast as it gets.
+* The *element index within the cache line* gets swapped with the *cache line index* within the *ring-buffer array element index*, so that logically subsequent elements reside in different cache lines. This eliminates contention between producers and consumers on the ring-buffer cache lines. Instead of N producers together with M consumers competing on the same ring-buffer array cache line in the worst case, it is only one producer competing with one consumer.
+
+In other words, power-of-2 ring-buffer array size yields top performance.
+
 # Benchmarks
 I have access to x86-64 hardware only. If you use a different architecture run tests a dozen times first and see if they pass. If they don't file an issue.
 
-## Latency and throughput benchmark
-Two producer threads post into one queue, two consumer threads drain the queue. Producer and consumer total times are measured. Producer latencies are times it takes to post one item. Consumer latencies are the time it took the item to arrive. These times include the price of rdtsc instruction.
+## Throughput benchmark
+Two producer threads post into one queue, two consumer threads drain the queue. Each producer posts one million messages. Total time to send and receive the messages is measured.
 
 Results on Intel Core i7-7700K, Ubuntu 18.04.2 LTS:
 ```
