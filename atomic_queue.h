@@ -88,7 +88,7 @@ public:
         do {
             if(static_cast<int>(head - tail_.load(X)) >= static_cast<int>(Derived::size))
                 return false;
-        } while(!head_.compare_exchange_weak(head, head + 1, A, X));
+        } while(!head_.compare_exchange_strong(head, head + 1, A, X));
 
         static_cast<Derived&>(*this).do_push(std::forward<T>(element), head);
         return true;
@@ -100,7 +100,7 @@ public:
         do {
             if(static_cast<int>(head_.load(X) - tail) <= 0)
                 return false;
-        } while(!tail_.compare_exchange_weak(tail, tail + 1, A, X));
+        } while(!tail_.compare_exchange_strong(tail, tail + 1, A, X));
 
         element = static_cast<Derived&>(*this).do_pop(tail);
         return true;
@@ -155,7 +155,7 @@ class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL>> {
     void do_push(T element, unsigned head) noexcept {
         assert(element != NIL);
         unsigned index = details::remap_index(head % SIZE, Remap{});
-        for(T expected = NIL; !elements_[index].compare_exchange_weak(expected, element, R, X); expected = NIL) // (1) Wait for store (2) to complete.
+        for(T expected = NIL; !elements_[index].compare_exchange_strong(expected, element, R, X); expected = NIL) // (1) Wait for store (2) to complete.
             /*_mm_pause()*/;
     }
 
@@ -185,7 +185,7 @@ class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE>> {
         LOADING
     };
     std::atomic<unsigned char> states_[SIZE] = {};
-    alignas(CACHE_LINE_SIZE) T elements_[SIZE];
+    alignas(CACHE_LINE_SIZE) T elements_[SIZE] = {};
 
     friend class AtomicQueueCommon<AtomicQueue2<T, SIZE>>;
 
@@ -196,7 +196,7 @@ class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE>> {
         unsigned index = details::remap_index(tail % SIZE, Remap{});
         for(;;) {
             unsigned char expected = STORED;
-            if(states_[index].compare_exchange_weak(expected, LOADING, X, X)) {
+            if(states_[index].compare_exchange_strong(expected, LOADING, X, X)) {
                 T element{std::move(elements_[index])};
                 states_[index].store(EMPTY, R);
                 return element;
@@ -210,7 +210,7 @@ class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE>> {
         unsigned index = details::remap_index(head % SIZE, Remap{});
         for(;;) {
             unsigned char expected = EMPTY;
-            if(states_[index].compare_exchange_weak(expected, STORING, X, X)) {
+            if(states_[index].compare_exchange_strong(expected, STORING, X, X)) {
                 elements_[index] = std::forward<U>(element);
                 states_[index].store(STORED, R);
                 return;

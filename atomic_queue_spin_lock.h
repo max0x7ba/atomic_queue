@@ -37,24 +37,26 @@ public:
     template<class U>
     bool try_push(U&& element) noexcept {
         this->lock_.lock();
-        bool result = this->head_ - this->tail_ < SIZE;
-        if(result) {
+        if(this->head_ - this->tail_ < SIZE) {
             q_[this->head_ % SIZE] = std::forward<U>(element);
             ++this->head_;
+            this->lock_.unlock();
+            return true;
         }
         this->lock_.unlock();
-        return result;
+        return false;
     }
 
     bool try_pop(T& element) noexcept {
         this->lock_.lock();
-        bool result = this->head_ != this->tail_;
-        if(result) {
+        if(this->head_ != this->tail_) {
             element = std::move(q_[this->tail_ % SIZE]);
             ++this->tail_;
+            this->lock_.unlock();
+            return true;
         }
         this->lock_.unlock();
-        return result;
+        return false;
     }
 
     bool was_empty() const noexcept {
