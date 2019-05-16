@@ -75,10 +75,14 @@ struct Stopper {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<class Queue>
-void throughput_producer(unsigned N, Queue* queue, Barrier* barrier, Stopper* stopper) {
+void throughput_producer(unsigned N, Queue* queue, Barrier* barrier, Stopper* stopper, std::atomic<uint64_t>* t0) {
     unsigned const stop = N + 1;
 
     barrier->wait();
+
+    // The first producer saves the start time.
+    uint64_t expected = 0;
+    t0->compare_exchange_strong(expected, __builtin_ia32_rdtsc(), std::memory_order_acq_rel, std::memory_order_relaxed);
 
     for(unsigned n = N; n; --n)
         queue->push(n);
@@ -87,34 +91,39 @@ void throughput_producer(unsigned N, Queue* queue, Barrier* barrier, Stopper* st
 }
 
 template<class Queue>
-void throughput_consumer(unsigned N, Queue* queue, Barrier* barrier) {
+void throughput_consumer(unsigned N, Queue* queue, Barrier* barrier, std::atomic<unsigned>* last_consumer, uint64_t* t1) {
     unsigned const stop = N + 1;
 
     barrier->wait();
 
     while(stop != queue->pop())
         ;
+
+    // The last consumer saves the end time.
+    if(1 == last_consumer->fetch_sub(1, std::memory_order_acq_rel))
+        *t1 = __builtin_ia32_rdtsc();
 }
 
 template<class Queue>
 uint64_t benchmark_throughput(unsigned N, unsigned producer_count, unsigned consumer_count) {
     Queue queue;
     Stopper stopper{{producer_count}, consumer_count};
+    std::atomic<uint64_t> t0{0};
+    uint64_t t1 = 0;
+    std::atomic<unsigned> last_consumer{consumer_count};
 
     Barrier barrier;
     std::vector<std::thread> threads(producer_count + consumer_count);
     for(unsigned i = 0; i < producer_count; ++i)
-        threads[i] = std::thread(throughput_producer<Queue>, N, &queue, &barrier, &stopper);
+        threads[i] = std::thread(throughput_producer<Queue>, N, &queue, &barrier, &stopper, &t0);
     for(unsigned i = 0; i < consumer_count; ++i)
-        threads[producer_count + i] = std::thread(throughput_consumer<Queue>, N, &queue, &barrier);
+        threads[producer_count + i] = std::thread(throughput_consumer<Queue>, N, &queue, &barrier, &last_consumer, &t1);
 
-    auto t0 = __builtin_ia32_rdtsc();
     barrier.release(producer_count + consumer_count);
     for(auto& t: threads)
         t.join();
-    auto t1 = __builtin_ia32_rdtsc();
 
-    return t1 - t0;
+    return t1 - t0.load(std::memory_order_relaxed);
 }
 
 template<class Queue>
