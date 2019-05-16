@@ -13,23 +13,14 @@ namespace atomic_queue {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Put the members into different cache lines, so that writers dont't contend with reader for head_/tail_.
-struct AtomicQueueSpinlockBase {
-    alignas(CACHE_LINE_SIZE) Spinlock lock_;
-    alignas(CACHE_LINE_SIZE) unsigned head_ = 0;
-    alignas(CACHE_LINE_SIZE) unsigned tail_ = 0;
-};
-
-// Intel Hardware Lock Elision favours minimum cache line number usage, hence, put all of these members into the same cache line.
-struct AtomicQueueSpinlockHleBase {
-    SpinlockHle lock_;
+template<class T, unsigned SIZE, bool MinimizeContention, class Spinlock>
+class AtomicQueueSpinlock_ {
+    Spinlock lock_;
     unsigned head_ = 0;
     unsigned tail_ = 0;
-};
-
-template<class T, unsigned SIZE, class Base>
-class AtomicQueueSpinlock_ : Base {
     alignas(CACHE_LINE_SIZE) T q_[SIZE] = {};
+
+    using Remap = typename details::GetIndexShuffleBits<MinimizeContention, SIZE, CACHE_LINE_SIZE / sizeof(T)>::type;
 
 public:
     using value_type = T;
@@ -38,7 +29,7 @@ public:
     bool try_push(U&& element) noexcept {
         this->lock_.lock();
         if(this->head_ - this->tail_ < SIZE) {
-            q_[this->head_ % SIZE] = std::forward<U>(element);
+            q_[details::remap_index(this->head_ % SIZE, Remap{})] = std::forward<U>(element);
             ++this->head_;
             this->lock_.unlock();
             return true;
@@ -50,7 +41,7 @@ public:
     bool try_pop(T& element) noexcept {
         this->lock_.lock();
         if(this->head_ != this->tail_) {
-            element = std::move(q_[this->tail_ % SIZE]);
+            element = std::move(q_[details::remap_index(this->tail_ % SIZE, Remap{})]);
             ++this->tail_;
             this->lock_.unlock();
             return true;
@@ -68,11 +59,11 @@ public:
     }
 };
 
-template<class T, unsigned SIZE>
-using AtomicQueueSpinlock = AtomicQueueSpinlock_<T, SIZE, AtomicQueueSpinlockBase>;
+template<class T, unsigned SIZE, bool MinimizeContention = details::IsPowerOf2<SIZE>::value>
+using AtomicQueueSpinlock = AtomicQueueSpinlock_<T, SIZE, MinimizeContention, Spinlock>;
 
-template<class T, unsigned SIZE>
-using AtomicQueueSpinlockHle = AtomicQueueSpinlock_<T, SIZE, AtomicQueueSpinlockHleBase>;
+template<class T, unsigned SIZE, bool MinimizeContention = details::IsPowerOf2<SIZE>::value>
+using AtomicQueueSpinlockHle = AtomicQueueSpinlock_<T, SIZE, MinimizeContention, SpinlockHle>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
