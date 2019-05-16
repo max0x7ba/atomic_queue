@@ -2,7 +2,7 @@
 #ifndef ATOMIC_QUEUE_SPIN_LOCK_H_INCLUDED
 #define ATOMIC_QUEUE_SPIN_LOCK_H_INCLUDED
 
-#include <system_error>
+#include <cstdlib>
 
 // #include <emmintrin.h>
 #include <pthread.h>
@@ -16,23 +16,23 @@ namespace atomic_queue {
 class Spinlock {
     pthread_spinlock_t s_;
 public:
-    Spinlock() {
-        if(int e = ::pthread_spin_init(&s_, 0))
-            throw std::system_error(e, std::system_category(), "Spinlock::Spinlock");
+    Spinlock() noexcept {
+        if(::pthread_spin_init(&s_, 0))
+            std::abort();
     }
 
     ~Spinlock() noexcept {
         ::pthread_spin_destroy(&s_);
     }
 
-    void lock() {
-        if(int e = ::pthread_spin_lock(&s_))
-            throw std::system_error(e, std::system_category(), "Spinlock::lock");
+    void lock() noexcept {
+        if(::pthread_spin_lock(&s_))
+            std::abort();
     }
 
-    void unlock() {
-        if(int e = ::pthread_spin_unlock(&s_))
-            throw std::system_error(e, std::system_category(), "Spinlock::unlock");
+    void unlock() noexcept {
+        if(::pthread_spin_unlock(&s_))
+            std::abort();
     }
 };
 
@@ -50,12 +50,12 @@ class SpinlockHle {
 #endif
 
 public:
-    void lock() {
+    void lock() noexcept {
         for(int expected = 0; !__atomic_compare_exchange_n(&lock_, &expected, 1, false, __ATOMIC_ACQUIRE | HLE_ACQUIRE, __ATOMIC_RELAXED); expected = 0)
             /*_mm_pause()*/;
     }
 
-    void unlock() {
+    void unlock() noexcept {
         __atomic_store_n(&lock_, 0, __ATOMIC_RELEASE | HLE_RELEASE);
     }
 };

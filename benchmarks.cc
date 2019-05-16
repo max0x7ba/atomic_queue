@@ -5,6 +5,7 @@
 #include "barrier.h"
 
 #include <boost/lockfree/spsc_queue.hpp>
+#include <boost/lockfree/queue.hpp>
 
 #include <algorithm>
 #include <stdexcept>
@@ -16,6 +17,8 @@
 #include <limits>
 #include <vector>
 
+#include <emmintrin.h>
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 using std::uint64_t;
@@ -26,21 +29,33 @@ namespace {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<class InputIt, class T, class BinaryOp, class UnaryOp>
-T transform_reduce(InputIt first, InputIt last, T init, BinaryOp binary_op, UnaryOp unary_op) {
-    for(; first != last; ++first)
-        init = binary_op(init, unary_op(*first));
-    return init;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 double const CPU_FREQ = cpu_base_frequency();
 
 template<class T>
 inline double to_seconds(T tsc) {
     return tsc / CPU_FREQ * 1e-9;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+template<class Queue>
+struct BoostAdapter : Queue {
+    using T = typename Queue::value_type;
+
+    using Queue::Queue;
+
+    void push(T element) {
+        while(!this->Queue::push(element))
+            _mm_pause();
+    }
+
+    T pop() {
+        T element;
+        while(!this->Queue::pop(element))
+            _mm_pause();
+        return element;
+    }
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -60,7 +75,7 @@ struct Stopper {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<class Queue>
-void producer(unsigned N, Queue* queue, Barrier* barrier, Stopper* stopper) {
+void throughput_producer(unsigned N, Queue* queue, Barrier* barrier, Stopper* stopper) {
     unsigned const stop = N + 1;
 
     barrier->wait();
@@ -72,7 +87,7 @@ void producer(unsigned N, Queue* queue, Barrier* barrier, Stopper* stopper) {
 }
 
 template<class Queue>
-void consumer(unsigned N, Queue* queue, Barrier* barrier) {
+void throughput_consumer(unsigned N, Queue* queue, Barrier* barrier) {
     unsigned const stop = N + 1;
 
     barrier->wait();
@@ -89,9 +104,9 @@ uint64_t benchmark_throughput(unsigned N, unsigned producer_count, unsigned cons
     Barrier barrier;
     std::vector<std::thread> threads(producer_count + consumer_count);
     for(unsigned i = 0; i < producer_count; ++i)
-        threads[i] = std::thread(producer<Queue>, N, &queue, &barrier, &stopper);
+        threads[i] = std::thread(throughput_producer<Queue>, N, &queue, &barrier, &stopper);
     for(unsigned i = 0; i < consumer_count; ++i)
-        threads[producer_count + i] = std::thread(consumer<Queue>, N, &queue, &barrier);
+        threads[producer_count + i] = std::thread(throughput_consumer<Queue>, N, &queue, &barrier);
 
     auto t0 = __builtin_ia32_rdtsc();
     barrier.release(producer_count + consumer_count);
@@ -117,20 +132,23 @@ void run_throughput_benchmark(char const* name) {
 
     double min_seconds = to_seconds(min_time);
     unsigned msg_per_sec = N * PRODUCERS / min_seconds;
-    std::printf("%20s: %'11u msg/sec\n", name, msg_per_sec);
+    std::printf("%28s: %'11u msg/sec\n", name, msg_per_sec);
 }
 
 void run_throughput_benchmarks() {
-    std::printf("---- Running throughput and throughput benchmarks (higher is better) ----\n");
+    std::printf("---- Running throughput benchmarks (higher is better) ----\n");
 
     int constexpr CAPACITY = 65536;
 
-    run_throughput_benchmark<RetryDecorator<AtomicQueue<uint64_t, CAPACITY>>>("AtomicQueue");
-    run_throughput_benchmark<AtomicQueue<uint64_t, CAPACITY>>("BlockingAtomicQueue");
-    run_throughput_benchmark<RetryDecorator<AtomicQueue2<uint64_t, CAPACITY>>>("AtomicQueue2");
-    run_throughput_benchmark<AtomicQueue2<uint64_t, CAPACITY>>("BlockingAtomicQueue2");
-    run_throughput_benchmark<RetryDecorator<AtomicQueueSpinlock<uint64_t, CAPACITY>>>("pthread_spinlock");
-    run_throughput_benchmark<RetryDecorator<AtomicQueueSpinlockHle<uint64_t, CAPACITY>>>("SpinlockHle");
+    run_throughput_benchmark<BoostAdapter<boost::lockfree::queue<unsigned, boost::lockfree::capacity<CAPACITY - 2>>>>("boost::lockfree::queue");
+    run_throughput_benchmark<RetryDecorator<AtomicQueueSpinlock<unsigned, CAPACITY>>>("pthread_spinlock");
+
+    run_throughput_benchmark<RetryDecorator<AtomicQueue<unsigned, CAPACITY>>>("AtomicQueue");
+    run_throughput_benchmark<AtomicQueue<unsigned, CAPACITY>>("BlockingAtomicQueue");
+    run_throughput_benchmark<RetryDecorator<AtomicQueue2<unsigned, CAPACITY>>>("AtomicQueue2");
+    run_throughput_benchmark<AtomicQueue2<unsigned, CAPACITY>>("BlockingAtomicQueue2");
+
+    // run_throughput_benchmark<RetryDecorator<AtomicQueueSpinlockHle<unsigned, CAPACITY>>>("SpinlockHle");
 
     std::printf("\n");
 }
@@ -169,7 +187,7 @@ inline std::array<uint64_t, 2> ping_pong_benchmark(unsigned N) {
 
 template<class Queue>
 void run_ping_pong_benchmark(char const* name) {
-    int constexpr N = 1000000;
+    int constexpr N = 100000;
     int constexpr RUNS = 10;
 
     // Select the best of RUNS runs.
@@ -182,29 +200,8 @@ void run_ping_pong_benchmark(char const* name) {
 
     auto avg_time = (best_times[0] + best_times[1]) / (2 * 1e9 * CPU_FREQ);
     auto round_trip_time = avg_time / N;
-    std::printf("%20s: %.9f sec/round-trip\n", name, round_trip_time);
+    std::printf("%28s: %.9f sec/round-trip\n", name, round_trip_time);
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-template<class Queue>
-struct SpscAdapter : Queue {
-    using T = typename Queue::value_type;
-
-    using Queue::Queue;
-
-    void push(T element) {
-        while(!this->Queue::push(element))
-            /*_mm_pause()*/;
-    }
-
-    T pop() {
-        T element;
-        while(!this->Queue::pop(element))
-            /*_mm_pause()*/;
-        return element;
-    }
-};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -216,13 +213,16 @@ void run_ping_pong_benchmarks() {
     // preclude aggressive optimizations.
     constexpr unsigned CAPACITY = 8;
 
-    run_ping_pong_benchmark<SpscAdapter<boost::lockfree::spsc_queue<unsigned, boost::lockfree::capacity<CAPACITY>>>>("boost::spsc_queue");
+    run_ping_pong_benchmark<BoostAdapter<boost::lockfree::spsc_queue<unsigned, boost::lockfree::capacity<CAPACITY>>>>("boost::lockfree::spsc_queue");
+    run_ping_pong_benchmark<BoostAdapter<boost::lockfree::queue<unsigned, boost::lockfree::capacity<CAPACITY>>>>("boost::lockfree::queue");
+    run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinlock<unsigned, CAPACITY>>>("pthread_spinlock");
+
     run_ping_pong_benchmark<RetryDecorator<AtomicQueue <unsigned, CAPACITY>>>("AtomicQueue");
     run_ping_pong_benchmark<AtomicQueue <unsigned, CAPACITY>>("BlockingAtomicQueue");
     run_ping_pong_benchmark<RetryDecorator<AtomicQueue2<unsigned, CAPACITY>>>("AtomicQueue2");
     run_ping_pong_benchmark<AtomicQueue2<unsigned, CAPACITY>>("BlockingAtomicQueue2");
-    run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinlock<unsigned, CAPACITY>>>("pthread_spinlock");
-    run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinlockHle<unsigned, CAPACITY>>>("SpinlockHle");
+
+    // run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinlockHle<unsigned, CAPACITY>>>("SpinlockHle");
 
     std::printf("\n");
 }
@@ -235,7 +235,6 @@ void run_ping_pong_benchmarks() {
 
 int main() {
     std::setlocale(LC_NUMERIC, "");
-    // std::cout << "CPU base frequency is " << CPU_FREQ << "GHz.\n";
 
     run_throughput_benchmarks();
     run_ping_pong_benchmarks();
