@@ -46,53 +46,51 @@ Using a power-of-2 ring-buffer array size allows a couple of optimizations:
 In other words, power-of-2 ring-buffer array size yields top performance.
 
 # Benchmarks
-I have access to x86-64 hardware only. If you use a different architecture run tests and see if they pass. If they don't you may like to raise an issue.
+I have access to x86-64 hardware only. If you use a different architecture you may like to run tests a few times first and make sure that they pass. If they don't you may like to raise an issue.
 
 ## Throughput benchmark
 Two producer threads post into one queue, two consumer threads drain the queue. Each producer posts one million messages. Total time to send and receive the messages is measured.
 
 Results on Intel Core i7-7700K, Ubuntu 18.04.2 LTS:
 ```
-         AtomicQueue:  15,412,546 msg/sec
- BlockingAtomicQueue:  48,855,955 msg/sec
-        AtomicQueue2:  14,992,677 msg/sec
-BlockingAtomicQueue2:  37,112,587 msg/sec
-    pthread_spinlock:  24,177,214 msg/sec
-         SpinlockHle:   8,952,720 msg/sec
+      boost::lockfree::queue:   7,711,548 msg/sec
+            pthread_spinlock:  15,790,499 msg/sec
+                 AtomicQueue:  15,412,546 msg/sec
+         BlockingAtomicQueue:  48,855,955 msg/sec
+                AtomicQueue2:  14,992,677 msg/sec
+        BlockingAtomicQueue2:  37,112,587 msg/sec
 ```
 
 Results on Intel Xeon Gold 6132, Red Hat Enterprise Linux Server release 6.10 (Santiago) (on one NUMA node):
 ```
-         AtomicQueue:   5,367,912 msg/sec
- BlockingAtomicQueue:  20,940,375 msg/sec
-        AtomicQueue2:   5,885,886 msg/sec
-BlockingAtomicQueue2:  14,483,390 msg/sec
-    pthread_spinlock:   5,295,343 msg/sec
-         SpinlockHle:   2,761,216 msg/sec
+            pthread_spinlock:   5,295,343 msg/sec
+                 AtomicQueue:   5,367,912 msg/sec
+         BlockingAtomicQueue:  20,940,375 msg/sec
+                AtomicQueue2:   5,885,886 msg/sec
+        BlockingAtomicQueue2:  14,483,390 msg/sec
 ```
 ## Ping-pong benchmark
-One thread posts an integer to another thread and waits for the reply using two queues. The benchmarks measures the total time of 1,000,000 ping-pongs, best of 10 runs. Contention is minimal here to be able to achieve and measure the lowest latency. Reports the total time and the average round-trip time. Wait-free `boost::lockfree::spsc_queue` and a pthread_spinlock-based queue are used as reference benchmarks.
+One thread posts an integer to another thread and waits for the reply using two queues. The benchmarks measures the total time of 100,000 ping-pongs, best of 10 runs. Contention is minimal here to be able to achieve and measure the lowest latency. Reports the average round-trip time.
 
 Results on Intel Core i7-7700K, Ubuntu 18.04.2 LTS:
 ```
-   boost::spsc_queue: 0.000000119 sec/round-trip
-         AtomicQueue: 0.000000146 sec/round-trip
- BlockingAtomicQueue: 0.000000090 sec/round-trip
-        AtomicQueue2: 0.000000174 sec/round-trip
-BlockingAtomicQueue2: 0.000000145 sec/round-trip
-    pthread_spinlock: 0.000000272 sec/round-trip
-         SpinlockHle: 0.000000187 sec/round-trip
+ boost::lockfree::spsc_queue: 0.000000117 sec/round-trip
+      boost::lockfree::queue: 0.000000253 sec/round-trip
+            pthread_spinlock: 0.000000272 sec/round-trip
+                 AtomicQueue: 0.000000146 sec/round-trip
+         BlockingAtomicQueue: 0.000000090 sec/round-trip
+                AtomicQueue2: 0.000000174 sec/round-trip
+        BlockingAtomicQueue2: 0.000000145 sec/round-trip
 ```
 
 Results on Intel Xeon Gold 6132, Red Hat Enterprise Linux Server release 6.10 (Santiago) (on one NUMA node):
 ```
-   boost::spsc_queue: 0.000000249 sec/round-trip.
-         AtomicQueue: 0.000000354 sec/round-trip.
- BlockingAtomicQueue: 0.000000216 sec/round-trip.
-        AtomicQueue2: 0.000000421 sec/round-trip.
-BlockingAtomicQueue2: 0.000000308 sec/round-trip.
-    pthread_spinlock: 0.000000723 sec/round-trip.
-         SpinlockHle: 0.000000266 sec/round-trip.
+            boost::spsc_queue: 0.000000249 sec/round-trip.
+             pthread_spinlock: 0.000000723 sec/round-trip.
+                  AtomicQueue: 0.000000354 sec/round-trip.
+          BlockingAtomicQueue: 0.000000216 sec/round-trip.
+                 AtomicQueue2: 0.000000421 sec/round-trip.
+         BlockingAtomicQueue2: 0.000000308 sec/round-trip.
 ```
 
 ## Scalability benchmark
