@@ -63,6 +63,7 @@ Results on Intel Core i7-7700K, Ubuntu 18.04.2 LTS:
 
 Results on Intel Xeon Gold 6132, Red Hat Enterprise Linux Server release 6.10 (Santiago) (on one NUMA node):
 ```
+      boost::lockfree::queue:   2,504,207 msg/sec
             pthread_spinlock:   5,295,343 msg/sec
                  AtomicQueue:   5,367,912 msg/sec
          BlockingAtomicQueue:  20,940,375 msg/sec
@@ -85,12 +86,13 @@ Results on Intel Core i7-7700K, Ubuntu 18.04.2 LTS:
 
 Results on Intel Xeon Gold 6132, Red Hat Enterprise Linux Server release 6.10 (Santiago) (on one NUMA node):
 ```
-            boost::spsc_queue: 0.000000249 sec/round-trip.
-             pthread_spinlock: 0.000000723 sec/round-trip.
-                  AtomicQueue: 0.000000354 sec/round-trip.
-          BlockingAtomicQueue: 0.000000216 sec/round-trip.
-                 AtomicQueue2: 0.000000421 sec/round-trip.
-         BlockingAtomicQueue2: 0.000000308 sec/round-trip.
+           boost::spsc_queue: 0.000000249 sec/round-trip.
+      boost::lockfree::queue: 0.000000708 sec/round-trip
+            pthread_spinlock: 0.000000723 sec/round-trip.
+                 AtomicQueue: 0.000000354 sec/round-trip.
+         BlockingAtomicQueue: 0.000000216 sec/round-trip.
+                AtomicQueue2: 0.000000421 sec/round-trip.
+        BlockingAtomicQueue2: 0.000000308 sec/round-trip.
 ```
 
 ## Scalability benchmark
@@ -98,40 +100,33 @@ This benchmark starts N producers and N consumers. The total throughput in msg/s
 Results on Intel Xeon Gold 6132, Red Hat Enterprise Linux Server release 6.10 (Santiago) (on one NUMA node):
 ```
 ---- Running throughput and throughput benchmarks (higher is better) ----
-         AtomicQueue, 1 producers:   7,553,638 msg/sec
-         AtomicQueue, 2 producers:   4,945,975 msg/sec
-         AtomicQueue, 3 producers:   3,857,356 msg/sec
-         AtomicQueue, 4 producers:   3,100,753 msg/sec
-         AtomicQueue, 5 producers:   2,758,586 msg/sec
-         AtomicQueue, 6 producers:   2,319,908 msg/sec
- BlockingAtomicQueue, 1 producers:  53,954,367 msg/sec
- BlockingAtomicQueue, 2 producers:  12,375,789 msg/sec
- BlockingAtomicQueue, 3 producers:  14,403,819 msg/sec
- BlockingAtomicQueue, 4 producers:  16,636,900 msg/sec
- BlockingAtomicQueue, 5 producers:  22,108,188 msg/sec
- BlockingAtomicQueue, 6 producers:  22,080,866 msg/sec
-        AtomicQueue2, 1 producers:   7,911,739 msg/sec
-        AtomicQueue2, 2 producers:   4,927,648 msg/sec
-        AtomicQueue2, 3 producers:   3,534,156 msg/sec
-        AtomicQueue2, 4 producers:   2,966,052 msg/sec
-        AtomicQueue2, 5 producers:   2,704,933 msg/sec
-        AtomicQueue2, 6 producers:   2,346,440 msg/sec
-BlockingAtomicQueue2, 1 producers:  10,505,730 msg/sec
-BlockingAtomicQueue2, 2 producers:  10,190,579 msg/sec
-BlockingAtomicQueue2, 3 producers:  13,050,528 msg/sec
-BlockingAtomicQueue2, 4 producers:  17,095,960 msg/sec
-BlockingAtomicQueue2, 5 producers:  20,831,507 msg/sec
-BlockingAtomicQueue2, 6 producers:  19,963,530 msg/sec
-    pthread_spinlock, 1 producers:   7,730,726 msg/sec
-    pthread_spinlock, 2 producers:   3,166,042 msg/sec
-    pthread_spinlock, 3 producers:   1,663,267 msg/sec
-    pthread_spinlock, 4 producers:   1,142,015 msg/sec
-    pthread_spinlock, 5 producers:   1,724,822 msg/sec
-    pthread_spinlock, 6 producers:   1,030,979 msg/sec
-         SpinlockHle, 1 producers:   7,448,553 msg/sec
-         SpinlockHle, 2 producers:   2,214,847 msg/sec
-         SpinlockHle, 3 producers:   1,534,624 msg/sec
-         SpinlockHle, 4 producers:     848,513 msg/sec
-         SpinlockHle, 5 producers:     636,505 msg/sec
-         SpinlockHle, 6 producers:     483,595 msg/sec
-```
+      boost::lockfree::queue, 2 producers:   2,287,130 msg/sec
+      boost::lockfree::queue, 3 producers:   2,302,414 msg/sec
+      boost::lockfree::queue, 4 producers:   1,744,023 msg/sec
+      boost::lockfree::queue, 5 producers:   1,534,171 msg/sec
+      boost::lockfree::queue, 6 producers:   1,781,191 msg/sec
+            pthread_spinlock, 2 producers:   4,590,751 msg/sec
+            pthread_spinlock, 3 producers:   3,436,103 msg/sec
+            pthread_spinlock, 4 producers:   2,500,333 msg/sec
+            pthread_spinlock, 5 producers:   1,871,897 msg/sec
+            pthread_spinlock, 6 producers:   2,087,420 msg/sec
+                 AtomicQueue, 2 producers:   4,846,906 msg/sec
+                 AtomicQueue, 3 producers:   4,158,126 msg/sec
+                 AtomicQueue, 4 producers:   2,836,063 msg/sec
+                 AtomicQueue, 5 producers:   2,427,541 msg/sec
+                 AtomicQueue, 6 producers:   2,268,458 msg/sec
+         BlockingAtomicQueue, 2 producers:  13,163,192 msg/sec
+         BlockingAtomicQueue, 3 producers:  14,974,197 msg/sec
+         BlockingAtomicQueue, 4 producers:  20,585,013 msg/sec
+         BlockingAtomicQueue, 5 producers:  21,295,096 msg/sec
+         BlockingAtomicQueue, 6 producers:  21,362,910 msg/sec
+                AtomicQueue2, 2 producers:   4,634,256 msg/sec
+                AtomicQueue2, 3 producers:   3,208,438 msg/sec
+                AtomicQueue2, 4 producers:   3,025,483 msg/sec
+                AtomicQueue2, 5 producers:   2,486,477 msg/sec
+                AtomicQueue2, 6 producers:   2,606,209 msg/sec
+        BlockingAtomicQueue2, 2 producers:   8,328,188 msg/sec
+        BlockingAtomicQueue2, 3 producers:  11,387,004 msg/sec
+        BlockingAtomicQueue2, 4 producers:  17,074,897 msg/sec
+        BlockingAtomicQueue2, 5 producers:  14,688,902 msg/sec
+        BlockingAtomicQueue2, 6 producers:  19,876,903 msg/sec
