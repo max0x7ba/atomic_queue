@@ -30,18 +30,18 @@ The containers support the following APIs:
 * `was_full` - Returns `true` if the container was full during the call. The state may have changed by the time the return value is examined.
 
 # Notes
-In a real-world multiple-producer-multiple-consumer scenario the ring-buffer size should be set to the maximum allowable queue size. When the buffer size is exacted it means that the consumers cannot consume the elements fast enough, fixing which would require either of:
+The available queues here use a ring-buffer array for storing elements. The size of the queue is fixed at compile time.
 
-* increasing the buffer size to be able to handle spikes of produced elements, or
-* increasing the number of consumers, or
-* decreasing the number of producers.
+In a real-world multiple-producer-multiple-consumer scenario the ring-buffer size should be set to the maximum allowable queue size. When the buffer size is exhausted it means that the consumers cannot consume the elements fast enough, fixing which would require either of:
 
-All the available queues here use a ring-buffer array for storing queue elements.
+* increasing the buffer size to be able to handle temporary spikes of produced elements, or
+* increasing the number of consumers to consume elements faster, or
+* decreasing the number of producers to producer fewer elements.
 
 Using a power-of-2 ring-buffer array size allows a couple of optimizations:
 
 * The writer and reader indexes get mapped into the ring-buffer array index using modulo `% SIZE` binary operator and using a power-of-2 size turns that modulo operator into one plain `and` instruction and that is as fast as it gets.
-* The *element index within the cache line* gets swapped with the *cache line index* within the *ring-buffer array element index*, so that logically subsequent elements reside in different cache lines. This eliminates contention between producers and consumers on the ring-buffer cache lines. Instead of N producers together with M consumers competing on the same ring-buffer array cache line in the worst case, it is only one producer competing with one consumer.
+* The *element index within the cache line* gets swapped with the *cache line index* within the *ring-buffer array element index*, so that subsequent queue elements actually reside in different cache lines. This eliminates contention between producers and consumers on the ring-buffer cache lines. Instead of N producers together with M consumers competing on the same ring-buffer array cache line in the worst case, it is only one producer competing with one consumer.
 
 In other words, power-of-2 ring-buffer array size yields top performance.
 
