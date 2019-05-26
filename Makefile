@@ -36,7 +36,7 @@ AR := ${ar.${TOOLSET}}
 
 cxxflags.gcc.debug := -Og -fstack-protector-all -fno-omit-frame-pointer # -D_GLIBCXX_DEBUG
 cxxflags.gcc.release := -O3 -mtune=native -ffast-math -falign-{functions,loops}=32 -DNDEBUG
-cxxflags.gcc := -pthread -march=native -std=gnu++14 -W{all,extra,error} -g -fmessage-length=0 ${cxxflags.gcc.${BUILD}}
+cxxflags.gcc := -pthread -march=native -std=gnu++14 -W{all,extra,error,no-maybe-uninitialized} -g -fmessage-length=0 ${cxxflags.gcc.${BUILD}}
 cxxflags.gcc-8 := ${cxxflags.gcc}
 
 cflags.gcc := -pthread -march=native -W{all,extra} -g -fmessage-length=0 ${cxxflags.gcc.${BUILD}}
@@ -58,6 +58,9 @@ cppflags := ${CPPFLAGS}
 ldflags := -fuse-ld=gold -pthread -g ${ldflags.${BUILD}} ${ldflags.${TOOLSET}} ${LDFLAGS}
 ldlibs := -lrt ${LDLIBS}
 
+cppflags.tbb :=
+ldlibs.tbb := /usr/local/lib/libtbb.so
+
 COMPILE.CXX = ${CXX} -o $@ -c ${cppflags} ${cxxflags} -MD -MP $(abspath $<)
 COMPILE.S = ${CXX} -o- -S -masm=intel ${cppflags} ${cxxflags} $(abspath $<) | c++filt > $@
 PREPROCESS.CXX = ${CXX} -o $@ -E ${cppflags} ${cxxflags} $(abspath $<)
@@ -75,6 +78,8 @@ ${exes} : % : ${build_dir}/%
 
 ${build_dir}/libatomic_queue.a : ${build_dir}/cpu_base_frequency.o
 
+${build_dir}/benchmarks : cppflags += ${cppflags.tbb}
+${build_dir}/benchmarks : ldlibs += ${ldlibs.tbb}
 ${build_dir}/benchmarks : ${build_dir}/libatomic_queue.a
 ${build_dir}/benchmarks : ${build_dir}/benchmarks.o Makefile | ${build_dir}
 	$(strip ${LINK.EXE})
@@ -117,7 +122,7 @@ ${build_dir} :
 	mkdir -p $@
 
 rtags : clean
-	${MAKE} -nk | rc -c -
+	${MAKE} -nk | rc -c -; true
 
 clean :
 	rm -rf ${build_dir}

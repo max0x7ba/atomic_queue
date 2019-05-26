@@ -7,6 +7,8 @@
 #include <boost/lockfree/spsc_queue.hpp>
 #include <boost/lockfree/queue.hpp>
 
+#include <tbb/concurrent_queue.h>
+
 #include <algorithm>
 #include <stdexcept>
 #include <clocale>
@@ -46,13 +48,30 @@ struct BoostAdapter : Queue {
 
     void push(T element) {
         while(!this->Queue::push(element))
-            _mm_pause();
+            /*_mm_pause()*/;
     }
 
     T pop() {
         T element;
         while(!this->Queue::pop(element))
-            _mm_pause();
+            /*_mm_pause()*/;
+        return element;
+    }
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+template<class Queue, size_t Capacity>
+struct TbbAdapter : Queue {
+    using T = typename Queue::value_type;
+
+    TbbAdapter() {
+        this->set_capacity(Capacity);
+    }
+
+    T pop() {
+        T element;
+        this->Queue::pop(element);
         return element;
     }
 };
@@ -141,7 +160,7 @@ void run_throughput_benchmark(char const* name) {
 
     double min_seconds = to_seconds(min_time);
     unsigned msg_per_sec = N * PRODUCERS / min_seconds;
-    std::printf("%28s: %'11u msg/sec\n", name, msg_per_sec);
+    std::printf("%30s: %'11u msg/sec\n", name, msg_per_sec);
 }
 
 void run_throughput_benchmarks() {
@@ -150,6 +169,7 @@ void run_throughput_benchmarks() {
     int constexpr CAPACITY = 65536;
 
     run_throughput_benchmark<BoostAdapter<boost::lockfree::queue<unsigned, boost::lockfree::capacity<CAPACITY - 2>>>>("boost::lockfree::queue");
+    run_throughput_benchmark<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, CAPACITY>>("tbb::concurrent_bounded_queue");
     run_throughput_benchmark<RetryDecorator<AtomicQueueSpinlock<unsigned, CAPACITY>>>("pthread_spinlock");
 
     run_throughput_benchmark<RetryDecorator<AtomicQueue<unsigned, CAPACITY>>>("AtomicQueue");
@@ -209,7 +229,7 @@ void run_ping_pong_benchmark(char const* name) {
 
     auto avg_time = (best_times[0] + best_times[1]) / (2 * 1e9 * CPU_FREQ);
     auto round_trip_time = avg_time / N;
-    std::printf("%28s: %.9f sec/round-trip\n", name, round_trip_time);
+    std::printf("%30s: %.9f sec/round-trip\n", name, round_trip_time);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -225,6 +245,7 @@ void run_ping_pong_benchmarks() {
     run_ping_pong_benchmark<BoostAdapter<boost::lockfree::spsc_queue<unsigned, boost::lockfree::capacity<CAPACITY>>>>("boost::lockfree::spsc_queue");
     run_ping_pong_benchmark<BoostAdapter<boost::lockfree::queue<unsigned, boost::lockfree::capacity<CAPACITY>>>>("boost::lockfree::queue");
     run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinlock<unsigned, CAPACITY>>>("pthread_spinlock");
+    run_ping_pong_benchmark<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, CAPACITY>>("tbb::concurrent_bounded_queue");
 
     run_ping_pong_benchmark<RetryDecorator<AtomicQueue <unsigned, CAPACITY>>>("AtomicQueue");
     run_ping_pong_benchmark<AtomicQueue <unsigned, CAPACITY>>("BlockingAtomicQueue");
