@@ -53,12 +53,13 @@ Two producer threads post into one queue, two consumer threads drain the queue. 
 
 Results on Intel Core i7-7700K, Ubuntu 18.04.2 LTS:
 ```
-      boost::lockfree::queue:   7,711,548 msg/sec
-            pthread_spinlock:  15,790,499 msg/sec
-                 AtomicQueue:  15,412,546 msg/sec
-         BlockingAtomicQueue:  48,855,955 msg/sec
-                AtomicQueue2:  14,992,677 msg/sec
-        BlockingAtomicQueue2:  37,112,587 msg/sec
+        boost::lockfree::queue:   9,111,702 msg/sec (mean:   8,319,644 stdev:     498,734) msg/sec
+ tbb::concurrent_bounded_queue:  20,505,918 msg/sec (mean:  18,053,459 stdev:   1,869,244) msg/sec
+              pthread_spinlock:  31,091,423 msg/sec (mean:  16,666,098 stdev:   6,403,520) msg/sec
+                   AtomicQueue:  15,865,858 msg/sec (mean:  14,481,723 stdev:     783,641) msg/sec
+           BlockingAtomicQueue:  37,307,748 msg/sec (mean:  31,693,904 stdev:   3,252,467) msg/sec
+                  AtomicQueue2:  14,996,508 msg/sec (mean:  13,964,554 stdev:     676,846) msg/sec
+          BlockingAtomicQueue2:  32,223,186 msg/sec (mean:  30,796,786 stdev:   1,990,534) msg/sec
 ```
 
 Results on Intel Xeon Gold 6132, Red Hat Enterprise Linux Server release 6.10 (Santiago) (on one NUMA node):
@@ -75,13 +76,14 @@ One thread posts an integer to another thread and waits for the reply using two 
 
 Results on Intel Core i7-7700K, Ubuntu 18.04.2 LTS:
 ```
- boost::lockfree::spsc_queue: 0.000000117 sec/round-trip
-      boost::lockfree::queue: 0.000000253 sec/round-trip
-            pthread_spinlock: 0.000000272 sec/round-trip
-                 AtomicQueue: 0.000000146 sec/round-trip
-         BlockingAtomicQueue: 0.000000090 sec/round-trip
-                AtomicQueue2: 0.000000174 sec/round-trip
-        BlockingAtomicQueue2: 0.000000145 sec/round-trip
+   boost::lockfree::spsc_queue: 0.000000106 sec/round-trip (mean: 0.000000114 stdev: 0.000000005) sec/round-trip
+        boost::lockfree::queue: 0.000000268 sec/round-trip (mean: 0.000000280 stdev: 0.000000010) sec/round-trip
+ tbb::concurrent_bounded_queue: 0.000003668 sec/round-trip (mean: 0.000003706 stdev: 0.000000018) sec/round-trip
+              pthread_spinlock: 0.000000349 sec/round-trip (mean: 0.000000856 stdev: 0.000001082) sec/round-trip
+                   AtomicQueue: 0.000000147 sec/round-trip (mean: 0.000000158 stdev: 0.000000006) sec/round-trip
+           BlockingAtomicQueue: 0.000000091 sec/round-trip (mean: 0.000000100 stdev: 0.000000008) sec/round-trip
+                  AtomicQueue2: 0.000000174 sec/round-trip (mean: 0.000000182 stdev: 0.000000005) sec/round-trip
+          BlockingAtomicQueue2: 0.000000190 sec/round-trip (mean: 0.000000193 stdev: 0.000000002) sec/round-trip
 ```
 
 Results on Intel Xeon Gold 6132, Red Hat Enterprise Linux Server release 6.10 (Santiago) (on one NUMA node):
