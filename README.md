@@ -53,23 +53,24 @@ Two producer threads post into one queue, two consumer threads drain the queue. 
 
 Results on Intel Core i7-7700K, Ubuntu 18.04.2 LTS:
 ```
-        boost::lockfree::queue:   9,111,702 msg/sec (mean:   8,319,644 stdev:     498,734) msg/sec
- tbb::concurrent_bounded_queue:  20,505,918 msg/sec (mean:  18,053,459 stdev:   1,869,244) msg/sec
-              pthread_spinlock:  31,091,423 msg/sec (mean:  16,666,098 stdev:   6,403,520) msg/sec
-                   AtomicQueue:  15,865,858 msg/sec (mean:  14,481,723 stdev:     783,641) msg/sec
-           BlockingAtomicQueue:  37,307,748 msg/sec (mean:  31,693,904 stdev:   3,252,467) msg/sec
-                  AtomicQueue2:  14,996,508 msg/sec (mean:  13,964,554 stdev:     676,846) msg/sec
-          BlockingAtomicQueue2:  32,223,186 msg/sec (mean:  30,796,786 stdev:   1,990,534) msg/sec
+        boost::lockfree::queue:   9,111,702 msg/sec (mean:   8,319,644 stdev:     498,734)
+ tbb::concurrent_bounded_queue:  20,505,918 msg/sec (mean:  18,053,459 stdev:   1,869,244)
+              pthread_spinlock:  31,091,423 msg/sec (mean:  16,666,098 stdev:   6,403,520)
+                   AtomicQueue:  15,865,858 msg/sec (mean:  14,481,723 stdev:     783,641)
+           BlockingAtomicQueue:  37,307,748 msg/sec (mean:  31,693,904 stdev:   3,252,467)
+                  AtomicQueue2:  14,996,508 msg/sec (mean:  13,964,554 stdev:     676,846)
+          BlockingAtomicQueue2:  32,223,186 msg/sec (mean:  30,796,786 stdev:   1,990,534)
 ```
 
 Results on Intel Xeon Gold 6132, Red Hat Enterprise Linux Server release 6.10 (Santiago) (on one NUMA node):
 ```
-      boost::lockfree::queue:   2,504,207 msg/sec
-            pthread_spinlock:   5,295,343 msg/sec
-                 AtomicQueue:   5,367,912 msg/sec
-         BlockingAtomicQueue:  20,940,375 msg/sec
-                AtomicQueue2:   5,885,886 msg/sec
-        BlockingAtomicQueue2:  14,483,390 msg/sec
+        boost::lockfree::queue:   2,398,544 msg/sec (mean:   2,302,336 stdev:      94,692)
+ tbb::concurrent_bounded_queue:   6,289,462 msg/sec (mean:   5,477,333 stdev:     416,377)
+              pthread_spinlock:   5,429,537 msg/sec (mean:   4,283,142 stdev:     594,738)
+                   AtomicQueue:   5,425,324 msg/sec (mean:   4,301,079 stdev:     525,305)
+           BlockingAtomicQueue:  17,180,243 msg/sec (mean:  13,367,047 stdev:   2,154,565)
+                  AtomicQueue2:   5,277,146 msg/sec (mean:   4,479,122 stdev:     480,400)
+          BlockingAtomicQueue2:  13,004,012 msg/sec (mean:  11,188,531 stdev:   1,192,558)
 ```
 ## Ping-pong benchmark
 One thread posts an integer to another thread and waits for the reply using two queues. The benchmarks measures the total time of 100,000 ping-pongs, best of 10 runs. Contention is minimal here to be able to achieve and measure the lowest latency. Reports the average round-trip time.
@@ -88,47 +89,53 @@ Results on Intel Core i7-7700K, Ubuntu 18.04.2 LTS:
 
 Results on Intel Xeon Gold 6132, Red Hat Enterprise Linux Server release 6.10 (Santiago) (on one NUMA node):
 ```
-           boost::spsc_queue: 0.000000249 sec/round-trip.
-      boost::lockfree::queue: 0.000000708 sec/round-trip
-            pthread_spinlock: 0.000000723 sec/round-trip.
-                 AtomicQueue: 0.000000354 sec/round-trip.
-         BlockingAtomicQueue: 0.000000216 sec/round-trip.
-                AtomicQueue2: 0.000000421 sec/round-trip.
-        BlockingAtomicQueue2: 0.000000308 sec/round-trip.
+   boost::lockfree::spsc_queue: 0.000000324 sec/round-trip (mean: 0.000000366 stdev: 0.000000056) sec/round-trip
+        boost::lockfree::queue: 0.000000688 sec/round-trip (mean: 0.000000782 stdev: 0.000000130) sec/round-trip
+ tbb::concurrent_bounded_queue: 0.000012759 sec/round-trip (mean: 0.000012934 stdev: 0.000000130) sec/round-trip
+              pthread_spinlock: 0.000001129 sec/round-trip (mean: 0.000001355 stdev: 0.000000165) sec/round-trip
+                   AtomicQueue: 0.000000546 sec/round-trip (mean: 0.000000608 stdev: 0.000000054) sec/round-trip
+           BlockingAtomicQueue: 0.000000320 sec/round-trip (mean: 0.000000348 stdev: 0.000000028) sec/round-trip
+                  AtomicQueue2: 0.000000408 sec/round-trip (mean: 0.000000477 stdev: 0.000000037) sec/round-trip
+          BlockingAtomicQueue2: 0.000000359 sec/round-trip (mean: 0.000000400 stdev: 0.000000032) sec/round-trip
 ```
 
 ## Scalability benchmark
-This benchmark starts N producers and N consumers. The total throughput in msg/sec is measured.
+This benchmark starts N producers and N consumers (NxN below). The total throughput in msg/sec is measured.
 Results on Intel Xeon Gold 6132, Red Hat Enterprise Linux Server release 6.10 (Santiago) (on one NUMA node):
 ```
 ---- Running throughput and throughput benchmarks (higher is better) ----
-      boost::lockfree::queue, 2 producers:   2,287,130 msg/sec
-      boost::lockfree::queue, 3 producers:   2,302,414 msg/sec
-      boost::lockfree::queue, 4 producers:   1,744,023 msg/sec
-      boost::lockfree::queue, 5 producers:   1,534,171 msg/sec
-      boost::lockfree::queue, 6 producers:   1,781,191 msg/sec
-            pthread_spinlock, 2 producers:   4,590,751 msg/sec
-            pthread_spinlock, 3 producers:   3,436,103 msg/sec
-            pthread_spinlock, 4 producers:   2,500,333 msg/sec
-            pthread_spinlock, 5 producers:   1,871,897 msg/sec
-            pthread_spinlock, 6 producers:   2,087,420 msg/sec
-                 AtomicQueue, 2 producers:   4,846,906 msg/sec
-                 AtomicQueue, 3 producers:   4,158,126 msg/sec
-                 AtomicQueue, 4 producers:   2,836,063 msg/sec
-                 AtomicQueue, 5 producers:   2,427,541 msg/sec
-                 AtomicQueue, 6 producers:   2,268,458 msg/sec
-         BlockingAtomicQueue, 2 producers:  13,163,192 msg/sec
-         BlockingAtomicQueue, 3 producers:  14,974,197 msg/sec
-         BlockingAtomicQueue, 4 producers:  20,585,013 msg/sec
-         BlockingAtomicQueue, 5 producers:  21,295,096 msg/sec
-         BlockingAtomicQueue, 6 producers:  21,362,910 msg/sec
-                AtomicQueue2, 2 producers:   4,634,256 msg/sec
-                AtomicQueue2, 3 producers:   3,208,438 msg/sec
-                AtomicQueue2, 4 producers:   3,025,483 msg/sec
-                AtomicQueue2, 5 producers:   2,486,477 msg/sec
-                AtomicQueue2, 6 producers:   2,606,209 msg/sec
-        BlockingAtomicQueue2, 2 producers:   8,328,188 msg/sec
-        BlockingAtomicQueue2, 3 producers:  11,387,004 msg/sec
-        BlockingAtomicQueue2, 4 producers:  17,074,897 msg/sec
-        BlockingAtomicQueue2, 5 producers:  14,688,902 msg/sec
-        BlockingAtomicQueue2, 6 producers:  19,876,903 msg/sec
+        boost::lockfree::queue, 2x2:   2,486,910 msg/sec (mean:   2,320,783 stdev:     188,366) msg/sec
+        boost::lockfree::queue, 3x3:   2,332,429 msg/sec (mean:   2,076,063 stdev:     205,316) msg/sec
+        boost::lockfree::queue, 4x4:   2,416,385 msg/sec (mean:   1,926,786 stdev:     229,553) msg/sec
+        boost::lockfree::queue, 5x5:   2,075,041 msg/sec (mean:   1,837,805 stdev:     151,124) msg/sec
+        boost::lockfree::queue, 6x6:   2,012,571 msg/sec (mean:   1,682,966 stdev:     143,713) msg/sec
+ tbb::concurrent_bounded_queue, 2x2:   6,208,394 msg/sec (mean:   4,637,585 stdev:     967,385) msg/sec
+ tbb::concurrent_bounded_queue, 3x3:   6,305,786 msg/sec (mean:   4,713,897 stdev:     956,974) msg/sec
+ tbb::concurrent_bounded_queue, 4x4:   5,876,249 msg/sec (mean:   5,005,050 stdev:     588,870) msg/sec
+ tbb::concurrent_bounded_queue, 5x5:   6,738,452 msg/sec (mean:   5,634,938 stdev:     738,323) msg/sec
+ tbb::concurrent_bounded_queue, 6x6:   6,840,621 msg/sec (mean:   6,019,159 stdev:     613,073) msg/sec
+              pthread_spinlock, 2x2:   5,195,250 msg/sec (mean:   3,935,210 stdev:   1,042,905) msg/sec
+              pthread_spinlock, 3x3:   3,478,066 msg/sec (mean:   1,830,504 stdev:     839,054) msg/sec
+              pthread_spinlock, 4x4:   2,386,709 msg/sec (mean:   1,405,528 stdev:     632,886) msg/sec
+              pthread_spinlock, 5x5:   1,887,785 msg/sec (mean:   1,021,789 stdev:     344,305) msg/sec
+              pthread_spinlock, 6x6:   1,977,791 msg/sec (mean:   1,247,068 stdev:     433,732) msg/sec
+                   AtomicQueue, 2x2:   5,088,592 msg/sec (mean:   4,483,912 stdev:     378,409) msg/sec
+                   AtomicQueue, 3x3:   3,858,049 msg/sec (mean:   3,401,465 stdev:     275,586) msg/sec
+                   AtomicQueue, 4x4:   3,194,399 msg/sec (mean:   2,679,596 stdev:     370,335) msg/sec
+                   AtomicQueue, 5x5:   2,964,360 msg/sec (mean:   2,383,516 stdev:     358,904) msg/sec
+                   AtomicQueue, 6x6:   2,805,196 msg/sec (mean:   2,175,421 stdev:     386,756) msg/sec
+           BlockingAtomicQueue, 2x2:  15,216,691 msg/sec (mean:  11,255,366 stdev:   2,144,351) msg/sec
+           BlockingAtomicQueue, 3x3:  16,189,937 msg/sec (mean:  12,743,020 stdev:   1,751,287) msg/sec
+           BlockingAtomicQueue, 4x4:  20,820,568 msg/sec (mean:  16,415,916 stdev:   3,860,112) msg/sec
+           BlockingAtomicQueue, 5x5:  21,542,593 msg/sec (mean:  17,352,998 stdev:   4,193,881) msg/sec
+           BlockingAtomicQueue, 6x6:  21,491,321 msg/sec (mean:  17,558,517 stdev:   3,824,894) msg/sec
+                  AtomicQueue2, 2x2:   4,881,916 msg/sec (mean:   4,446,936 stdev:     354,687) msg/sec
+                  AtomicQueue2, 3x3:   3,760,442 msg/sec (mean:   3,343,958 stdev:     295,021) msg/sec
+                  AtomicQueue2, 4x4:   3,152,725 msg/sec (mean:   2,661,291 stdev:     236,837) msg/sec
+                  AtomicQueue2, 5x5:   3,192,256 msg/sec (mean:   2,466,403 stdev:     371,514) msg/sec
+                  AtomicQueue2, 6x6:   2,551,024 msg/sec (mean:   2,134,442 stdev:     322,944) msg/sec
+          BlockingAtomicQueue2, 2x2:  11,847,354 msg/sec (mean:   9,194,327 stdev:   1,883,534) msg/sec
+          BlockingAtomicQueue2, 3x3:  13,050,469 msg/sec (mean:  11,457,476 stdev:   1,148,692) msg/sec
+          BlockingAtomicQueue2, 4x4:  19,967,380 msg/sec (mean:  13,552,963 stdev:   3,569,927) msg/sec
+          BlockingAtomicQueue2, 5x5:  19,042,976 msg/sec (mean:  12,586,241 stdev:   2,894,310) msg/sec
+          BlockingAtomicQueue2, 6x6:  19,970,175 msg/sec (mean:  14,714,509 stdev:   3,414,408) msg/sec
