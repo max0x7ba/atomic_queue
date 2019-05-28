@@ -8,6 +8,7 @@
 #include <boost/lockfree/queue.hpp>
 
 #include <tbb/concurrent_queue.h>
+#include <tbb/spin_mutex.h>
 
 #include <algorithm>
 #include <stdexcept>
@@ -138,21 +139,25 @@ uint64_t benchmark_throughput(unsigned N, unsigned producer_count, unsigned cons
 }
 
 template<class Queue>
-void run_throughput_benchmark(char const* name) {
-    int constexpr N = 1000000;
+void run_throughput_benchmark(char const* name, unsigned N, unsigned thread_count_min, unsigned thread_count_max) {
     int constexpr RUNS = 10;
-    int constexpr PRODUCERS = 2;
-    int constexpr CONSUMERS = 2;
 
-    uint64_t min_time = std::numeric_limits<uint64_t>::max();
-    for(unsigned run = RUNS; run--;) {
-        uint64_t time = benchmark_throughput<Queue>(N, PRODUCERS, CONSUMERS);
-        min_time = std::min(min_time, time);
+    for(unsigned threads = thread_count_min; threads <= thread_count_max; ++threads) {
+        uint64_t min_time = std::numeric_limits<uint64_t>::max();
+        for(unsigned run = RUNS; run--;) {
+            uint64_t time = benchmark_throughput<Queue>(N, threads, threads);
+            min_time = std::min(min_time, time);
+        }
+
+        double min_seconds = to_seconds(min_time);
+        unsigned msg_per_sec = N * threads / min_seconds;
+        std::printf("%30s,%u: %'11u msg/sec\n", name, threads, msg_per_sec);
     }
+}
 
-    double min_seconds = to_seconds(min_time);
-    unsigned msg_per_sec = N * PRODUCERS / min_seconds;
-    std::printf("%30s: %'11u msg/sec\n", name, msg_per_sec);
+template<class Queue>
+void run_throughput_benchmark(char const* name) {
+    run_throughput_benchmark<Queue>(name, 1000000, 2, 2);
 }
 
 void run_throughput_benchmarks() {
@@ -160,9 +165,13 @@ void run_throughput_benchmarks() {
 
     int constexpr CAPACITY = 65536;
 
-    run_throughput_benchmark<BoostAdapter<boost::lockfree::queue<unsigned, boost::lockfree::capacity<CAPACITY - 2>>>>("boost::lockfree::queue");
-    run_throughput_benchmark<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, CAPACITY>>("tbb::concurrent_bounded_queue");
     run_throughput_benchmark<RetryDecorator<AtomicQueueSpinlock<unsigned, CAPACITY>>>("pthread_spinlock");
+
+    run_throughput_benchmark<BoostAdapter<boost::lockfree::queue<unsigned, boost::lockfree::capacity<CAPACITY - 2>>>>("boost::lockfree::queue");
+
+    run_throughput_benchmark<RetryDecorator<AtomicQueueSpinlockT<unsigned, CAPACITY, tbb::spin_mutex>>>("tbb::spin_mutex");
+    run_throughput_benchmark<RetryDecorator<AtomicQueueSpinlockT<unsigned, CAPACITY, tbb::speculative_spin_mutex>>>("tbb::speculative_spin_mutex");
+    run_throughput_benchmark<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, CAPACITY>>("tbb::concurrent_bounded_queue");
 
     run_throughput_benchmark<RetryDecorator<AtomicQueue<unsigned, CAPACITY>>>("AtomicQueue");
     run_throughput_benchmark<AtomicQueue<unsigned, CAPACITY>>("BlockingAtomicQueue");
@@ -234,9 +243,13 @@ void run_ping_pong_benchmarks() {
     // preclude aggressive optimizations.
     constexpr unsigned CAPACITY = 8;
 
+    run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinlock<unsigned, CAPACITY>>>("pthread_spinlock");
+
     run_ping_pong_benchmark<BoostAdapter<boost::lockfree::spsc_queue<unsigned, boost::lockfree::capacity<CAPACITY>>>>("boost::lockfree::spsc_queue");
     run_ping_pong_benchmark<BoostAdapter<boost::lockfree::queue<unsigned, boost::lockfree::capacity<CAPACITY>>>>("boost::lockfree::queue");
-    run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinlock<unsigned, CAPACITY>>>("pthread_spinlock");
+
+    run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinlockT<unsigned, CAPACITY, tbb::spin_mutex>>>("tbb::spin_mutex");
+    run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinlockT<unsigned, CAPACITY, tbb::speculative_spin_mutex>>>("tbb::speculative_spin_mutex");
     run_ping_pong_benchmark<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, CAPACITY>>("tbb::concurrent_bounded_queue");
 
     run_ping_pong_benchmark<RetryDecorator<AtomicQueue <unsigned, CAPACITY>>>("AtomicQueue");

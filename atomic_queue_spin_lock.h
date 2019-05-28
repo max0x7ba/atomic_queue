@@ -13,40 +13,37 @@ namespace atomic_queue {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<class T, unsigned SIZE, bool MinimizeContention, class Spinlock>
+template<class T, unsigned SIZE, bool MinimizeContention, class Mutex>
 class AtomicQueueSpinlock_ {
-    Spinlock lock_;
+    Mutex mutex_;
     unsigned head_ = 0;
     unsigned tail_ = 0;
     alignas(CACHE_LINE_SIZE) T q_[SIZE] = {};
 
     using Remap = typename details::GetIndexShuffleBits<MinimizeContention, SIZE, CACHE_LINE_SIZE / sizeof(T)>::type;
+    using ScopedLock = typename Mutex::scoped_lock;
 
 public:
     using value_type = T;
 
     template<class U>
     bool try_push(U&& element) noexcept {
-        this->lock_.lock();
+        ScopedLock lock(this->mutex_);
         if(this->head_ - this->tail_ < SIZE) {
             q_[details::remap_index(this->head_ % SIZE, Remap{})] = std::forward<U>(element);
             ++this->head_;
-            this->lock_.unlock();
             return true;
         }
-        this->lock_.unlock();
         return false;
     }
 
     bool try_pop(T& element) noexcept {
-        this->lock_.lock();
+        ScopedLock lock(this->mutex_);
         if(this->head_ != this->tail_) {
             element = std::move(q_[details::remap_index(this->tail_ % SIZE, Remap{})]);
             ++this->tail_;
-            this->lock_.unlock();
             return true;
         }
-        this->lock_.unlock();
         return false;
     }
 
@@ -58,6 +55,9 @@ public:
         return static_cast<int>(this->head_ - this->tail_) >= static_cast<int>(SIZE);
     }
 };
+
+template<class T, unsigned SIZE, class Mutex, bool MinimizeContention = details::IsPowerOf2<SIZE>::value>
+using AtomicQueueSpinlockT = AtomicQueueSpinlock_<T, SIZE, MinimizeContention, Mutex>;
 
 template<class T, unsigned SIZE, bool MinimizeContention = details::IsPowerOf2<SIZE>::value>
 using AtomicQueueSpinlock = AtomicQueueSpinlock_<T, SIZE, MinimizeContention, Spinlock>;

@@ -3,6 +3,7 @@
 #define ATOMIC_QUEUE_SPIN_LOCK_H_INCLUDED
 
 #include <cstdlib>
+#include <mutex>
 
 // #include <emmintrin.h>
 #include <pthread.h>
@@ -16,6 +17,8 @@ namespace atomic_queue {
 class Spinlock {
     pthread_spinlock_t s_;
 public:
+    using scoped_lock = std::lock_guard<Spinlock>;
+
     Spinlock() noexcept {
         if(::pthread_spin_init(&s_, 0))
             std::abort();
@@ -50,6 +53,8 @@ class SpinlockHle {
 #endif
 
 public:
+    using scoped_lock = std::lock_guard<Spinlock>;
+
     void lock() noexcept {
         for(int expected = 0; !__atomic_compare_exchange_n(&lock_, &expected, 1, false, __ATOMIC_ACQUIRE | HLE_ACQUIRE, __ATOMIC_RELAXED); expected = 0)
             /*_mm_pause()*/;
