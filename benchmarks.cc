@@ -62,17 +62,9 @@ struct BoostAdapter : Queue {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<class Queue, size_t Capacity>
-struct TbbAdapter : Queue {
-    using T = typename Queue::value_type;
-
+struct TbbAdapter : RetryDecorator<Queue> {
     TbbAdapter() {
         this->set_capacity(Capacity);
-    }
-
-    T pop() {
-        T element;
-        this->Queue::pop(element);
-        return element;
     }
 };
 
