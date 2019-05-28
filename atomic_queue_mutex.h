@@ -13,8 +13,8 @@ namespace atomic_queue {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<class T, unsigned SIZE, bool MinimizeContention, class Mutex>
-class AtomicQueueSpinlock_ {
+template<class T, class Mutex, unsigned SIZE, bool MinimizeContention>
+class AtomicQueueMutexT {
     Mutex mutex_;
     unsigned head_ = 0;
     unsigned tail_ = 0;
@@ -57,13 +57,13 @@ public:
 };
 
 template<class T, unsigned SIZE, class Mutex, bool MinimizeContention = details::IsPowerOf2<SIZE>::value>
-using AtomicQueueSpinlockT = AtomicQueueSpinlock_<T, SIZE, MinimizeContention, Mutex>;
+using AtomicQueueMutex = AtomicQueueMutexT<T, Mutex, SIZE, MinimizeContention>;
 
 template<class T, unsigned SIZE, bool MinimizeContention = details::IsPowerOf2<SIZE>::value>
-using AtomicQueueSpinlock = AtomicQueueSpinlock_<T, SIZE, MinimizeContention, Spinlock>;
+using AtomicQueueSpinlock = AtomicQueueMutexT<T, Spinlock, SIZE, MinimizeContention>;
 
 template<class T, unsigned SIZE, bool MinimizeContention = details::IsPowerOf2<SIZE>::value>
-using AtomicQueueSpinlockHle = AtomicQueueSpinlock_<T, SIZE, MinimizeContention, SpinlockHle>;
+using AtomicQueueSpinlockHle = AtomicQueueMutexT<T, SpinlockHle, SIZE, MinimizeContention>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

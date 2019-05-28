@@ -1,6 +1,6 @@
 /* -*- mode: c++; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 4 -*- */
-#include "atomic_queue_spin_lock.h"
 #include "cpu_base_frequency.h"
+#include "atomic_queue_mutex.h"
 #include "atomic_queue.h"
 #include "barrier.h"
 
@@ -169,8 +169,8 @@ void run_throughput_benchmarks() {
 
     run_throughput_benchmark<BoostAdapter<boost::lockfree::queue<unsigned, boost::lockfree::capacity<CAPACITY - 2>>>>("boost::lockfree::queue");
 
-    run_throughput_benchmark<RetryDecorator<AtomicQueueSpinlockT<unsigned, CAPACITY, tbb::spin_mutex>>>("tbb::spin_mutex");
-    run_throughput_benchmark<RetryDecorator<AtomicQueueSpinlockT<unsigned, CAPACITY, tbb::speculative_spin_mutex>>>("tbb::speculative_spin_mutex");
+    run_throughput_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, tbb::spin_mutex>>>("tbb::spin_mutex");
+    run_throughput_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, tbb::speculative_spin_mutex>>>("tbb::speculative_spin_mutex");
     run_throughput_benchmark<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, CAPACITY>>("tbb::concurrent_bounded_queue");
 
     run_throughput_benchmark<RetryDecorator<AtomicQueue<unsigned, CAPACITY>>>("AtomicQueue");
@@ -248,8 +248,8 @@ void run_ping_pong_benchmarks() {
     run_ping_pong_benchmark<BoostAdapter<boost::lockfree::spsc_queue<unsigned, boost::lockfree::capacity<CAPACITY>>>>("boost::lockfree::spsc_queue");
     run_ping_pong_benchmark<BoostAdapter<boost::lockfree::queue<unsigned, boost::lockfree::capacity<CAPACITY>>>>("boost::lockfree::queue");
 
-    run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinlockT<unsigned, CAPACITY, tbb::spin_mutex>>>("tbb::spin_mutex");
-    run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinlockT<unsigned, CAPACITY, tbb::speculative_spin_mutex>>>("tbb::speculative_spin_mutex");
+    run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, tbb::spin_mutex>>>("tbb::spin_mutex");
+    run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, tbb::speculative_spin_mutex>>>("tbb::speculative_spin_mutex");
     run_ping_pong_benchmark<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, CAPACITY>>("tbb::concurrent_bounded_queue");
 
     run_ping_pong_benchmark<RetryDecorator<AtomicQueue <unsigned, CAPACITY>>>("AtomicQueue");

@@ -3,7 +3,7 @@
 #define BOOST_TEST_MODULE atomic_queue
 #include <boost/test/unit_test.hpp>
 
-#include "atomic_queue_spin_lock.h"
+#include "atomic_queue_mutex.h"
 #include "atomic_queue.h"
 #include "barrier.h"
 
