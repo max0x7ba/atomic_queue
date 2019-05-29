@@ -80,7 +80,7 @@ Results on Intel Xeon Gold 6132, Red Hat Enterprise Linux Server release 6.10 (S
 ```
 
 ## Throughput and scalability benchmark
-N producer threads post into one queue, N consumer threads drain the queue. Each producer posts one million messages. Total time to send and receive all the messages is measured. The benchmark is run for from 1 producer and 1 consumer up to `total-number-of-cpus / 2 - 1` producers/consumers to measure the scalabilty of different queues.
+N producer threads post into one queue, N consumer threads drain the queue. Each producer posts 1,000,000 messages. Total time to send and receive all the messages is measured. The benchmark is run for from 1 producer and 1 consumer up to `total-number-of-cpus / 2 - 1` producers/consumers to measure the scalabilty of different queues.
 
 ![Scalability Intel i7-7700k 5GHz](https://raw.githubusercontent.com/max0x7ba/atomic_queue/master/results/scalability-7700k-5GHz.png "Scalability Intel i7-7700k 5GHz") ![Intel Xeon Gold 6132](https://raw.githubusercontent.com/max0x7ba/atomic_queue/master/results/scalability-xeon-gold-6132.png "Intel Xeon Gold 6132")
 

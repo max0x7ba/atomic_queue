@@ -275,8 +275,8 @@ int main() {
     run_throughput_benchmarks();
     run_ping_pong_benchmarks();
 
-    static_cast<void>(run_ping_pong_benchmarks);
-    static_cast<void>(run_throughput_benchmarks);
+    // static_cast<void>(run_ping_pong_benchmarks);
+    // static_cast<void>(run_throughput_benchmarks);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
