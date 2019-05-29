@@ -157,7 +157,8 @@ void run_throughput_benchmark(char const* name, unsigned N, unsigned thread_coun
 
 template<class Queue>
 void run_throughput_benchmark(char const* name) {
-    run_throughput_benchmark<Queue>(name, 1000000, 2, 2);
+    unsigned const thread_count_max = std::thread::hardware_concurrency() / 2 - 1; // -1 for the main thread.
+    run_throughput_benchmark<Queue>(name, 1000000, 1, thread_count_max);
 }
 
 void run_throughput_benchmarks() {
