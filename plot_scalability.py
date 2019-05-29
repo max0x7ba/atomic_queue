@@ -43,9 +43,12 @@ def plot_scalability(results):
     print(df.columns)
 
     style = {
-        'pthread_spinlock': 's-k',
-        'boost::lockfree::queue': 's-g',
-        'tbb::concurrent_bounded_queue': 's-b',
+        'pthread_spinlock': 's-',
+        'boost::lockfree::queue': 's-',
+
+        'tbb::concurrent_bounded_queue': 's-',
+        'tbb::spin_mutex': 's-',
+        'tbb::speculative_spin_mutex': 's-',
 
         'AtomicQueue': 'x-r',
         'AtomicQueue2': 'x-y',
