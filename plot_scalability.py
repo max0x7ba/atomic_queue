@@ -10,6 +10,7 @@ from pprint import pprint
 
 import matplotlib.pyplot as plt
 import matplotlib
+from matplotlib.ticker import MultipleLocator, FuncFormatter
 
 from matplotlib import rcParams
 rcParams['font.family'] = 'serif'
@@ -56,12 +57,17 @@ def plot_scalability(results):
         'BlockingAtomicQueue': 'o-r',
         'BlockingAtomicQueue2': 'o-y',
         }
-    ax = df.plot(title='Scalability', style=style)
+    ax = df.plot(title='Scalability, Intel Xeon Gold 6132', style=style)
+    # ax = df.plot(title='Scalability, Intel Core i7-7700K 5GHz', style=style)
     ax.autoscale(tight=False)
     ax.legend(frameon=False)
-    ax.get_yaxis().set_major_formatter(matplotlib.ticker.FuncFormatter(lambda x, p: format(int(x), ',')))
+    ax.get_yaxis().set_major_formatter(FuncFormatter(lambda x, p: format(int(x), ',')))
     ax.set_ylabel('msg/sec')
-    ax.set_xlabel('threads')
+    ax.set_ylim(top=12e7, bottom=-1e6)
+    # ax.yaxis.set_major_locator(MultipleLocator(1e9))
+    ax.set_xlabel('number of producers, number of consumers')
+    ax.yaxis.set_major_locator(MultipleLocator(1e7))
+    ax.xaxis.set_major_locator(MultipleLocator(1))
     ax.set_frame_on(False)
     ax.grid()
     plt.show()
