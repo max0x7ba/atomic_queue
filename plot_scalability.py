@@ -54,6 +54,7 @@ def plot_scalability(results):
         'BlockingAtomicQueue2': 'o-y',
         }
     ax = df.plot(title='Scalability', style=style)
+    ax.autoscale(tight=False)
     ax.legend(frameon=False)
     ax.get_yaxis().set_major_formatter(matplotlib.ticker.FuncFormatter(lambda x, p: format(int(x), ',')))
     ax.set_ylabel('msg/sec')
@@ -64,40 +65,3 @@ def plot_scalability(results):
 
 
 plot_scalability(results)
-
-# pprint(results)
-
-# def format_msg_sec(d, benchmark):
-#     return "{:11,.0f} {} (mean: {:11,.0f} stdev: {:11,.0f})".format(d.minmax[1], benchmark, d.mean, math.sqrt(d.variance))
-
-# def format_round_trip(d, benchmark):
-#     return "{:11.9f} {} (mean: {:11.9f} stdev: {:11.9f})".format(d.minmax[0], benchmark, d.mean, math.sqrt(d.variance))
-
-# fmt = {
-#     'msg/sec': format_msg_sec,
-#     'sec/round-trip': format_round_trip
-#     }
-
-# num_fmt = {
-#     'msg/sec': "{:.0f}",
-#     'sec/round-trip': "{:.9f}"
-#     }
-
-# for benchmark in ['msg/sec', 'sec/round-trip']:
-#     csv_fmt = "{},{}," + ','.join([num_fmt[benchmark]] * 4)
-#     for queue, qr in results.items():
-#         runs = qr.get(benchmark, None)
-#         if not runs:
-#             continue
-#         d = stats.describe(runs)
-#         desc = fmt[benchmark](d, benchmark)
-#         print("{:>32s}: {} {}".format(queue, desc, benchmark))
-
-# # X-axis, rows: threads.
-# # Y-axis, columns: msg/sec or sec/round-trip
-
-# def plot_scalability(results):
-#     columns = [k.split(',') for k in results.keys()]
-#     print(columns)
-
-# plot_scalability(results)
