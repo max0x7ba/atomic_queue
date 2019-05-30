@@ -25,8 +25,7 @@ results = list(parse_output(sys.stdin))
 # pprint(results)
 
 def plot_scalability(results):
-    df = pd.DataFrame.from_records(((*extract_name_threads(r[0]), r[2]) for r in results), columns=['queue', 'threads', 'msg/sec'])
-    df = df.groupby(['queue', 'threads']).max().unstack(level=0).droplevel(0, axis=1)
+    df = as_scalability_df(results)
     # print(df.to_json(orient='columns'))
     # print(df.columns)
 
