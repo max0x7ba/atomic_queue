@@ -1,7 +1,7 @@
 'use strict';
 
 Highcharts.createElement('link', {
-    href: 'https://fonts.googleapis.com/css?family=Ubuntu&display=swap',
+    href: 'https://fonts.googleapis.com/css?family=Ubuntu:400,700&display=swap',
     rel: 'stylesheet',
     type: 'text/css'
 }, null, document.getElementsByTagName('head')[0]);

@@ -42,7 +42,7 @@ $(function() {
                 followPointer: true,
                 useHTML: true,
                 shared: true,
-                headerFormat: '<span style="font-size: 10px; font-style: bold">{point.key} producers, {point.key} consumers</span><table>',
+                headerFormat: '<span style="font-weight: bold; font-size: 1.2em;">{point.key} producers, {point.key} consumers</span><table>',
                 pointFormat: '<tr><td style="color: {series.color}">{series.name}: </td>' +'<td style="text-align: right"><b>{point.y} msg/sec</b></td></tr>',
                 footerFormat: '</table>'
             },
