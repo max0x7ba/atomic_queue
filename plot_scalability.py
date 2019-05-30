@@ -16,9 +16,9 @@ from matplotlib import rcParams
 rcParams['font.family'] = 'serif'
 rcParams['font.serif'] = ['Ubuntu']
 
-print("numpy", np.__version__)
-print("pandas", pd.__version__)
-print("matplotlib", matplotlib.__version__)
+# print("numpy", np.__version__)
+# print("pandas", pd.__version__)
+# print("matplotlib", matplotlib.__version__)
 
 def parse_output(f):
     parser = re.compile("\s*(\S+):\s+([,.0-9]+)\s+(\S+)")
@@ -40,8 +40,8 @@ def extract_name_threads(name_theads):
 def plot_scalability(results):
     df = pd.DataFrame.from_records(((*extract_name_threads(r[0]), r[2]) for r in results), columns=['queue', 'threads', 'msg/sec'])
     df = df.groupby(['queue', 'threads']).max().unstack(level=0).droplevel(0, axis=1)
-    print(df)
-    print(df.columns)
+    # print(df.to_json(orient='columns'))
+    # print(df.columns)
 
     style = {
         'pthread_spinlock': 's-',
