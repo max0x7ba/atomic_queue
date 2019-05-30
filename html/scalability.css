@@ -1,9 +1,22 @@
 body {
     background-color: black;
     color: white;
+    font-family: 'Roboto Slab', sans-serif;
 }
 
 div.chart {
     height: 600px;
-    margin-bottom: 2em;
+    margin-top: 2em;
+}
+
+p {
+    color: #808080;
+    margin-left: 2em;
+    margin-right: 2em;
+}
+
+h1 {
+    color: #808080;
+    margin-left: 1em;
+    margin-right: 1em;
 }
