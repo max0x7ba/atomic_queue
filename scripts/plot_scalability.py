@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import sys
-import re
 import math
 import numpy as np
 import pandas as pd
@@ -16,26 +15,14 @@ from matplotlib import rcParams
 rcParams['font.family'] = 'serif'
 rcParams['font.serif'] = ['Ubuntu']
 
+from parse_output import *
+
 # print("numpy", np.__version__)
 # print("pandas", pd.__version__)
 # print("matplotlib", matplotlib.__version__)
 
-def parse_output(f):
-    parser = re.compile("\s*(\S+):\s+([,.0-9]+)\s+(\S+)")
-    for line in f:
-        m = parser.match(line)
-        if m:
-            queue = m.group(1)
-            units = m.group(3)
-            value = float(m.group(2).replace(',', ''))
-            yield queue, units, value
-
 results = list(parse_output(sys.stdin))
 # pprint(results)
-
-def extract_name_threads(name_theads):
-    name, threads = name_theads.split(',')
-    return name, int(threads)
 
 def plot_scalability(results):
     df = pd.DataFrame.from_records(((*extract_name_threads(r[0]), r[2]) for r in results), columns=['queue', 'threads', 'msg/sec'])
