@@ -1,0 +1,9 @@
+body {
+    background-color: black;
+    color: white;
+}
+
+div.chart {
+    height: 600px;
+    margin-bottom: 2em;
+}
