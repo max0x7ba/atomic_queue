@@ -26,7 +26,7 @@ $(function() {
                 tickInterval: 1
             },
             yAxis: {
-                title: { text: 'msg/sec' }
+                title: { text: 'throughput, msg/sec' }
             },
 
             legend: {

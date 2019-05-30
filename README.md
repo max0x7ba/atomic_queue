@@ -80,7 +80,7 @@ Results on Intel Xeon Gold 6132, Red Hat Enterprise Linux Server release 6.10 (S
 ```
 
 ## Throughput and scalability benchmark
-N producer threads post a 4-byte integer into one queue, N consumer threads drain the queue. Each producer posts 1,000,000 messages. Total time to send and receive all the messages is measured. The benchmark is run for from 1 producer and 1 consumer up to `total-number-of-cpus / 2 - 1` producers/consumers to measure the scalabilty of different queues.
+N producer threads push a 4-byte integer into one queue, N consumer threads pop the integers from the queue. Each producer posts 1,000,000 messages. Total time to send and receive all the messages is measured. The benchmark is run for from 1 producer and 1 consumer up to `(total-number-of-cpus / 2 - 1)` producers/consumers to measure the scalabilty of different queues.
 
 [View the interactive charts](https://max0x7ba.github.io/atomic_queue/html/scalability.html).
 
