@@ -1,16 +1,10 @@
 'use strict';
 
-Highcharts.createElement('link', {
-    href: 'https://fonts.googleapis.com/css?family=Ubuntu:400,700&display=swap',
-    rel: 'stylesheet',
-    type: 'text/css'
-}, null, document.getElementsByTagName('head')[0]);
-
 Highcharts.theme = {
     colors: ['#F1C40F', '#F39C12', '#C0392B', '#E74C3C', '#9B59B6', '#58D68D', '#5DADE2', '#2E86C1', '#21618C'],
     chart: {
         backgroundColor: 'black',
-        style: { fontFamily: 'Ubuntu, sans-serif' }
+        style: { fontFamily: "'Roboto Slab', sans-serif" }
     },
     title: {
         style: {
@@ -86,7 +80,7 @@ Highcharts.theme = {
     },
     legend: {
         itemStyle: {
-            color: '#E0E0E3'
+            color: '#808080'
         },
         itemHoverStyle: {
             color: '#FFF'
@@ -107,10 +101,10 @@ Highcharts.theme = {
     },
     drilldown: {
         activeAxisLabelStyle: {
-            color: '#F0F0F3'
+            color: '#F0F0F0'
         },
         activeDataLabelStyle: {
-            color: '#F0F0F3'
+            color: '#F0F0F0'
         }
     },
     navigation: {
