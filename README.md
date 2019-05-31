@@ -1,12 +1,22 @@
 # atomic_queue
-Multiple producer multiple consumer C++14 *lock-free* queues. They contain busy loops, so they are not *wait-free*.
+Multiple producer multiple consumer C++14 *lock-free* queues based on C++11 memory model and `std::atomic<>`. The queues employ busy loops, so they are not *wait-free*.
+
+The main idea these queues utilize is simplicity: fixed size buffer, busy wait.
+
+These qualities are also limitations: the maximum queue size must be set at compile time, there are no blocking push/pop functionality. Nevertheless, ultra-low-latency applications need just that and nothing more. The simplicity pays off (scroll down for benchmarks).
+
 Available containers are:
 * `AtomicQueue` - a fixed size ring-buffer for atomic elements.
 * `BlockingAtomicQueue` - a faster fixed size ring-buffer for atomic elements which busy-waits when empty or full.
 * `AtomicQueue2` - a fixed size ring-buffer for non-atomic elements.
 * `BlockingAtomicQueue2` - a faster fixed size ring-buffer for non-atomic elements which busy-waits when empty or full.
-* `pthread_spinlock` - a fixed size ring-buffer for non-atomic elements, uses `pthread_spinlock_t` for locking.
-* `SpinlockHle` - a fixed size ring-buffer for non-atomic elements, uses a spinlock with Intel Hardware Lock Elision (only when compiling with gcc).
+
+A few well-known containers are used for reference in the benchmarks:
+* `pthread_spinlock` - a locked fixed size ring-buffer with `pthread_spinlock_t`.
+* `boost::lockfree::queue` - eponymous queue.
+* `tbb::spin_mutex` - a locked fixed size ring-buffer with `tbb::spin_mutex`.
+* `tbb::speculative_spin_mutex` - a locked fixed size ring-buffer with `tbb::speculative_spin_mutex`.
+* `tbb::concurrent_bounded_queue` - eponymous queue used in non-blocking mode.
 
 # Build and run instructions
 The containers provided are header-only class templates that require only `#include <atomic_queue/atomic_queue.h>`, no building/installing is necessary.
