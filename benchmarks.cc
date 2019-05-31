@@ -46,10 +46,8 @@ inline double to_seconds(T tsc) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<class Queue>
-struct BoostAdapter : Queue {
+struct BoostSpScAdapter : Queue {
     using T = typename Queue::value_type;
-
-    using Queue::Queue;
 
     void push(T element) {
         while(!this->Queue::push(element))
@@ -61,6 +59,16 @@ struct BoostAdapter : Queue {
         while(!this->Queue::pop(element))
             /*_mm_pause()*/;
         return element;
+    }
+};
+
+template<class Queue>
+struct BoostQueueAdapter : BoostSpScAdapter<Queue> {
+    using T = typename Queue::value_type;
+
+    void push(T element) {
+        while(!this->Queue::bounded_push(element))
+            /*_mm_pause()*/;
     }
 };
 
@@ -167,8 +175,8 @@ void run_throughput_benchmark(char const* name, Type<Queue>) {
 }
 
 template<class... Args>
-void run_throughput_benchmark(char const* name, Type<BoostAdapter<boost::lockfree::spsc_queue<Args...>>>) {
-    using Queue = BoostAdapter<boost::lockfree::spsc_queue<Args...>>;
+void run_throughput_benchmark(char const* name, Type<BoostSpScAdapter<boost::lockfree::spsc_queue<Args...>>>) {
+    using Queue = BoostSpScAdapter<boost::lockfree::spsc_queue<Args...>>;
     run_throughput_benchmark<Queue>(name, 1000000, 1, 1); // spsc_queue can only handle 1 producer and 1 consumer.
 }
 
@@ -177,8 +185,8 @@ void run_throughput_benchmarks() {
 
     int constexpr CAPACITY = 65536;
 
-    run_throughput_benchmark("boost::lockfree::spsc_queue", Type<BoostAdapter<boost::lockfree::spsc_queue<unsigned, boost::lockfree::capacity<CAPACITY>>>>{});
-    run_throughput_benchmark("boost::lockfree::queue", Type<BoostAdapter<boost::lockfree::queue<unsigned, boost::lockfree::capacity<CAPACITY - 2>>>>{});
+    run_throughput_benchmark("boost::lockfree::spsc_queue", Type<BoostSpScAdapter<boost::lockfree::spsc_queue<unsigned, boost::lockfree::capacity<CAPACITY>>>>{});
+    run_throughput_benchmark("boost::lockfree::queue", Type<BoostQueueAdapter<boost::lockfree::queue<unsigned, boost::lockfree::capacity<CAPACITY - 2>>>>{});
 
     run_throughput_benchmark("pthread_spinlock", Type<RetryDecorator<AtomicQueueSpinlock<unsigned, CAPACITY>>>{});
 
@@ -258,8 +266,8 @@ void run_ping_pong_benchmarks() {
     // preclude aggressive optimizations.
     constexpr unsigned CAPACITY = 8;
 
-    run_ping_pong_benchmark<BoostAdapter<boost::lockfree::spsc_queue<unsigned, boost::lockfree::capacity<CAPACITY>>>>("boost::lockfree::spsc_queue");
-    run_ping_pong_benchmark<BoostAdapter<boost::lockfree::queue<unsigned, boost::lockfree::capacity<CAPACITY>>>>("boost::lockfree::queue");
+    run_ping_pong_benchmark<BoostSpScAdapter<boost::lockfree::spsc_queue<unsigned, boost::lockfree::capacity<CAPACITY>>>>("boost::lockfree::spsc_queue");
+    run_ping_pong_benchmark<BoostQueueAdapter<boost::lockfree::queue<unsigned, boost::lockfree::capacity<CAPACITY>>>>("boost::lockfree::queue");
 
     run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinlock<unsigned, CAPACITY>>>("pthread_spinlock");
 

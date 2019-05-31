@@ -12,9 +12,10 @@ Available containers are:
 * `BlockingAtomicQueue2` - a faster fixed size ring-buffer for non-atomic elements which busy-waits when empty or full.
 
 A few well-known containers are used for reference in the benchmarks:
-* `pthread_spinlock` - a locked fixed size ring-buffer with `pthread_spinlock_t`.
 * `boost::lockfree::spsc_queue` - a wait-free single producer single consumer queue from Boost library.
 * `boost::lockfree::queue` - a lock-free multiple producer multiple consumer queue from Boost library.
+* `pthread_spinlock` - a locked fixed size ring-buffer with `pthread_spinlock_t`.
+* `moodycamel::ConcurrentQueue` - a lock-free multiple producer multiple consumer queue used in non-blocking mode.
 * `tbb::spin_mutex` - a locked fixed size ring-buffer with `tbb::spin_mutex` from Intel Threading Building Blocks.
 * `tbb::speculative_spin_mutex` - a locked fixed size ring-buffer with `tbb::speculative_spin_mutex` from Intel Threading Building Blocks.
 * `tbb::concurrent_bounded_queue` - eponymous queue used in non-blocking mode from Intel Threading Building Blocks.
