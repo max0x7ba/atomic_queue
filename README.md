@@ -247,4 +247,6 @@ tbb::concurrent_bounded_queue,13:   1,321,028 msg/sec (mean:   1,077,006 stdev: 
          BlockingAtomicQueue2,13:  17,183,451 msg/sec (mean:  10,493,666 stdev:   4,169,898) msg/sec
 ```
 
+(C) Maxim Egorushkin 2019
+
 [1]: https://max0x7ba.github.io/atomic_queue/html/scalability.html
