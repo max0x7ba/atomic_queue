@@ -25,7 +25,7 @@ AR := ${ar.${TOOLSET}}
 
 cxxflags.gcc.debug := -Og -fstack-protector-all -fno-omit-frame-pointer # -D_GLIBCXX_DEBUG
 cxxflags.gcc.release := -O3 -mtune=native -ffast-math -falign-{functions,loops}=32 -DNDEBUG
-cxxflags.gcc := -pthread -march=native -std=gnu++14 -W{all,extra,error,no-maybe-uninitialized} -g -fmessage-length=0 ${cxxflags.gcc.${BUILD}}
+cxxflags.gcc := -pthread -march=native -std=gnu++14 -W{all,extra,error,no-{maybe-uninitialized,unused-function}} -g -fmessage-length=0 ${cxxflags.gcc.${BUILD}}
 cxxflags.gcc-8 := ${cxxflags.gcc}
 
 cflags.gcc := -pthread -march=native -W{all,extra} -g -fmessage-length=0 ${cxxflags.gcc.${BUILD}}
