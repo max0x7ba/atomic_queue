@@ -1,7 +1,7 @@
 # atomic_queue
-Multiple producer multiple consumer C++14 *lock-free* queues based on C++11 memory model and `std::atomic<>`. The queues employ busy loops, so they are not *wait-free*.
+Multiple producer multiple consumer C++14 *lock-free* queues based on `std::atomic<>`. The queues employ busy loops, so they are not *wait-free*.
 
-The main idea these queues utilize is simplicity: fixed size buffer, busy wait.
+The main idea these queues utilize is _simplicity_: fixed size buffer, busy wait.
 
 These qualities are also limitations: the maximum queue size must be set at compile time, there are no blocking push/pop functionality. Nevertheless, ultra-low-latency applications need just that and nothing more. The simplicity pays off (scroll down for benchmarks).
 
@@ -13,10 +13,11 @@ Available containers are:
 
 A few well-known containers are used for reference in the benchmarks:
 * `pthread_spinlock` - a locked fixed size ring-buffer with `pthread_spinlock_t`.
-* `boost::lockfree::queue` - eponymous queue.
-* `tbb::spin_mutex` - a locked fixed size ring-buffer with `tbb::spin_mutex`.
-* `tbb::speculative_spin_mutex` - a locked fixed size ring-buffer with `tbb::speculative_spin_mutex`.
-* `tbb::concurrent_bounded_queue` - eponymous queue used in non-blocking mode.
+* `boost::lockfree::spsc_queue` - a wait-free single producer single consumer queue from Boost library.
+* `boost::lockfree::queue` - a lock-free multiple producer multiple consumer queue from Boost library.
+* `tbb::spin_mutex` - a locked fixed size ring-buffer with `tbb::spin_mutex` from Intel Threading Building Blocks.
+* `tbb::speculative_spin_mutex` - a locked fixed size ring-buffer with `tbb::speculative_spin_mutex` from Intel Threading Building Blocks.
+* `tbb::concurrent_bounded_queue` - eponymous queue used in non-blocking mode from Intel Threading Building Blocks.
 
 # Build and run instructions
 The containers provided are header-only class templates that require only `#include <atomic_queue/atomic_queue.h>`, no building/installing is necessary.
