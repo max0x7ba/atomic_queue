@@ -1,7 +1,6 @@
 # time make -rC ~/src/atomic_queue -j8 run_benchmarks
-# time make -rC ~/src/atomic_queue -j8 BUILD=debug run_benchmarks
-# time make -rC ~/src/atomic_queue -j8 TOOLSET=gcc-8 run_benchmarks
-# time make -rC ~/src/atomic_queue -j8 TOOLSET=gcc-8 run_tests
+# time make -rC ~/src/atomic_queue -j8 BUILD=debug run_tests
+# time make -rC ~/src/atomic_queue -j8 BUILD=debug TOOLSET=clang run_tests
 
 SHELL := /bin/bash
 BUILD := release
@@ -14,20 +13,10 @@ cc.gcc := gcc
 ld.gcc := g++
 ar.gcc := gcc-ar
 
-cxx.gcc-8 := g++-8
-cc.gcc-8 := gcc-8
-ld.gcc-8 := g++-8
-ar.gcc-8 := gcc-ar-8
-
 cxx.clang := clang++
 cc.clang := clang
 ld.clang := clang++
 ar.clang := ar
-
-cxx.clang-7 := clang++-7
-cc.clang-7 := clang-7
-ld.clang-7 := clang++-7
-ar.clang-7 := ar
 
 CXX := ${cxx.${TOOLSET}}
 CC := ${cc.${TOOLSET}}
@@ -43,8 +32,8 @@ cflags.gcc := -pthread -march=native -W{all,extra} -g -fmessage-length=0 ${cxxfl
 cflags.gcc-8 := ${cflags.gcc}
 
 cxxflags.clang.debug := -O0 -fstack-protector-all
-cxxflags.clang.release := -O3 -mtune=native -ffast-math -DNDEBUG
-cxxflags.clang := -pthread -std=gnu++14 -march=native -W{all,extra,error} -g -fmessage-length=0 ${cxxflags.clang.${BUILD}}
+cxxflags.clang.release := -O3 -mtune=native -ffast-math -falign-{functions,loops}=32 -DNDEBUG
+cxxflags.clang := -pthread -march=native -std=gnu++14 -W{all,extra,error} -g -fmessage-length=0 ${cxxflags.clang.${BUILD}}
 cxxflags.clang-7 := ${cxxflags.clang}
 
 ldflags.debug :=
@@ -59,7 +48,10 @@ ldflags := -fuse-ld=gold -pthread -g ${ldflags.${BUILD}} ${ldflags.${TOOLSET}} $
 ldlibs := -lrt ${LDLIBS}
 
 cppflags.tbb :=
-ldlibs.tbb := /usr/local/lib/libtbb.so
+ldlibs.tbb := {-L,'-Wl,-rpath='}/usr/local/lib -ltbb
+
+cppflags.moodycamel := -I$(abspath ..)
+ldlibs.moodycamel :=
 
 COMPILE.CXX = ${CXX} -o $@ -c ${cppflags} ${cxxflags} -MD -MP $(abspath $<)
 COMPILE.S = ${CXX} -o- -S -masm=intel ${cppflags} ${cxxflags} $(abspath $<) | c++filt > $@
@@ -78,14 +70,14 @@ ${exes} : % : ${build_dir}/%
 
 ${build_dir}/libatomic_queue.a : ${build_dir}/cpu_base_frequency.o
 
-${build_dir}/benchmarks : cppflags += ${cppflags.tbb}
-${build_dir}/benchmarks : ldlibs += ${ldlibs.tbb}
-${build_dir}/benchmarks : ${build_dir}/libatomic_queue.a
-${build_dir}/benchmarks : ${build_dir}/benchmarks.o Makefile | ${build_dir}
+${build_dir}/benchmarks : cppflags += ${cppflags.tbb} ${cppflags.moodycamel}
+${build_dir}/benchmarks : ldlibs += ${ldlibs.tbb} ${ldlibs.moodycamel}
+${build_dir}/benchmarks : ${build_dir}/benchmarks.o ${build_dir}/libatomic_queue.a Makefile | ${build_dir}
 	$(strip ${LINK.EXE})
 -include ${build_dir}/benchmarks.d
 
-${build_dir}/tests : ldlibs += -lboost_unit_test_framework
+${build_dir}/tests : cppflags += ${cppflags.moodycamel}
+${build_dir}/tests : ldlibs += ${ldlibs.moodycamel} -lboost_unit_test_framework
 ${build_dir}/tests : ${build_dir}/tests.o Makefile | ${build_dir}
 	$(strip ${LINK.EXE})
 -include ${build_dir}/tests.d

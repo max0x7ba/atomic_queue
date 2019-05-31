@@ -5,9 +5,9 @@
 
 #include "atomic_queue_mutex.h"
 #include "atomic_queue.h"
+#include "moodycamel.h"
 #include "barrier.h"
 
-#include <numeric>
 #include <cstdint>
 #include <thread>
 
@@ -19,11 +19,15 @@ namespace {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // Check that all push'es are ever pop'ed once with multiple producer and multiple consumers.
 template<class Queue>
 void stress() {
-    constexpr int PRODUCERS = 2;
-    constexpr int CONSUMERS = 2;
+    constexpr int PRODUCERS = 3;
+    constexpr int CONSUMERS = 3;
     constexpr unsigned N = 1000000;
 
     Queue q;
@@ -59,8 +63,14 @@ void stress() {
     for(auto& t : consumers)
         t.join();
 
-    uint64_t result = std::accumulate(results, results + CONSUMERS, uint64_t{});
     constexpr uint64_t expected_result = (N + 1) / 2. * N;
+
+    uint64_t result = 0;
+    for(auto& r : results) {
+        BOOST_CHECK_GT(r, expected_result / (CONSUMERS + 1)); // Make sure a consumer didn't starve. False positives are possible here.
+        result += r;
+    }
+
     int64_t result_diff = result / CONSUMERS - expected_result;
     BOOST_CHECK_EQUAL(result_diff, 0);
 }
@@ -91,6 +101,10 @@ BOOST_AUTO_TEST_CASE(stress_BlockingAtomicQueue2) {
 
 BOOST_AUTO_TEST_CASE(stress_pthread_spinlock) {
     stress<RetryDecorator<AtomicQueueSpinlock<unsigned, CAPACITY>>>();
+}
+
+BOOST_AUTO_TEST_CASE(stress_MoodyCamelQueue) {
+    stress<MoodyCamelQueue<unsigned, CAPACITY>>();
 }
 
 // BOOST_AUTO_TEST_CASE(stress_SpinlockHle) {

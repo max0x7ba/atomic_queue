@@ -25,11 +25,14 @@ The containers provided are header-only class templates that require only `#incl
 Building is neccessary to run the tests and benchmarks.
 
 ```
-git clone git@github.com:max0x7ba/atomic_queue.git
+git clone https://github.com/cameron314/concurrentqueue.git
+git clone https://github.com/max0x7ba/atomic_queue.git
 cd atomic_queue
 make -r -j4 run_tests
 make -r -j4 run_benchmarks
 ```
+
+The benchmark also requires Intel TBB library to be available. It assumes that it is installed in `/usr/local/include` and `/usr/local/lib`. If it is installed elsewhere you may like to modify `cppflags.tbb` and `ldlibs.tbb` in `Makefile`.
 
 # API
 The containers support the following APIs:
