@@ -3,7 +3,7 @@ Multiple producer multiple consumer C++14 *lock-free* queues based on `std::atom
 
 The main idea these queues utilize is _simplicity_: fixed size buffer, busy wait.
 
-These qualities are also limitations: the maximum queue size must be set at compile time, there are no blocking push/pop functionality. Nevertheless, ultra-low-latency applications need just that and nothing more. The simplicity pays off (scroll down for benchmarks).
+These qualities are also limitations: the maximum queue size must be set at compile time, there are no blocking push/pop functionality. Nevertheless, ultra-low-latency applications need just that and nothing more. The simplicity pays off (see the [scalability benchmark][1]).
 
 Available containers are:
 * `AtomicQueue` - a fixed size ring-buffer for atomic elements.
@@ -93,7 +93,7 @@ Results on Intel Xeon Gold 6132, Red Hat Enterprise Linux Server release 6.10 (S
 ## Throughput and scalability benchmark
 N producer threads push a 4-byte integer into one queue, N consumer threads pop the integers from the queue. Each producer posts 1,000,000 messages. Total time to send and receive all the messages is measured. The benchmark is run for from 1 producer and 1 consumer up to `(total-number-of-cpus / 2 - 1)` producers/consumers to measure the scalabilty of different queues.
 
-[View the interactive charts](https://max0x7ba.github.io/atomic_queue/html/scalability.html).
+[View the interactive charts][1].
 
 Results on Intel Core i7-7700K 5GHz, Ubuntu 18.04.2 LTS (up to 3 producers and 3 consumers):
 ```
@@ -246,3 +246,5 @@ tbb::concurrent_bounded_queue,13:   1,321,028 msg/sec (mean:   1,077,006 stdev: 
          BlockingAtomicQueue2,12:  18,422,462 msg/sec (mean:  10,758,590 stdev:   4,505,264) msg/sec
          BlockingAtomicQueue2,13:  17,183,451 msg/sec (mean:  10,493,666 stdev:   4,169,898) msg/sec
 ```
+
+[1]: https://max0x7ba.github.io/atomic_queue/html/scalability.html
