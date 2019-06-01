@@ -1,7 +1,6 @@
 'use strict';
 
 Highcharts.theme = {
-    colors: ['#F1C40F', '#F39C12', '#C0392B', '#E74C3C', '#9B59B6', '#58D68D', '#5DADE2', '#2E86C1', '#21618C'],
     chart: {
         backgroundColor: 'black',
         style: { fontFamily: "'Roboto Slab', sans-serif" }
@@ -71,6 +70,9 @@ Highcharts.theme = {
         column: {
             borderWidth: 0
         },
+        bar: {
+            borderWidth: 0
+        },
         candlestick: {
             lineColor: 'white'
         },
@@ -79,6 +81,9 @@ Highcharts.theme = {
         }
     },
     legend: {
+        layout: 'horizontal',
+        align: 'center',
+        verticalAlign: 'bottom',
         itemStyle: {
             color: '#808080'
         },
@@ -180,7 +185,10 @@ Highcharts.theme = {
     dataLabelsColor: '#B0B0B0',
     textColor: '#C0C0C0',
     contrastTextColor: '#F0F0F0',
-    maskColor: 'rgba(255,255,255,0.3)'
+    maskColor: 'rgba(255,255,255,0.3)',
+
+    lang: { thousandsSep: ',' },
+    credits: { enabled: false }
 };
 
 // Apply the theme

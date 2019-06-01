@@ -9,3 +9,4 @@ from parse_output import *
 results = list(parse_output(sys.stdin))
 df = as_scalability_df(results)
 df.to_json(sys.stdout, orient='columns')
+print()
