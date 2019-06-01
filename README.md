@@ -3,7 +3,7 @@ Multiple producer multiple consumer C++14 *lock-free* queues based on `std::atom
 
 The main idea these queues utilize is _simplicity_: fixed size buffer, busy wait.
 
-These qualities are also limitations: the maximum queue size must be set at compile time, there are no blocking push/pop functionality. Nevertheless, ultra-low-latency applications need just that and nothing more. The simplicity pays off (see the [scalability benchmark][1]).
+These qualities are also limitations: the maximum queue size must be set at compile time, there are no blocking push/pop functionality. Nevertheless, ultra-low-latency applications need just that and nothing more. The simplicity pays off (see the [throughput and latency benchmarks][1]).
 
 Available containers are:
 * `AtomicQueue` - a fixed size ring-buffer for atomic elements.
@@ -63,7 +63,7 @@ In other words, power-of-2 ring-buffer array size yields top performance.
 # Benchmarks
 I have access to x86-64 hardware only. If you use a different architecture you may like to run tests a few times first and make sure that they pass. If they don't you may like to raise an issue.
 
-[View benchmarks charts][1].
+[View throughput and latency benchmarks charts][1].
 
 ## Ping-pong benchmark
 One thread posts an integer to another thread and waits for the reply using two queues. The benchmarks measures the total time of 100,000 ping-pongs, best of 10 runs. Contention is minimal here to be able to achieve and measure the lowest latency. Reports the average round-trip time.
