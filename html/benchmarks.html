@@ -8,7 +8,7 @@
     <script src="theme.js"></script>
     <script src="benchmarks.js"></script>
     <meta charset="utf-8">
-    <title>Scalaibilty Benchmarks</title>
+    <title>Scalaibilty and Latency Benchmarks</title>
   </head>
   <body>
     <h1>Scalability Benchmark</h1>
@@ -20,5 +20,6 @@
     <p>One thread posts an integer to another thread and waits for the reply using two queues. The benchmarks measures the total time of 100,000 ping-pongs, best of 10 runs. Contention is minimal here to be able to achieve and measure the lowest latency. Reports the average round-trip time.</p>
     <div class="chart" id="latency-7700k-5GHz"></div>
     <div class="chart" id="latency-xeon-gold-6132"></div>
+    <p class="copyright">(C) Maxim Egorushkin 2019</p>
   </body>
 </html>

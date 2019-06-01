@@ -12,10 +12,14 @@ div.chart {
 p {
     color: #A0A0A0;
     margin-left: 2em;
-    margin-right: 2em;
+}
+
+p.copyright {
+    color: #A0A0A0;
+    text-align: right;
+    font-size: 0.8em;
 }
 
 h1 {
     margin-left: 1em;
-    margin-right: 1em;
 }
