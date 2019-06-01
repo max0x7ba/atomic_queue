@@ -63,6 +63,8 @@ In other words, power-of-2 ring-buffer array size yields top performance.
 # Benchmarks
 I have access to x86-64 hardware only. If you use a different architecture you may like to run tests a few times first and make sure that they pass. If they don't you may like to raise an issue.
 
+[View benchmarks charts][1].
+
 ## Ping-pong benchmark
 One thread posts an integer to another thread and waits for the reply using two queues. The benchmarks measures the total time of 100,000 ping-pongs, best of 10 runs. Contention is minimal here to be able to achieve and measure the lowest latency. Reports the average round-trip time.
 
@@ -98,8 +100,6 @@ Results on Intel Xeon Gold 6132, Red Hat Enterprise Linux Server release 6.10 (S
 
 ## Throughput and scalability benchmark
 N producer threads push a 4-byte integer into one queue, N consumer threads pop the integers from the queue. Each producer posts 1,000,000 messages. Total time to send and receive all the messages is measured. The benchmark is run for from 1 producer and 1 consumer up to `(total-number-of-cpus / 2 - 1)` producers/consumers to measure the scalabilty of different queues.
-
-[View the interactive charts][1].
 
 Results on Intel Core i7-7700K 5GHz, Ubuntu 18.04.2 LTS (up to 3 producers and 3 consumers):
 ```
@@ -273,4 +273,4 @@ tbb::concurrent_bounded_queue,13:   1,346,596 msg/sec (mean:   1,238,757 stdev: 
 
 (C) Maxim Egorushkin 2019
 
-[1]: https://max0x7ba.github.io/atomic_queue/html/scalability.html
+[1]: https://max0x7ba.github.io/atomic_queue/html/benchmarks.html
