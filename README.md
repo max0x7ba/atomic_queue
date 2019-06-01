@@ -68,30 +68,32 @@ One thread posts an integer to another thread and waits for the reply using two 
 
 Results on Intel Core i7-7700K 5GHz, Ubuntu 18.04.2 LTS:
 ```
-                pthread_spinlock: 0.000000338 sec/round-trip (mean: 0.000006725 stdev: 0.000016684)
-     boost::lockfree::spsc_queue: 0.000000113 sec/round-trip (mean: 0.000000121 stdev: 0.000000005)
-          boost::lockfree::queue: 0.000000262 sec/round-trip (mean: 0.000000281 stdev: 0.000000014)
-                 tbb::spin_mutex: 0.000000940 sec/round-trip (mean: 0.000001318 stdev: 0.000000228)
-     tbb::speculative_spin_mutex: 0.000000815 sec/round-trip (mean: 0.000003316 stdev: 0.000003579)
-   tbb::concurrent_bounded_queue: 0.000000250 sec/round-trip (mean: 0.000000254 stdev: 0.000000002)
-                     AtomicQueue: 0.000000146 sec/round-trip (mean: 0.000000160 stdev: 0.000000009)
-             BlockingAtomicQueue: 0.000000094 sec/round-trip (mean: 0.000000104 stdev: 0.000000009)
-                    AtomicQueue2: 0.000000177 sec/round-trip (mean: 0.000000185 stdev: 0.000000008)
-            BlockingAtomicQueue2: 0.000000188 sec/round-trip (mean: 0.000000199 stdev: 0.000000006)
+     boost::lockfree::spsc_queue: 0.000000104 sec/round-trip (mean: 0.000000122 stdev: 0.000000006)
+          boost::lockfree::queue: 0.000000269 sec/round-trip (mean: 0.000000289 stdev: 0.000000010)
+                pthread_spinlock: 0.000000397 sec/round-trip (mean: 0.000001894 stdev: 0.000004674)
+     moodycamel::ConcurrentQueue: 0.000000191 sec/round-trip (mean: 0.000000198 stdev: 0.000000004)
+                 tbb::spin_mutex: 0.000000623 sec/round-trip (mean: 0.000001304 stdev: 0.000000298)
+     tbb::speculative_spin_mutex: 0.000000502 sec/round-trip (mean: 0.000002322 stdev: 0.000002635)
+   tbb::concurrent_bounded_queue: 0.000000248 sec/round-trip (mean: 0.000000255 stdev: 0.000000003)
+                     AtomicQueue: 0.000000142 sec/round-trip (mean: 0.000000159 stdev: 0.000000007)
+             BlockingAtomicQueue: 0.000000093 sec/round-trip (mean: 0.000000106 stdev: 0.000000008)
+                    AtomicQueue2: 0.000000170 sec/round-trip (mean: 0.000000186 stdev: 0.000000007)
+            BlockingAtomicQueue2: 0.000000184 sec/round-trip (mean: 0.000000198 stdev: 0.000000005)
 ```
 
 Results on Intel Xeon Gold 6132, Red Hat Enterprise Linux Server release 6.10 (Santiago) (on one NUMA node):
 ```
-                pthread_spinlock: 0.000001126 sec/round-trip (mean: 0.000001371 stdev: 0.000000110)
-     boost::lockfree::spsc_queue: 0.000000267 sec/round-trip (mean: 0.000000330 stdev: 0.000000040)
-          boost::lockfree::queue: 0.000000704 sec/round-trip (mean: 0.000000731 stdev: 0.000000029)
-                 tbb::spin_mutex: 0.000001954 sec/round-trip (mean: 0.000002253 stdev: 0.000000178)
-     tbb::speculative_spin_mutex: 0.000001894 sec/round-trip (mean: 0.000002871 stdev: 0.000000605)
-   tbb::concurrent_bounded_queue: 0.000000622 sec/round-trip (mean: 0.000000652 stdev: 0.000000026)
-                     AtomicQueue: 0.000000379 sec/round-trip (mean: 0.000000407 stdev: 0.000000020)
-             BlockingAtomicQueue: 0.000000205 sec/round-trip (mean: 0.000000227 stdev: 0.000000015)
-                    AtomicQueue2: 0.000000430 sec/round-trip (mean: 0.000000488 stdev: 0.000000035)
-            BlockingAtomicQueue2: 0.000000349 sec/round-trip (mean: 0.000000426 stdev: 0.000000048)
+     boost::lockfree::spsc_queue: 0.000000311 sec/round-trip (mean: 0.000000378 stdev: 0.000000064)
+          boost::lockfree::queue: 0.000000661 sec/round-trip (mean: 0.000000741 stdev: 0.000000052)
+                pthread_spinlock: 0.000001114 sec/round-trip (mean: 0.000001242 stdev: 0.000000094)
+     moodycamel::ConcurrentQueue: 0.000000451 sec/round-trip (mean: 0.000000468 stdev: 0.000000016)
+                 tbb::spin_mutex: 0.000001995 sec/round-trip (mean: 0.000002187 stdev: 0.000000149)
+     tbb::speculative_spin_mutex: 0.000002353 sec/round-trip (mean: 0.000002931 stdev: 0.000000610)
+   tbb::concurrent_bounded_queue: 0.000000611 sec/round-trip (mean: 0.000000644 stdev: 0.000000030)
+                     AtomicQueue: 0.000000342 sec/round-trip (mean: 0.000000390 stdev: 0.000000028)
+             BlockingAtomicQueue: 0.000000211 sec/round-trip (mean: 0.000000233 stdev: 0.000000018)
+                    AtomicQueue2: 0.000000429 sec/round-trip (mean: 0.000000483 stdev: 0.000000032)
+            BlockingAtomicQueue2: 0.000000377 sec/round-trip (mean: 0.000000405 stdev: 0.000000024)
 ```
 
 ## Throughput and scalability benchmark
@@ -101,154 +103,172 @@ N producer threads push a 4-byte integer into one queue, N consumer threads pop 
 
 Results on Intel Core i7-7700K 5GHz, Ubuntu 18.04.2 LTS (up to 3 producers and 3 consumers):
 ```
-              pthread_spinlock,1:  41,729,933 msg/sec (mean:  26,683,936 stdev:  11,654,232)
-              pthread_spinlock,2:  15,577,961 msg/sec (mean:  10,918,994 stdev:   4,056,484)
-              pthread_spinlock,3:  14,945,822 msg/sec (mean:  12,344,251 stdev:   1,516,615)
-        boost::lockfree::queue,1:  10,205,501 msg/sec (mean:   8,777,975 stdev:     519,013)
-        boost::lockfree::queue,2:   7,970,549 msg/sec (mean:   7,571,607 stdev:     204,034)
-        boost::lockfree::queue,3:   7,920,727 msg/sec (mean:   7,500,886 stdev:     223,848)
-               tbb::spin_mutex,1:  85,232,248 msg/sec (mean:  75,835,769 stdev:   7,520,634)
-               tbb::spin_mutex,2:  54,468,218 msg/sec (mean:  52,852,844 stdev:   1,160,117)
-               tbb::spin_mutex,3:  38,036,453 msg/sec (mean:  36,639,812 stdev:   1,349,359)
-   tbb::speculative_spin_mutex,1:  53,445,745 msg/sec (mean:  43,561,898 stdev:  10,963,816)
-   tbb::speculative_spin_mutex,2:  39,245,530 msg/sec (mean:  36,096,034 stdev:   2,343,191)
-   tbb::speculative_spin_mutex,3:  31,189,300 msg/sec (mean:  29,897,663 stdev:   1,349,058)
- tbb::concurrent_bounded_queue,1:  15,349,404 msg/sec (mean:  15,101,452 stdev:     168,659)
- tbb::concurrent_bounded_queue,2:  15,966,472 msg/sec (mean:  15,274,391 stdev:     338,877)
- tbb::concurrent_bounded_queue,3:  14,038,820 msg/sec (mean:  13,576,880 stdev:     319,065)
-                   AtomicQueue,1:  27,473,115 msg/sec (mean:  20,220,784 stdev:   2,882,339)
-                   AtomicQueue,2:  13,780,199 msg/sec (mean:  12,759,643 stdev:     537,253)
-                   AtomicQueue,3:  13,532,478 msg/sec (mean:  11,716,300 stdev:     801,247)
-           BlockingAtomicQueue,1: 117,895,405 msg/sec (mean: 116,294,485 stdev:   1,552,575)
-           BlockingAtomicQueue,2:  43,575,992 msg/sec (mean:  38,487,993 stdev:   2,474,282)
-           BlockingAtomicQueue,3:  36,987,120 msg/sec (mean:  35,985,071 stdev:     405,577)
-                  AtomicQueue2,1:  25,092,312 msg/sec (mean:  21,651,330 stdev:   1,766,771)
-                  AtomicQueue2,2:  14,274,779 msg/sec (mean:  12,587,898 stdev:     828,637)
-                  AtomicQueue2,3:  12,566,061 msg/sec (mean:  11,592,397 stdev:     512,848)
-          BlockingAtomicQueue2,1:  98,733,131 msg/sec (mean:  51,740,580 stdev:  22,082,502)
-          BlockingAtomicQueue2,2:  38,478,447 msg/sec (mean:  35,316,568 stdev:   2,384,323)
-          BlockingAtomicQueue2,3:  37,995,297 msg/sec (mean:  36,199,004 stdev:     892,665)
+   boost::lockfree::spsc_queue,1: 200,912,400 msg/sec (mean:  55,913,665 stdev:  29,080,515)
+        boost::lockfree::queue,1:  11,023,483 msg/sec (mean:   8,891,171 stdev:     708,467)
+        boost::lockfree::queue,2:   8,099,673 msg/sec (mean:   7,645,702 stdev:     149,323)
+        boost::lockfree::queue,3:   8,206,546 msg/sec (mean:   7,536,162 stdev:     250,879)
+              pthread_spinlock,1:  41,645,830 msg/sec (mean:  26,320,453 stdev:  13,257,379)
+              pthread_spinlock,2:  15,673,894 msg/sec (mean:  12,444,315 stdev:   1,965,528)
+              pthread_spinlock,3:  14,472,407 msg/sec (mean:  11,887,118 stdev:   1,060,958)
+   moodycamel::ConcurrentQueue,1:  21,877,814 msg/sec (mean:  19,444,916 stdev:   1,348,017)
+   moodycamel::ConcurrentQueue,2:  13,313,696 msg/sec (mean:  11,499,845 stdev:     437,919)
+   moodycamel::ConcurrentQueue,3:  16,899,773 msg/sec (mean:  15,984,864 stdev:     797,766)
+               tbb::spin_mutex,1:  84,869,062 msg/sec (mean:  76,475,045 stdev:   6,171,235)
+               tbb::spin_mutex,2:  54,668,038 msg/sec (mean:  51,719,257 stdev:   2,075,092)
+               tbb::spin_mutex,3:  37,958,525 msg/sec (mean:  36,439,365 stdev:   1,404,608)
+   tbb::speculative_spin_mutex,1:  54,891,133 msg/sec (mean:  43,317,759 stdev:   8,101,107)
+   tbb::speculative_spin_mutex,2:  38,183,081 msg/sec (mean:  34,324,437 stdev:   2,121,573)
+   tbb::speculative_spin_mutex,3:  31,167,841 msg/sec (mean:  29,258,773 stdev:   1,274,343)
+ tbb::concurrent_bounded_queue,1:  15,714,751 msg/sec (mean:  15,087,393 stdev:     417,337)
+ tbb::concurrent_bounded_queue,2:  16,053,555 msg/sec (mean:  15,201,702 stdev:     364,394)
+ tbb::concurrent_bounded_queue,3:  14,006,100 msg/sec (mean:  13,396,482 stdev:     493,767)
+                   AtomicQueue,1:  27,042,489 msg/sec (mean:  21,581,720 stdev:   3,450,145)
+                   AtomicQueue,2:  14,433,267 msg/sec (mean:  13,375,775 stdev:     865,119)
+                   AtomicQueue,3:  13,174,470 msg/sec (mean:  12,001,608 stdev:     686,301)
+           BlockingAtomicQueue,1: 118,101,900 msg/sec (mean: 101,335,735 stdev:  22,520,834)
+           BlockingAtomicQueue,2:  48,069,873 msg/sec (mean:  41,438,055 stdev:   3,801,293)
+           BlockingAtomicQueue,3:  45,423,479 msg/sec (mean:  38,890,828 stdev:   4,074,442)
+                  AtomicQueue2,1:  26,956,305 msg/sec (mean:  22,534,377 stdev:   3,201,878)
+                  AtomicQueue2,2:  14,416,246 msg/sec (mean:  13,183,150 stdev:     850,885)
+                  AtomicQueue2,3:  13,116,088 msg/sec (mean:  11,947,091 stdev:     660,428)
+          BlockingAtomicQueue2,1:  99,226,630 msg/sec (mean:  59,988,061 stdev:  25,054,014)
+          BlockingAtomicQueue2,2:  39,737,559 msg/sec (mean:  35,894,714 stdev:   3,228,720)
+          BlockingAtomicQueue2,3:  54,349,231 msg/sec (mean:  37,354,419 stdev:   3,331,709)
 ```
 
 Results on Intel Xeon Gold 6132, Red Hat Enterprise Linux Server release 6.10 (Santiago):
 ```
-              pthread_spinlock,1:  10,528,950 msg/sec (mean:   7,135,541 stdev:   1,656,530) msg/sec
-              pthread_spinlock,2:   4,893,893 msg/sec (mean:   3,475,089 stdev:   1,301,925) msg/sec
-              pthread_spinlock,3:   3,415,445 msg/sec (mean:   2,169,690 stdev:   1,020,208) msg/sec
-              pthread_spinlock,4:   1,815,364 msg/sec (mean:   1,102,412 stdev:     299,150) msg/sec
-              pthread_spinlock,5:   1,838,567 msg/sec (mean:   1,252,792 stdev:     380,737) msg/sec
-              pthread_spinlock,6:   1,976,192 msg/sec (mean:   1,131,395 stdev:     374,738) msg/sec
-              pthread_spinlock,7:   1,356,570 msg/sec (mean:     927,125 stdev:     182,245) msg/sec
-              pthread_spinlock,8:     750,588 msg/sec (mean:     337,961 stdev:     168,515) msg/sec
-              pthread_spinlock,9:     406,777 msg/sec (mean:     284,747 stdev:      74,412) msg/sec
-             pthread_spinlock,10:     488,545 msg/sec (mean:     346,543 stdev:      70,152) msg/sec
-             pthread_spinlock,11:     938,401 msg/sec (mean:     421,141 stdev:     191,404) msg/sec
-             pthread_spinlock,12:     771,721 msg/sec (mean:     548,686 stdev:     101,946) msg/sec
-             pthread_spinlock,13:     880,304 msg/sec (mean:     728,863 stdev:     108,598) msg/sec
-        boost::lockfree::queue,1:   2,832,410 msg/sec (mean:   2,719,808 stdev:      71,558) msg/sec
-        boost::lockfree::queue,2:   2,447,314 msg/sec (mean:   2,205,913 stdev:     185,500) msg/sec
-        boost::lockfree::queue,3:   2,313,702 msg/sec (mean:   2,055,019 stdev:     165,980) msg/sec
-        boost::lockfree::queue,4:   2,246,386 msg/sec (mean:   1,791,941 stdev:     170,484) msg/sec
-        boost::lockfree::queue,5:   1,869,494 msg/sec (mean:   1,672,529 stdev:     128,212) msg/sec
-        boost::lockfree::queue,6:   1,960,557 msg/sec (mean:   1,577,905 stdev:     169,535) msg/sec
-        boost::lockfree::queue,7:   1,160,872 msg/sec (mean:     978,152 stdev:     124,778) msg/sec
-        boost::lockfree::queue,8:     875,150 msg/sec (mean:     745,016 stdev:      60,285) msg/sec
-        boost::lockfree::queue,9:     857,813 msg/sec (mean:     710,603 stdev:      66,984) msg/sec
-       boost::lockfree::queue,10:     947,622 msg/sec (mean:     712,768 stdev:      93,074) msg/sec
-       boost::lockfree::queue,11:     851,373 msg/sec (mean:     709,074 stdev:      61,122) msg/sec
-       boost::lockfree::queue,12:     710,111 msg/sec (mean:     651,526 stdev:      37,881) msg/sec
-       boost::lockfree::queue,13:     719,645 msg/sec (mean:     678,960 stdev:      23,743) msg/sec
-               tbb::spin_mutex,1:  34,681,551 msg/sec (mean:  27,082,041 stdev:   6,139,291) msg/sec
-               tbb::spin_mutex,2:  17,158,264 msg/sec (mean:  11,650,750 stdev:   3,082,065) msg/sec
-               tbb::spin_mutex,3:  10,342,594 msg/sec (mean:   7,011,495 stdev:   1,591,270) msg/sec
-               tbb::spin_mutex,4:   7,667,926 msg/sec (mean:   4,606,593 stdev:   1,306,123) msg/sec
-               tbb::spin_mutex,5:   3,152,852 msg/sec (mean:   2,459,999 stdev:     398,700) msg/sec
-               tbb::spin_mutex,6:   1,965,263 msg/sec (mean:   1,619,113 stdev:     305,671) msg/sec
-               tbb::spin_mutex,7:     983,530 msg/sec (mean:     727,541 stdev:     136,859) msg/sec
-               tbb::spin_mutex,8:     676,976 msg/sec (mean:     572,145 stdev:      56,698) msg/sec
-               tbb::spin_mutex,9:     448,862 msg/sec (mean:     381,525 stdev:      42,106) msg/sec
-              tbb::spin_mutex,10:     406,257 msg/sec (mean:     297,962 stdev:      49,150) msg/sec
-              tbb::spin_mutex,11:     370,267 msg/sec (mean:     295,962 stdev:      48,509) msg/sec
-              tbb::spin_mutex,12:     361,317 msg/sec (mean:     269,652 stdev:      48,871) msg/sec
-              tbb::spin_mutex,13:     296,267 msg/sec (mean:     257,280 stdev:      32,800) msg/sec
-   tbb::speculative_spin_mutex,1:  30,907,825 msg/sec (mean:  23,624,642 stdev:   3,401,649) msg/sec
-   tbb::speculative_spin_mutex,2:  13,545,496 msg/sec (mean:  11,135,443 stdev:   1,196,123) msg/sec
-   tbb::speculative_spin_mutex,3:   9,674,606 msg/sec (mean:   6,597,609 stdev:   1,247,501) msg/sec
-   tbb::speculative_spin_mutex,4:   6,905,555 msg/sec (mean:   4,955,328 stdev:     927,885) msg/sec
-   tbb::speculative_spin_mutex,5:   7,253,715 msg/sec (mean:   4,054,914 stdev:   1,431,125) msg/sec
-   tbb::speculative_spin_mutex,6:   4,233,654 msg/sec (mean:   3,177,924 stdev:     513,674) msg/sec
-   tbb::speculative_spin_mutex,7:   2,218,420 msg/sec (mean:   1,398,375 stdev:     550,866) msg/sec
-   tbb::speculative_spin_mutex,8:   2,033,093 msg/sec (mean:     879,026 stdev:     516,417) msg/sec
-   tbb::speculative_spin_mutex,9:   1,420,848 msg/sec (mean:     826,594 stdev:     307,698) msg/sec
-  tbb::speculative_spin_mutex,10:   1,388,596 msg/sec (mean:     857,187 stdev:     322,385) msg/sec
-  tbb::speculative_spin_mutex,11:   1,281,117 msg/sec (mean:     812,983 stdev:     247,808) msg/sec
-  tbb::speculative_spin_mutex,12:   1,205,642 msg/sec (mean:     779,953 stdev:     235,769) msg/sec
-  tbb::speculative_spin_mutex,13:   1,094,144 msg/sec (mean:     775,990 stdev:     194,991) msg/sec
- tbb::concurrent_bounded_queue,1:   6,098,542 msg/sec (mean:   5,814,600 stdev:     147,108) msg/sec
- tbb::concurrent_bounded_queue,2:   5,424,954 msg/sec (mean:   4,853,541 stdev:     464,175) msg/sec
- tbb::concurrent_bounded_queue,3:   3,894,589 msg/sec (mean:   3,448,634 stdev:     184,678) msg/sec
- tbb::concurrent_bounded_queue,4:   3,475,549 msg/sec (mean:   3,092,397 stdev:     219,271) msg/sec
- tbb::concurrent_bounded_queue,5:   3,135,563 msg/sec (mean:   2,829,418 stdev:     153,813) msg/sec
- tbb::concurrent_bounded_queue,6:   2,789,218 msg/sec (mean:   2,581,072 stdev:     145,911) msg/sec
- tbb::concurrent_bounded_queue,7:   1,484,382 msg/sec (mean:   1,335,447 stdev:      68,810) msg/sec
- tbb::concurrent_bounded_queue,8:   1,068,659 msg/sec (mean:   1,012,191 stdev:      44,403) msg/sec
- tbb::concurrent_bounded_queue,9:   1,029,527 msg/sec (mean:     948,962 stdev:      41,990) msg/sec
-tbb::concurrent_bounded_queue,10:   1,041,493 msg/sec (mean:     936,649 stdev:      60,383) msg/sec
-tbb::concurrent_bounded_queue,11:   1,213,040 msg/sec (mean:     961,922 stdev:     109,544) msg/sec
-tbb::concurrent_bounded_queue,12:   1,157,905 msg/sec (mean:     990,672 stdev:     100,562) msg/sec
-tbb::concurrent_bounded_queue,13:   1,321,028 msg/sec (mean:   1,077,006 stdev:     115,641) msg/sec
-                   AtomicQueue,1:   9,759,971 msg/sec (mean:   8,289,720 stdev:   1,217,898) msg/sec
-                   AtomicQueue,2:   5,551,276 msg/sec (mean:   4,422,193 stdev:     468,885) msg/sec
-                   AtomicQueue,3:   3,937,683 msg/sec (mean:   3,378,673 stdev:     265,828) msg/sec
-                   AtomicQueue,4:   3,492,101 msg/sec (mean:   2,686,387 stdev:     428,926) msg/sec
-                   AtomicQueue,5:   2,650,348 msg/sec (mean:   2,248,884 stdev:     239,093) msg/sec
-                   AtomicQueue,6:   2,492,281 msg/sec (mean:   2,038,296 stdev:     238,984) msg/sec
-                   AtomicQueue,7:   1,304,372 msg/sec (mean:   1,127,092 stdev:      99,367) msg/sec
-                   AtomicQueue,8:   1,083,301 msg/sec (mean:     926,286 stdev:     107,203) msg/sec
-                   AtomicQueue,9:   1,013,039 msg/sec (mean:     853,978 stdev:     106,103) msg/sec
-                  AtomicQueue,10:   1,071,124 msg/sec (mean:     830,858 stdev:     126,075) msg/sec
-                  AtomicQueue,11:   1,040,391 msg/sec (mean:     812,820 stdev:     119,143) msg/sec
-                  AtomicQueue,12:   1,079,620 msg/sec (mean:     816,151 stdev:     141,325) msg/sec
-                  AtomicQueue,13:   1,256,532 msg/sec (mean:     857,250 stdev:     188,958) msg/sec
-           BlockingAtomicQueue,1:  68,666,934 msg/sec (mean:  49,140,572 stdev:  18,686,875) msg/sec
-           BlockingAtomicQueue,2:  17,451,686 msg/sec (mean:  11,502,455 stdev:   2,658,769) msg/sec
-           BlockingAtomicQueue,3:  17,462,525 msg/sec (mean:  13,084,148 stdev:   2,764,593) msg/sec
-           BlockingAtomicQueue,4:  20,015,414 msg/sec (mean:  15,096,382 stdev:   2,692,777) msg/sec
-           BlockingAtomicQueue,5:  21,160,763 msg/sec (mean:  15,833,361 stdev:   3,401,577) msg/sec
-           BlockingAtomicQueue,6:  21,323,176 msg/sec (mean:  16,231,944 stdev:   3,415,167) msg/sec
-           BlockingAtomicQueue,7:  17,352,048 msg/sec (mean:  11,075,951 stdev:   2,716,966) msg/sec
-           BlockingAtomicQueue,8:  16,279,532 msg/sec (mean:  11,067,140 stdev:   2,954,936) msg/sec
-           BlockingAtomicQueue,9:  15,683,801 msg/sec (mean:  10,910,722 stdev:   2,865,635) msg/sec
-          BlockingAtomicQueue,10:  16,975,831 msg/sec (mean:  11,288,098 stdev:   3,376,545) msg/sec
-          BlockingAtomicQueue,11:  16,986,634 msg/sec (mean:  11,263,550 stdev:   3,449,288) msg/sec
-          BlockingAtomicQueue,12:  17,341,962 msg/sec (mean:  11,253,321 stdev:   3,427,861) msg/sec
-          BlockingAtomicQueue,13:  21,286,526 msg/sec (mean:  12,243,851 stdev:   5,090,129) msg/sec
-                  AtomicQueue2,1:   8,411,912 msg/sec (mean:   6,592,580 stdev:     989,437) msg/sec
-                  AtomicQueue2,2:   4,776,622 msg/sec (mean:   4,177,573 stdev:     321,332) msg/sec
-                  AtomicQueue2,3:   3,452,154 msg/sec (mean:   3,177,045 stdev:     237,084) msg/sec
-                  AtomicQueue2,4:   3,139,269 msg/sec (mean:   2,583,758 stdev:     271,817) msg/sec
-                  AtomicQueue2,5:   2,855,631 msg/sec (mean:   2,233,939 stdev:     265,530) msg/sec
-                  AtomicQueue2,6:   2,403,095 msg/sec (mean:   1,960,660 stdev:     220,065) msg/sec
-                  AtomicQueue2,7:   1,368,201 msg/sec (mean:   1,123,255 stdev:     122,034) msg/sec
-                  AtomicQueue2,8:   1,061,715 msg/sec (mean:     911,566 stdev:     109,810) msg/sec
-                  AtomicQueue2,9:   1,066,555 msg/sec (mean:     845,567 stdev:     123,918) msg/sec
-                 AtomicQueue2,10:   1,055,948 msg/sec (mean:     833,438 stdev:     127,311) msg/sec
-                 AtomicQueue2,11:   1,118,051 msg/sec (mean:     818,161 stdev:     149,693) msg/sec
-                 AtomicQueue2,12:   1,068,713 msg/sec (mean:     823,639 stdev:     153,354) msg/sec
-                 AtomicQueue2,13:   1,078,537 msg/sec (mean:     861,185 stdev:     155,784) msg/sec
-          BlockingAtomicQueue2,1:  39,681,843 msg/sec (mean:  17,274,996 stdev:  10,063,758) msg/sec
-          BlockingAtomicQueue2,2:  14,543,387 msg/sec (mean:  10,099,061 stdev:   2,843,547) msg/sec
-          BlockingAtomicQueue2,3:  18,757,837 msg/sec (mean:  11,923,479 stdev:   2,965,424) msg/sec
-          BlockingAtomicQueue2,4:  19,715,309 msg/sec (mean:  13,879,254 stdev:   3,116,542) msg/sec
-          BlockingAtomicQueue2,5:  20,939,894 msg/sec (mean:  14,058,602 stdev:   3,978,787) msg/sec
-          BlockingAtomicQueue2,6:  20,621,634 msg/sec (mean:  14,037,438 stdev:   3,676,946) msg/sec
-          BlockingAtomicQueue2,7:  12,647,499 msg/sec (mean:   9,992,268 stdev:   1,509,709) msg/sec
-          BlockingAtomicQueue2,8:  15,973,301 msg/sec (mean:   9,964,540 stdev:   3,130,516) msg/sec
-          BlockingAtomicQueue2,9:  15,591,109 msg/sec (mean:  10,102,342 stdev:   3,409,520) msg/sec
-         BlockingAtomicQueue2,10:  16,220,540 msg/sec (mean:  10,419,866 stdev:   3,767,179) msg/sec
-         BlockingAtomicQueue2,11:  16,370,119 msg/sec (mean:  10,647,052 stdev:   3,986,337) msg/sec
-         BlockingAtomicQueue2,12:  18,422,462 msg/sec (mean:  10,758,590 stdev:   4,505,264) msg/sec
-         BlockingAtomicQueue2,13:  17,183,451 msg/sec (mean:  10,493,666 stdev:   4,169,898) msg/sec
+   boost::lockfree::spsc_queue,1:  28,647,057 msg/sec (mean:  22,693,074 stdev:   3,598,465)
+        boost::lockfree::queue,1:   3,076,177 msg/sec (mean:   2,765,004 stdev:     195,521)
+        boost::lockfree::queue,2:   2,585,288 msg/sec (mean:   2,338,816 stdev:     107,362)
+        boost::lockfree::queue,3:   2,308,909 msg/sec (mean:   2,057,308 stdev:     153,187)
+        boost::lockfree::queue,4:   2,077,551 msg/sec (mean:   1,967,348 stdev:     112,596)
+        boost::lockfree::queue,5:   2,132,701 msg/sec (mean:   1,891,829 stdev:     137,626)
+        boost::lockfree::queue,6:   1,910,673 msg/sec (mean:   1,749,657 stdev:      91,024)
+        boost::lockfree::queue,7:   1,272,620 msg/sec (mean:   1,125,578 stdev:     125,300)
+        boost::lockfree::queue,8:     995,984 msg/sec (mean:     889,595 stdev:      83,644)
+        boost::lockfree::queue,9:     971,658 msg/sec (mean:     845,532 stdev:      77,976)
+       boost::lockfree::queue,10:     935,901 msg/sec (mean:     811,837 stdev:      74,902)
+       boost::lockfree::queue,11:     913,673 msg/sec (mean:     788,239 stdev:      77,656)
+       boost::lockfree::queue,12:     981,122 msg/sec (mean:     799,710 stdev:     114,963)
+       boost::lockfree::queue,13:     952,212 msg/sec (mean:     782,055 stdev:     101,111)
+              pthread_spinlock,1:  11,181,241 msg/sec (mean:   8,678,774 stdev:   1,431,924)
+              pthread_spinlock,2:   4,712,279 msg/sec (mean:   3,961,406 stdev:     737,401)
+              pthread_spinlock,3:   2,948,019 msg/sec (mean:   2,427,866 stdev:     461,181)
+              pthread_spinlock,4:   2,700,026 msg/sec (mean:   2,310,386 stdev:     289,120)
+              pthread_spinlock,5:   2,152,777 msg/sec (mean:   1,601,107 stdev:     273,779)
+              pthread_spinlock,6:   2,024,179 msg/sec (mean:   1,634,283 stdev:     190,858)
+              pthread_spinlock,7:     928,253 msg/sec (mean:     763,768 stdev:      92,018)
+              pthread_spinlock,8:   1,171,516 msg/sec (mean:     874,895 stdev:     177,677)
+              pthread_spinlock,9:   1,004,067 msg/sec (mean:     804,082 stdev:     149,973)
+             pthread_spinlock,10:     933,977 msg/sec (mean:     784,822 stdev:     119,769)
+             pthread_spinlock,11:   1,092,945 msg/sec (mean:     878,627 stdev:     120,965)
+             pthread_spinlock,12:     986,337 msg/sec (mean:     923,589 stdev:      46,840)
+             pthread_spinlock,13:   1,014,406 msg/sec (mean:     934,062 stdev:      52,259)
+   moodycamel::ConcurrentQueue,1:   9,114,627 msg/sec (mean:   8,308,408 stdev:     672,635)
+   moodycamel::ConcurrentQueue,2:   7,268,810 msg/sec (mean:   6,665,790 stdev:     265,512)
+   moodycamel::ConcurrentQueue,3:   6,919,174 msg/sec (mean:   6,269,986 stdev:     383,235)
+   moodycamel::ConcurrentQueue,4:   6,846,519 msg/sec (mean:   6,421,347 stdev:     231,997)
+   moodycamel::ConcurrentQueue,5:   7,140,036 msg/sec (mean:   6,614,685 stdev:     306,086)
+   moodycamel::ConcurrentQueue,6:   6,757,518 msg/sec (mean:   6,494,175 stdev:     227,283)
+   moodycamel::ConcurrentQueue,7:   5,071,657 msg/sec (mean:   4,339,176 stdev:     333,287)
+   moodycamel::ConcurrentQueue,8:   4,363,453 msg/sec (mean:   4,196,728 stdev:     114,195)
+   moodycamel::ConcurrentQueue,9:   4,343,497 msg/sec (mean:   4,207,567 stdev:     109,656)
+  moodycamel::ConcurrentQueue,10:   4,453,191 msg/sec (mean:   4,284,342 stdev:     111,786)
+  moodycamel::ConcurrentQueue,11:   4,527,464 msg/sec (mean:   4,273,049 stdev:     157,656)
+  moodycamel::ConcurrentQueue,12:   4,537,660 msg/sec (mean:   4,242,330 stdev:     175,883)
+  moodycamel::ConcurrentQueue,13:   4,666,488 msg/sec (mean:   4,440,837 stdev:     110,196)
+               tbb::spin_mutex,1:  29,135,222 msg/sec (mean:  17,934,214 stdev:   4,739,509)
+               tbb::spin_mutex,2:  15,306,010 msg/sec (mean:  10,665,850 stdev:   3,010,463)
+               tbb::spin_mutex,3:  10,198,837 msg/sec (mean:   8,083,138 stdev:   1,425,041)
+               tbb::spin_mutex,4:   5,864,980 msg/sec (mean:   4,742,709 stdev:     845,063)
+               tbb::spin_mutex,5:   4,116,864 msg/sec (mean:   3,210,940 stdev:     613,440)
+               tbb::spin_mutex,6:   2,988,234 msg/sec (mean:   2,266,884 stdev:     427,068)
+               tbb::spin_mutex,7:   1,730,819 msg/sec (mean:   1,068,094 stdev:     292,511)
+               tbb::spin_mutex,8:     972,850 msg/sec (mean:     793,698 stdev:     119,169)
+               tbb::spin_mutex,9:     629,137 msg/sec (mean:     581,143 stdev:      40,334)
+              tbb::spin_mutex,10:     540,488 msg/sec (mean:     463,466 stdev:      54,790)
+              tbb::spin_mutex,11:     468,472 msg/sec (mean:     410,419 stdev:      44,053)
+              tbb::spin_mutex,12:     421,827 msg/sec (mean:     353,267 stdev:      40,408)
+              tbb::spin_mutex,13:     366,985 msg/sec (mean:     304,259 stdev:      39,443)
+   tbb::speculative_spin_mutex,1:  25,288,998 msg/sec (mean:  20,585,201 stdev:   2,256,491)
+   tbb::speculative_spin_mutex,2:  13,186,085 msg/sec (mean:   9,799,421 stdev:   2,499,323)
+   tbb::speculative_spin_mutex,3:   8,743,569 msg/sec (mean:   7,171,561 stdev:   1,002,477)
+   tbb::speculative_spin_mutex,4:   7,999,963 msg/sec (mean:   5,117,732 stdev:   1,236,482)
+   tbb::speculative_spin_mutex,5:   3,985,715 msg/sec (mean:   3,565,111 stdev:     429,700)
+   tbb::speculative_spin_mutex,6:   4,093,998 msg/sec (mean:   3,542,068 stdev:     313,860)
+   tbb::speculative_spin_mutex,7:   2,441,846 msg/sec (mean:   1,872,755 stdev:     374,232)
+   tbb::speculative_spin_mutex,8:   1,637,582 msg/sec (mean:   1,227,244 stdev:     269,996)
+   tbb::speculative_spin_mutex,9:   1,410,427 msg/sec (mean:   1,091,426 stdev:     206,588)
+  tbb::speculative_spin_mutex,10:   1,347,447 msg/sec (mean:   1,081,240 stdev:     198,834)
+  tbb::speculative_spin_mutex,11:   1,204,232 msg/sec (mean:   1,041,802 stdev:     162,687)
+  tbb::speculative_spin_mutex,12:   1,156,347 msg/sec (mean:     976,303 stdev:     166,562)
+  tbb::speculative_spin_mutex,13:   1,172,530 msg/sec (mean:     944,933 stdev:     176,456)
+ tbb::concurrent_bounded_queue,1:   6,765,902 msg/sec (mean:   6,142,626 stdev:     811,488)
+ tbb::concurrent_bounded_queue,2:   5,241,217 msg/sec (mean:   4,742,619 stdev:     422,609)
+ tbb::concurrent_bounded_queue,3:   4,004,545 msg/sec (mean:   3,641,471 stdev:     285,388)
+ tbb::concurrent_bounded_queue,4:   3,515,826 msg/sec (mean:   3,184,182 stdev:     197,310)
+ tbb::concurrent_bounded_queue,5:   3,003,594 msg/sec (mean:   2,881,030 stdev:     102,012)
+ tbb::concurrent_bounded_queue,6:   2,819,324 msg/sec (mean:   2,659,355 stdev:      88,103)
+ tbb::concurrent_bounded_queue,7:   1,932,210 msg/sec (mean:   1,484,911 stdev:     181,223)
+ tbb::concurrent_bounded_queue,8:   1,232,510 msg/sec (mean:   1,118,334 stdev:      51,649)
+ tbb::concurrent_bounded_queue,9:   1,195,961 msg/sec (mean:   1,082,382 stdev:      54,020)
+tbb::concurrent_bounded_queue,10:   1,249,509 msg/sec (mean:   1,096,589 stdev:      73,672)
+tbb::concurrent_bounded_queue,11:   1,310,556 msg/sec (mean:   1,144,796 stdev:      75,096)
+tbb::concurrent_bounded_queue,12:   1,326,741 msg/sec (mean:   1,197,917 stdev:      74,431)
+tbb::concurrent_bounded_queue,13:   1,346,596 msg/sec (mean:   1,238,757 stdev:      52,699)
+                   AtomicQueue,1:  10,876,679 msg/sec (mean:   8,747,218 stdev:   1,102,805)
+                   AtomicQueue,2:   5,180,138 msg/sec (mean:   4,442,608 stdev:     698,069)
+                   AtomicQueue,3:   3,819,595 msg/sec (mean:   3,361,412 stdev:     384,166)
+                   AtomicQueue,4:   3,217,122 msg/sec (mean:   2,758,063 stdev:     362,728)
+                   AtomicQueue,5:   3,017,459 msg/sec (mean:   2,423,402 stdev:     371,827)
+                   AtomicQueue,6:   2,722,561 msg/sec (mean:   2,226,434 stdev:     385,393)
+                   AtomicQueue,7:   1,490,056 msg/sec (mean:   1,230,381 stdev:     126,115)
+                   AtomicQueue,8:   1,278,662 msg/sec (mean:   1,066,826 stdev:     126,556)
+                   AtomicQueue,9:   1,270,394 msg/sec (mean:   1,029,380 stdev:     148,501)
+                  AtomicQueue,10:   1,255,603 msg/sec (mean:   1,005,427 stdev:     159,563)
+                  AtomicQueue,11:   1,355,484 msg/sec (mean:   1,033,717 stdev:     200,534)
+                  AtomicQueue,12:   1,341,954 msg/sec (mean:   1,046,170 stdev:     198,635)
+                  AtomicQueue,13:   1,350,106 msg/sec (mean:   1,018,254 stdev:     211,751)
+           BlockingAtomicQueue,1:  86,410,344 msg/sec (mean:  31,230,992 stdev:  24,726,622)
+           BlockingAtomicQueue,2:  17,162,337 msg/sec (mean:  13,205,489 stdev:   2,754,161)
+           BlockingAtomicQueue,3:  19,023,817 msg/sec (mean:  14,735,034 stdev:   2,961,968)
+           BlockingAtomicQueue,4:  20,938,222 msg/sec (mean:  15,435,882 stdev:   3,890,728)
+           BlockingAtomicQueue,5:  21,692,927 msg/sec (mean:  15,368,820 stdev:   3,950,987)
+           BlockingAtomicQueue,6:  20,439,739 msg/sec (mean:  15,595,728 stdev:   3,515,589)
+           BlockingAtomicQueue,7:  17,031,623 msg/sec (mean:  12,427,977 stdev:   2,896,894)
+           BlockingAtomicQueue,8:  16,755,863 msg/sec (mean:  12,303,993 stdev:   3,573,294)
+           BlockingAtomicQueue,9:  16,788,438 msg/sec (mean:  12,643,899 stdev:   3,417,971)
+          BlockingAtomicQueue,10:  16,413,155 msg/sec (mean:  12,623,848 stdev:   3,409,084)
+          BlockingAtomicQueue,11:  16,912,252 msg/sec (mean:  12,577,364 stdev:   3,384,598)
+          BlockingAtomicQueue,12:  18,181,788 msg/sec (mean:  12,440,329 stdev:   4,239,337)
+          BlockingAtomicQueue,13:  19,839,626 msg/sec (mean:  13,187,908 stdev:   5,468,174)
+                  AtomicQueue2,1:  10,759,484 msg/sec (mean:   8,019,587 stdev:   1,508,048)
+                  AtomicQueue2,2:   5,277,380 msg/sec (mean:   4,100,059 stdev:     691,213)
+                  AtomicQueue2,3:   3,557,626 msg/sec (mean:   3,231,486 stdev:     236,954)
+                  AtomicQueue2,4:   3,008,402 msg/sec (mean:   2,629,686 stdev:     294,975)
+                  AtomicQueue2,5:   2,733,786 msg/sec (mean:   2,305,379 stdev:     317,369)
+                  AtomicQueue2,6:   2,603,402 msg/sec (mean:   2,164,224 stdev:     321,805)
+                  AtomicQueue2,7:   1,420,849 msg/sec (mean:   1,210,288 stdev:     110,186)
+                  AtomicQueue2,8:   1,280,821 msg/sec (mean:   1,076,774 stdev:     107,586)
+                  AtomicQueue2,9:   1,274,808 msg/sec (mean:   1,046,436 stdev:     130,689)
+                 AtomicQueue2,10:   1,312,496 msg/sec (mean:   1,028,963 stdev:     159,621)
+                 AtomicQueue2,11:   1,392,093 msg/sec (mean:   1,040,809 stdev:     194,492)
+                 AtomicQueue2,12:   1,336,302 msg/sec (mean:   1,050,987 stdev:     184,558)
+                 AtomicQueue2,13:   1,319,230 msg/sec (mean:   1,077,793 stdev:     159,467)
+          BlockingAtomicQueue2,1:  26,950,145 msg/sec (mean:  16,322,670 stdev:   7,418,470)
+          BlockingAtomicQueue2,2:  12,190,558 msg/sec (mean:  10,675,183 stdev:     992,340)
+          BlockingAtomicQueue2,3:  13,485,867 msg/sec (mean:  11,205,558 stdev:   1,809,125)
+          BlockingAtomicQueue2,4:  17,495,970 msg/sec (mean:  12,224,369 stdev:   2,886,940)
+          BlockingAtomicQueue2,5:  16,804,263 msg/sec (mean:  13,789,346 stdev:   2,379,408)
+          BlockingAtomicQueue2,6:  14,726,468 msg/sec (mean:  12,157,770 stdev:   1,508,241)
+          BlockingAtomicQueue2,7:  14,647,858 msg/sec (mean:  11,334,545 stdev:   2,156,781)
+          BlockingAtomicQueue2,8:  15,170,010 msg/sec (mean:  11,348,993 stdev:   3,254,143)
+          BlockingAtomicQueue2,9:  15,439,516 msg/sec (mean:  11,484,726 stdev:   3,346,619)
+         BlockingAtomicQueue2,10:  15,293,454 msg/sec (mean:  11,639,758 stdev:   3,255,057)
+         BlockingAtomicQueue2,11:  16,381,086 msg/sec (mean:  11,802,579 stdev:   3,388,164)
+         BlockingAtomicQueue2,12:  17,706,679 msg/sec (mean:  11,891,352 stdev:   4,118,196)
+         BlockingAtomicQueue2,13:  16,665,156 msg/sec (mean:  11,348,928 stdev:   3,999,387)
 ```
 
 (C) Maxim Egorushkin 2019
