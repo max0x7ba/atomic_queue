@@ -27,3 +27,8 @@ p {
     color: #A0A0A0;
     margin-left: 20px;
 }
+
+div.disqus_thread {
+    margin-left: 20px;
+    margin-right: 20px;
+}
