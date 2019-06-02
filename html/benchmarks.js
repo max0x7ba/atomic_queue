@@ -38,7 +38,7 @@ $(function() {
                 name: name,
                 color: s[0],
                 index: s[1],
-                data: [{y: value * 1e9, x: s[1]}]
+                data: [{y: Math.round(value * 1e9), x: s[1]}]
             };
         });
         const categories = series
@@ -74,10 +74,14 @@ $(function() {
         const [series, categories] = series_categories;
         Highcharts.chart(div_id, {
             chart: { type: 'bar' },
-            plotOptions: { series: { stacking: 'normal' } },
+            plotOptions: {
+                series: { stacking: 'normal' },
+                bar: { dataLabels: { enabled: true, align: 'left', inside: false } }
+            },
             title: { text: 'Latency on ' + title_suffix },
             xAxis: { categories: categories },
             yAxis: { title: { text: 'letency, nanoseconds/round-trip' } },
+            tooltip: { valueSuffix: ' nanoseconds' },
             series: series
         });
     }
