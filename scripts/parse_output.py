@@ -21,12 +21,8 @@ def extract_name_threads(name_theads):
 
 
 def as_scalability_df(results):
-    df = pd.DataFrame.from_records(((*extract_name_threads(r[0]), r[2]) for r in results), columns=['queue', 'threads', 'msg/sec'])
-    df = df.groupby(['queue', 'threads']).max().unstack(level=0).droplevel(0, axis=1)
-    return df
+    return pd.DataFrame.from_records(((*extract_name_threads(r[0]), r[2]) for r in results if r[1] == 'msg/sec'), columns=['queue', 'threads', 'msg/sec'])
 
 
 def as_latency_df(results):
-    df = pd.DataFrame.from_records(((r[0], r[2]) for r in results), columns=['queue', 'sec/round-trip'])
-    df = df.groupby('queue').min()
-    return df
+    return pd.DataFrame.from_records(((r[0], r[2]) for r in results if r[1] == 'sec/round-trip'), columns=['queue', 'sec/round-trip'])

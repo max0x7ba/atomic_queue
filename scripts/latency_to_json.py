@@ -8,6 +8,7 @@ from parse_output import *
 
 results = list(parse_output(sys.stdin))
 df = as_latency_df(results)
+df = df.groupby('queue').min()
 pprint(df)
 df.to_json(sys.stdout, orient='columns')
 print()

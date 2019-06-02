@@ -8,5 +8,6 @@ from parse_output import *
 
 results = list(parse_output(sys.stdin))
 df = as_scalability_df(results)
+df = df.groupby(['queue', 'threads']).max().unstack(level=0).droplevel(0, axis=1)
 df.to_json(sys.stdout, orient='columns')
 print()
