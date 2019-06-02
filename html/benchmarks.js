@@ -80,7 +80,7 @@ $(function() {
             },
             title: { text: 'Latency on ' + title_suffix },
             xAxis: { categories: categories },
-            yAxis: { title: { text: 'letency, nanoseconds/round-trip' } },
+            yAxis: { title: { text: 'letency, nanoseconds/round-trip' }, max: 700 },
             tooltip: { valueSuffix: ' nanoseconds' },
             series: series
         });

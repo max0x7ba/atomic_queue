@@ -9,17 +9,21 @@ div.chart {
     margin-top: 2em;
 }
 
-p {
-    color: #A0A0A0;
-    margin-left: 2em;
-}
-
 p.copyright {
     color: #A0A0A0;
-    text-align: right;
+    text-align: left;
     font-size: 0.8em;
 }
 
 h1 {
-    margin-left: 1em;
+    margin-left: 20px;
+}
+
+h3 {
+    margin-left: 20px;
+}
+
+p {
+    color: #A0A0A0;
+    margin-left: 20px;
 }
