@@ -51,13 +51,13 @@ struct BoostSpScAdapter : Queue {
 
     void push(T element) {
         while(!this->Queue::push(element))
-            /*_mm_pause()*/;
+            _mm_pause();
     }
 
     T pop() {
         T element;
         while(!this->Queue::pop(element))
-            /*_mm_pause()*/;
+            _mm_pause();
         return element;
     }
 };
@@ -68,7 +68,7 @@ struct BoostQueueAdapter : BoostSpScAdapter<Queue> {
 
     void push(T element) {
         while(!this->Queue::bounded_push(element))
-            /*_mm_pause()*/;
+            _mm_pause();
     }
 };
 
@@ -152,10 +152,11 @@ uint64_t benchmark_throughput(unsigned N, unsigned producer_count, unsigned cons
 }
 
 template<class Queue>
-void run_throughput_benchmark(char const* name, unsigned N, unsigned thread_count_min, unsigned thread_count_max) {
-    int constexpr RUNS = 10;
+void run_throughput_benchmark(char const* name, unsigned M, unsigned thread_count_min, unsigned thread_count_max) {
+    int constexpr RUNS = 3;
 
     for(unsigned threads = thread_count_min; threads <= thread_count_max; ++threads) {
+        unsigned const N = M / threads;
         uint64_t min_time = std::numeric_limits<uint64_t>::max();
         for(unsigned run = RUNS; run--;) {
             uint64_t time = benchmark_throughput<Queue>(N, threads, threads);

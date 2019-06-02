@@ -8,7 +8,7 @@
 #include <utility>
 #include <atomic>
 
-// #include <emmintrin.h>
+#include <emmintrin.h>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -148,7 +148,7 @@ class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL>> {
             T element = elements_[index].exchange(NIL, R);
             if(element != NIL)
                 return element;
-            /*_mm_pause()*/;
+            _mm_pause();
         }
     }
 
@@ -156,7 +156,7 @@ class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL>> {
         assert(element != NIL);
         unsigned index = details::remap_index(head % SIZE, Remap{});
         for(T expected = NIL; !elements_[index].compare_exchange_strong(expected, element, R, X); expected = NIL) // (1) Wait for store (2) to complete.
-            /*_mm_pause()*/;
+            _mm_pause();
     }
 
 public:
@@ -201,7 +201,7 @@ class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE>> {
                 states_[index].store(EMPTY, R);
                 return element;
             }
-            /*_mm_pause()*/;
+            _mm_pause();
         }
     }
 
@@ -215,7 +215,7 @@ class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE>> {
                 states_[index].store(STORED, R);
                 return;
             }
-            /*_mm_pause()*/;
+            _mm_pause();
         }
     }
 
@@ -233,13 +233,13 @@ struct RetryDecorator : Queue {
 
     void push(T element) noexcept {
         while(!this->try_push(element))
-            /*_mm_pause()*/;
+            _mm_pause();
     }
 
     T pop() noexcept {
         T element;
         while(!this->try_pop(element))
-            /*_mm_pause()*/;
+            _mm_pause();
         return element;
     }
 };
