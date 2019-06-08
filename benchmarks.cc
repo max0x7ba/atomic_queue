@@ -115,39 +115,48 @@ void throughput_producer(unsigned N, Queue* queue, Barrier* barrier, Stopper* st
 }
 
 template<class Queue>
-void throughput_consumer(unsigned N, Queue* queue, Barrier* barrier, std::atomic<unsigned>* last_consumer, uint64_t* t1) {
+void throughput_consumer(unsigned N, Queue* queue, Barrier* barrier, std::atomic<long>* total_sum, std::atomic<unsigned>* last_consumer, uint64_t* t1) {
     unsigned const stop = N + 1;
+    long sum = 0;
 
     barrier->wait();
 
-    while(stop != queue->pop())
-        ;
+    for(;;) {
+        unsigned n = queue->pop();
+        if(n == stop)
+            break;
+        sum += n;
+    }
 
     // The last consumer saves the end time.
     auto t = __builtin_ia32_rdtsc();
     if(1 == last_consumer->fetch_sub(1, std::memory_order_acq_rel))
         *t1 = t;
+
+    total_sum->fetch_add(sum, std::memory_order_relaxed);
 }
 
 template<class Queue>
-uint64_t benchmark_throughput(unsigned N, unsigned producer_count, unsigned consumer_count) {
+uint64_t benchmark_throughput(unsigned N, unsigned producer_count, unsigned consumer_count, long* total_sum2) {
     Queue queue;
     Stopper stopper{{producer_count}, consumer_count};
     std::atomic<uint64_t> t0{0};
     uint64_t t1 = 0;
     std::atomic<unsigned> last_consumer{consumer_count};
+    std::atomic<long> total_sum{0};
 
     Barrier barrier;
     std::vector<std::thread> threads(producer_count + consumer_count);
     for(unsigned i = 0; i < producer_count; ++i)
         threads[i] = std::thread(throughput_producer<Queue>, N, &queue, &barrier, &stopper, &t0);
     for(unsigned i = 0; i < consumer_count; ++i)
-        threads[producer_count + i] = std::thread(throughput_consumer<Queue>, N, &queue, &barrier, &last_consumer, &t1);
+        threads[producer_count + i] = std::thread(throughput_consumer<Queue>, N, &queue, &barrier, &total_sum, &last_consumer, &t1);
 
     barrier.release(producer_count + consumer_count);
     for(auto& t: threads)
         t.join();
 
+    *total_sum2 = total_sum;
     return t1 - t0.load(std::memory_order_relaxed);
 }
 
@@ -158,9 +167,18 @@ void run_throughput_benchmark(char const* name, unsigned M, unsigned thread_coun
     for(unsigned threads = thread_count_min; threads <= thread_count_max; ++threads) {
         unsigned const N = M / threads;
         uint64_t min_time = std::numeric_limits<uint64_t>::max();
+
+        // Verify that all messages were received exactly once.
+        long const expected_sum = (N + 1) / 2. * N * threads;
+
         for(unsigned run = RUNS; run--;) {
-            uint64_t time = benchmark_throughput<Queue>(N, threads, threads);
+            long total_sum = 0;
+            uint64_t time = benchmark_throughput<Queue>(N, threads, threads, &total_sum);
             min_time = std::min(min_time, time);
+
+            long diff = static_cast<long>(total_sum - expected_sum);
+            if(diff)
+                std::fprintf(stderr, "%s: wrong checksum error: expected_sum: %'ld, diff: %'ld.\n", name, expected_sum, diff);
         }
 
         double min_seconds = to_seconds(min_time);
