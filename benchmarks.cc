@@ -208,6 +208,8 @@ void run_throughput_benchmarks() {
     run_throughput_benchmark("boost::lockfree::queue", Type<BoostQueueAdapter<boost::lockfree::queue<unsigned, boost::lockfree::capacity<CAPACITY - 2>>>>{});
 
     run_throughput_benchmark("pthread_spinlock", Type<RetryDecorator<AtomicQueueSpinlock<unsigned, CAPACITY>>>{});
+    run_throughput_benchmark("FairSpinlock", Type<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, FairSpinlock>>>{});
+    run_throughput_benchmark("UnfairSpinlock", Type<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, UnfairSpinlock>>>{});
 
     run_throughput_benchmark("moodycamel::ConcurrentQueue", Type<MoodyCamelQueue<unsigned, CAPACITY>>{});
 
@@ -289,6 +291,8 @@ void run_ping_pong_benchmarks() {
     run_ping_pong_benchmark<BoostQueueAdapter<boost::lockfree::queue<unsigned, boost::lockfree::capacity<CAPACITY>>>>("boost::lockfree::queue");
 
     run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinlock<unsigned, CAPACITY>>>("pthread_spinlock");
+    run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, FairSpinlock>>>("FairSpinlock");
+    run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, UnfairSpinlock>>>("UnfairSpinlock");
 
     run_ping_pong_benchmark<MoodyCamelQueue<unsigned, CAPACITY>>("moodycamel::ConcurrentQueue");
 
@@ -317,9 +321,6 @@ int main() {
 
     run_throughput_benchmarks();
     run_ping_pong_benchmarks();
-
-    // static_cast<void>(run_ping_pong_benchmarks);
-    // static_cast<void>(run_throughput_benchmarks);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
