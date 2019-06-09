@@ -178,7 +178,7 @@ void run_throughput_benchmark(char const* name, unsigned M, unsigned thread_coun
 
             long diff = static_cast<long>(total_sum - expected_sum);
             if(diff)
-                std::fprintf(stderr, "%s: wrong checksum error: expected_sum: %'ld, diff: %'ld.\n", name, expected_sum, diff);
+                std::fprintf(stderr, "%s: wrong checksum error: producers: %u, expected_sum: %'ld, diff: %'ld.\n", name, threads, expected_sum, diff);
         }
 
         double min_seconds = to_seconds(min_time);
