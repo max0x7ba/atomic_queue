@@ -83,35 +83,16 @@ struct TbbAdapter : RetryDecorator<Queue> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct Stopper {
-    std::atomic<unsigned> producer_count_;
-    unsigned const consumer_count_;
-
-    template<class Queue>
-    void operator()(Queue* const queue, unsigned stop) {
-        if(1 == producer_count_.fetch_sub(1, std::memory_order_relaxed)) {
-            for(unsigned i = consumer_count_; i--;)
-                queue->push(stop);
-        }
-    }
-};
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 template<class Queue>
-void throughput_producer(unsigned N, Queue* queue, Barrier* barrier, Stopper* stopper, std::atomic<uint64_t>* t0) {
-    unsigned const stop = N + 1;
-
+void throughput_producer(unsigned N, Queue* queue, Barrier* barrier, std::atomic<uint64_t>* t0) {
     barrier->wait();
 
     // The first producer saves the start time.
     uint64_t expected = 0;
     t0->compare_exchange_strong(expected, __builtin_ia32_rdtsc(), std::memory_order_acq_rel, std::memory_order_relaxed);
 
-    for(unsigned n = N; n; --n)
+    for(unsigned n = 1, stop = N + 1; n <= stop; ++n)
         queue->push(n);
-
-    (*stopper)(queue, stop);
 }
 
 template<class Queue>
@@ -139,7 +120,6 @@ void throughput_consumer(unsigned N, Queue* queue, Barrier* barrier, std::atomic
 template<class Queue>
 uint64_t benchmark_throughput(unsigned N, unsigned producer_count, unsigned consumer_count, long* total_sum2) {
     Queue queue;
-    Stopper stopper{{producer_count}, consumer_count};
     std::atomic<uint64_t> t0{0};
     uint64_t t1 = 0;
     std::atomic<unsigned> last_consumer{consumer_count};
@@ -148,7 +128,7 @@ uint64_t benchmark_throughput(unsigned N, unsigned producer_count, unsigned cons
     Barrier barrier;
     std::vector<std::thread> threads(producer_count + consumer_count);
     for(unsigned i = 0; i < producer_count; ++i)
-        threads[i] = std::thread(throughput_producer<Queue>, N, &queue, &barrier, &stopper, &t0);
+        threads[i] = std::thread(throughput_producer<Queue>, N, &queue, &barrier, &t0);
     for(unsigned i = 0; i < consumer_count; ++i)
         threads[producer_count + i] = std::thread(throughput_consumer<Queue>, N, &queue, &barrier, &total_sum, &last_consumer, &t1);
 
