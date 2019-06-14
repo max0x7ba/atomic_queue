@@ -7,9 +7,9 @@ These qualities are also limitations: the maximum queue size must be set at comp
 
 Available containers are:
 * `AtomicQueue` - a fixed size ring-buffer for atomic elements.
-* `BlockingAtomicQueue` - a faster fixed size ring-buffer for atomic elements which busy-waits when empty or full.
+* `OptimistAtomicQueue` - a faster fixed size ring-buffer for atomic elements which busy-waits when empty or full.
 * `AtomicQueue2` - a fixed size ring-buffer for non-atomic elements.
-* `BlockingAtomicQueue2` - a faster fixed size ring-buffer for non-atomic elements which busy-waits when empty or full.
+* `OptimistAtomicQueue2` - a faster fixed size ring-buffer for non-atomic elements which busy-waits when empty or full.
 
 A few well-known containers are used for reference in the benchmarks:
 * `boost::lockfree::spsc_queue` - a wait-free single producer single consumer queue from Boost library.
@@ -78,9 +78,9 @@ Results on Intel Core i7-7700K 5GHz, Ubuntu 18.04.2 LTS:
      tbb::speculative_spin_mutex: 0.000000410 sec/round-trip (mean: 0.000000923 stdev: 0.000000623)
    tbb::concurrent_bounded_queue: 0.000000249 sec/round-trip (mean: 0.000000253 stdev: 0.000000002)
                      AtomicQueue: 0.000000146 sec/round-trip (mean: 0.000000156 stdev: 0.000000005)
-             BlockingAtomicQueue: 0.000000088 sec/round-trip (mean: 0.000000104 stdev: 0.000000010)
+             OptimistAtomicQueue: 0.000000088 sec/round-trip (mean: 0.000000104 stdev: 0.000000010)
                     AtomicQueue2: 0.000000181 sec/round-trip (mean: 0.000000193 stdev: 0.000000006)
-            BlockingAtomicQueue2: 0.000000151 sec/round-trip (mean: 0.000000165 stdev: 0.000000010)
+            OptimistAtomicQueue2: 0.000000151 sec/round-trip (mean: 0.000000165 stdev: 0.000000010)
 ```
 
 Results on Intel Xeon Gold 6132, Red Hat Enterprise Linux Server release 6.10 (Santiago) (on one NUMA node):
@@ -93,9 +93,9 @@ Results on Intel Xeon Gold 6132, Red Hat Enterprise Linux Server release 6.10 (S
      tbb::speculative_spin_mutex: 0.000000588 sec/round-trip (mean: 0.000000758 stdev: 0.000000137)
    tbb::concurrent_bounded_queue: 0.000000594 sec/round-trip (mean: 0.000000615 stdev: 0.000000016)
                      AtomicQueue: 0.000000345 sec/round-trip (mean: 0.000000389 stdev: 0.000000024)
-             BlockingAtomicQueue: 0.000000204 sec/round-trip (mean: 0.000000224 stdev: 0.000000012)
+             OptimistAtomicQueue: 0.000000204 sec/round-trip (mean: 0.000000224 stdev: 0.000000012)
                     AtomicQueue2: 0.000000400 sec/round-trip (mean: 0.000000463 stdev: 0.000000038)
-            BlockingAtomicQueue2: 0.000000319 sec/round-trip (mean: 0.000000372 stdev: 0.000000035)
+            OptimistAtomicQueue2: 0.000000319 sec/round-trip (mean: 0.000000372 stdev: 0.000000035)
 ```
 
 ## Throughput and scalability benchmark
@@ -125,15 +125,15 @@ Results on Intel Core i7-7700K 5GHz, Ubuntu 18.04.2 LTS (up to 3 producers and 3
                    AtomicQueue,1:  27,480,485 msg/sec (mean:  21,620,085 stdev:   3,089,085)
                    AtomicQueue,2:  14,569,157 msg/sec (mean:  13,275,562 stdev:     814,508)
                    AtomicQueue,3:  12,931,967 msg/sec (mean:  12,060,323 stdev:     548,793)
-           BlockingAtomicQueue,1: 119,346,550 msg/sec (mean:  94,219,439 stdev:  22,267,824)
-           BlockingAtomicQueue,2:  46,267,662 msg/sec (mean:  40,535,588 stdev:   3,454,206)
-           BlockingAtomicQueue,3:  53,199,578 msg/sec (mean:  37,737,803 stdev:   2,957,516)
+           OptimistAtomicQueue,1: 119,346,550 msg/sec (mean:  94,219,439 stdev:  22,267,824)
+           OptimistAtomicQueue,2:  46,267,662 msg/sec (mean:  40,535,588 stdev:   3,454,206)
+           OptimistAtomicQueue,3:  53,199,578 msg/sec (mean:  37,737,803 stdev:   2,957,516)
                   AtomicQueue2,1:  26,452,767 msg/sec (mean:  21,764,050 stdev:   2,604,954)
                   AtomicQueue2,2:  14,616,236 msg/sec (mean:  13,030,890 stdev:     933,939)
                   AtomicQueue2,3:  12,823,498 msg/sec (mean:  11,878,783 stdev:     542,021)
-          BlockingAtomicQueue2,1:  75,140,383 msg/sec (mean:  46,821,449 stdev:  11,226,903)
-          BlockingAtomicQueue2,2:  38,691,918 msg/sec (mean:  34,771,236 stdev:   2,762,252)
-          BlockingAtomicQueue2,3:  38,757,784 msg/sec (mean:  36,395,621 stdev:     723,460)
+          OptimistAtomicQueue2,1:  75,140,383 msg/sec (mean:  46,821,449 stdev:  11,226,903)
+          OptimistAtomicQueue2,2:  38,691,918 msg/sec (mean:  34,771,236 stdev:   2,762,252)
+          OptimistAtomicQueue2,3:  38,757,784 msg/sec (mean:  36,395,621 stdev:     723,460)
 ```
 
 Results on Intel Xeon Gold 6132, Red Hat Enterprise Linux Server release 6.10 (Santiago):
@@ -230,19 +230,19 @@ tbb::concurrent_bounded_queue,13:   1,222,088 msg/sec (mean:     898,824 stdev: 
                   AtomicQueue,11:   1,036,841 msg/sec (mean:     816,904 stdev:     115,519)
                   AtomicQueue,12:   1,078,988 msg/sec (mean:     827,803 stdev:     123,915)
                   AtomicQueue,13:   1,180,694 msg/sec (mean:     847,368 stdev:     138,499)
-           BlockingAtomicQueue,1:  59,693,531 msg/sec (mean:  22,762,812 stdev:  15,145,833)
-           BlockingAtomicQueue,2:  11,800,036 msg/sec (mean:   8,972,437 stdev:   1,263,817)
-           BlockingAtomicQueue,3:  14,568,786 msg/sec (mean:  10,476,116 stdev:   2,114,945)
-           BlockingAtomicQueue,4:  15,321,197 msg/sec (mean:  11,341,814 stdev:   2,415,766)
-           BlockingAtomicQueue,5:  15,140,085 msg/sec (mean:  11,998,579 stdev:   2,269,305)
-           BlockingAtomicQueue,6:  19,606,221 msg/sec (mean:  13,316,182 stdev:   2,813,488)
-           BlockingAtomicQueue,7:  14,671,926 msg/sec (mean:  10,202,378 stdev:   1,864,250)
-           BlockingAtomicQueue,8:  15,203,509 msg/sec (mean:  11,391,972 stdev:   2,944,044)
-           BlockingAtomicQueue,9:  15,671,514 msg/sec (mean:  11,415,476 stdev:   3,151,627)
-          BlockingAtomicQueue,10:  16,153,284 msg/sec (mean:  11,641,816 stdev:   3,300,332)
-          BlockingAtomicQueue,11:  16,560,016 msg/sec (mean:  11,824,417 stdev:   3,405,276)
-          BlockingAtomicQueue,12:  17,896,080 msg/sec (mean:  12,112,173 stdev:   3,932,033)
-          BlockingAtomicQueue,13:  21,504,122 msg/sec (mean:  13,923,061 stdev:   6,070,772)
+           OptimistAtomicQueue,1:  59,693,531 msg/sec (mean:  22,762,812 stdev:  15,145,833)
+           OptimistAtomicQueue,2:  11,800,036 msg/sec (mean:   8,972,437 stdev:   1,263,817)
+           OptimistAtomicQueue,3:  14,568,786 msg/sec (mean:  10,476,116 stdev:   2,114,945)
+           OptimistAtomicQueue,4:  15,321,197 msg/sec (mean:  11,341,814 stdev:   2,415,766)
+           OptimistAtomicQueue,5:  15,140,085 msg/sec (mean:  11,998,579 stdev:   2,269,305)
+           OptimistAtomicQueue,6:  19,606,221 msg/sec (mean:  13,316,182 stdev:   2,813,488)
+           OptimistAtomicQueue,7:  14,671,926 msg/sec (mean:  10,202,378 stdev:   1,864,250)
+           OptimistAtomicQueue,8:  15,203,509 msg/sec (mean:  11,391,972 stdev:   2,944,044)
+           OptimistAtomicQueue,9:  15,671,514 msg/sec (mean:  11,415,476 stdev:   3,151,627)
+          OptimistAtomicQueue,10:  16,153,284 msg/sec (mean:  11,641,816 stdev:   3,300,332)
+          OptimistAtomicQueue,11:  16,560,016 msg/sec (mean:  11,824,417 stdev:   3,405,276)
+          OptimistAtomicQueue,12:  17,896,080 msg/sec (mean:  12,112,173 stdev:   3,932,033)
+          OptimistAtomicQueue,13:  21,504,122 msg/sec (mean:  13,923,061 stdev:   6,070,772)
                   AtomicQueue2,1:  10,130,602 msg/sec (mean:   7,318,949 stdev:   1,148,938)
                   AtomicQueue2,2:   5,003,208 msg/sec (mean:   3,664,508 stdev:     645,104)
                   AtomicQueue2,3:   3,548,190 msg/sec (mean:   2,761,750 stdev:     357,122)
@@ -256,19 +256,19 @@ tbb::concurrent_bounded_queue,13:   1,222,088 msg/sec (mean:     898,824 stdev: 
                  AtomicQueue2,11:   1,115,495 msg/sec (mean:     818,013 stdev:     118,519)
                  AtomicQueue2,12:   1,140,078 msg/sec (mean:     830,333 stdev:     131,305)
                  AtomicQueue2,13:   1,249,730 msg/sec (mean:     864,061 stdev:     146,864)
-          BlockingAtomicQueue2,1:  26,168,905 msg/sec (mean:   9,177,001 stdev:   3,598,507)
-          BlockingAtomicQueue2,2:  12,074,730 msg/sec (mean:   7,173,045 stdev:   1,603,749)
-          BlockingAtomicQueue2,3:  15,164,677 msg/sec (mean:   9,238,944 stdev:   1,847,296)
-          BlockingAtomicQueue2,4:  16,067,618 msg/sec (mean:  10,342,609 stdev:   2,299,330)
-          BlockingAtomicQueue2,5:  17,905,619 msg/sec (mean:  10,753,262 stdev:   2,572,491)
-          BlockingAtomicQueue2,6:  14,028,380 msg/sec (mean:  11,009,890 stdev:   1,767,214)
-          BlockingAtomicQueue2,7:  16,145,968 msg/sec (mean:  10,115,926 stdev:   2,093,751)
-          BlockingAtomicQueue2,8:  14,583,260 msg/sec (mean:  10,943,199 stdev:   2,959,249)
-          BlockingAtomicQueue2,9:  15,337,181 msg/sec (mean:  11,044,559 stdev:   3,285,722)
-         BlockingAtomicQueue2,10:  15,643,690 msg/sec (mean:  11,377,700 stdev:   3,693,233)
-         BlockingAtomicQueue2,11:  16,158,847 msg/sec (mean:  11,585,951 stdev:   3,961,141)
-         BlockingAtomicQueue2,12:  17,669,598 msg/sec (mean:  12,139,260 stdev:   4,040,177)
-         BlockingAtomicQueue2,13:  21,016,313 msg/sec (mean:  13,275,243 stdev:   5,207,114)
+          OptimistAtomicQueue2,1:  26,168,905 msg/sec (mean:   9,177,001 stdev:   3,598,507)
+          OptimistAtomicQueue2,2:  12,074,730 msg/sec (mean:   7,173,045 stdev:   1,603,749)
+          OptimistAtomicQueue2,3:  15,164,677 msg/sec (mean:   9,238,944 stdev:   1,847,296)
+          OptimistAtomicQueue2,4:  16,067,618 msg/sec (mean:  10,342,609 stdev:   2,299,330)
+          OptimistAtomicQueue2,5:  17,905,619 msg/sec (mean:  10,753,262 stdev:   2,572,491)
+          OptimistAtomicQueue2,6:  14,028,380 msg/sec (mean:  11,009,890 stdev:   1,767,214)
+          OptimistAtomicQueue2,7:  16,145,968 msg/sec (mean:  10,115,926 stdev:   2,093,751)
+          OptimistAtomicQueue2,8:  14,583,260 msg/sec (mean:  10,943,199 stdev:   2,959,249)
+          OptimistAtomicQueue2,9:  15,337,181 msg/sec (mean:  11,044,559 stdev:   3,285,722)
+         OptimistAtomicQueue2,10:  15,643,690 msg/sec (mean:  11,377,700 stdev:   3,693,233)
+         OptimistAtomicQueue2,11:  16,158,847 msg/sec (mean:  11,585,951 stdev:   3,961,141)
+         OptimistAtomicQueue2,12:  17,669,598 msg/sec (mean:  12,139,260 stdev:   4,040,177)
+         OptimistAtomicQueue2,13:  21,016,313 msg/sec (mean:  13,275,243 stdev:   5,207,114)
 ```
 
 (C) Maxim Egorushkin 2019
