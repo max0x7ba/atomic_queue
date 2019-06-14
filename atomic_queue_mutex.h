@@ -20,7 +20,7 @@ class AtomicQueueMutexT {
     unsigned tail_ = 0;
     alignas(CACHE_LINE_SIZE) T q_[SIZE] = {};
 
-    using Remap = typename details::GetIndexShuffleBits<MinimizeContention, SIZE, CACHE_LINE_SIZE / sizeof(T)>::type;
+    static constexpr int SHUFFLE_BITS = details::GetIndexShuffleBits<MinimizeContention, SIZE, CACHE_LINE_SIZE / sizeof(T)>::value;
     using ScopedLock = typename Mutex::scoped_lock;
 
 public:
@@ -30,7 +30,7 @@ public:
     bool try_push(U&& element) noexcept {
         ScopedLock lock(this->mutex_);
         if(this->head_ - this->tail_ < SIZE) {
-            q_[details::remap_index(this->head_ % SIZE, Remap{})] = std::forward<U>(element);
+            q_[details::remap_index<SHUFFLE_BITS>(this->head_ % SIZE)] = std::forward<U>(element);
             ++this->head_;
             return true;
         }
@@ -40,7 +40,7 @@ public:
     bool try_pop(T& element) noexcept {
         ScopedLock lock(this->mutex_);
         if(this->head_ != this->tail_) {
-            element = std::move(q_[details::remap_index(this->tail_ % SIZE, Remap{})]);
+            element = std::move(q_[details::remap_index<SHUFFLE_BITS>(this->tail_ % SIZE)]);
             ++this->tail_;
             return true;
         }

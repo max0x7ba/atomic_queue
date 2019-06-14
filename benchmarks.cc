@@ -83,6 +83,15 @@ struct TbbAdapter : RetryDecorator<Queue> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+template<class Queue, size_t Capacity>
+struct CapacityToConstructor : Queue {
+    CapacityToConstructor()
+        : Queue(Capacity)
+    {}
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 template<class Queue>
 void throughput_producer(unsigned N, Queue* queue, Barrier* barrier, std::atomic<uint64_t>* t0) {
     barrier->wait();
@@ -186,8 +195,8 @@ void run_throughput_benchmarks() {
     run_throughput_benchmark("boost::lockfree::queue", Type<BoostQueueAdapter<boost::lockfree::queue<unsigned, boost::lockfree::capacity<CAPACITY - 2>>>>{});
 
     run_throughput_benchmark("pthread_spinlock", Type<RetryDecorator<AtomicQueueSpinlock<unsigned, CAPACITY>>>{});
-    run_throughput_benchmark("FairSpinlock", Type<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, FairSpinlock>>>{});
-    run_throughput_benchmark("UnfairSpinlock", Type<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, UnfairSpinlock>>>{});
+    // run_throughput_benchmark("FairSpinlock", Type<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, FairSpinlock>>>{});
+    // run_throughput_benchmark("UnfairSpinlock", Type<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, UnfairSpinlock>>>{});
 
     run_throughput_benchmark("moodycamel::ConcurrentQueue", Type<MoodyCamelQueue<unsigned, CAPACITY>>{});
 
@@ -196,9 +205,14 @@ void run_throughput_benchmarks() {
     run_throughput_benchmark("tbb::concurrent_bounded_queue", Type<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, CAPACITY>>{});
 
     run_throughput_benchmark("AtomicQueue", Type<RetryDecorator<AtomicQueue<unsigned, CAPACITY>>>{});
+    run_throughput_benchmark("AtomicQueueB", Type<RetryDecorator<CapacityToConstructor<AtomicQueueB<unsigned>, CAPACITY>>>{});
     run_throughput_benchmark("BlockingAtomicQueue", Type<AtomicQueue<unsigned, CAPACITY>>{});
+    run_throughput_benchmark("BlockingAtomicQueueB", Type<CapacityToConstructor<AtomicQueueB<unsigned>, CAPACITY>>{});
+
     run_throughput_benchmark("AtomicQueue2", Type<RetryDecorator<AtomicQueue2<unsigned, CAPACITY>>>{});
+    run_throughput_benchmark("AtomicQueueB2", Type<RetryDecorator<CapacityToConstructor<AtomicQueueB2<unsigned>, CAPACITY>>>{});
     run_throughput_benchmark("BlockingAtomicQueue2", Type<AtomicQueue2<unsigned, CAPACITY>>{});
+    run_throughput_benchmark("BlockingAtomicQueueB2", Type<CapacityToConstructor<AtomicQueueB2<unsigned>, CAPACITY>>{});
 
     // run_throughput_benchmark<RetryDecorator<AtomicQueueSpinlockHle<unsigned, CAPACITY>>>("SpinlockHle");
 
@@ -269,8 +283,8 @@ void run_ping_pong_benchmarks() {
     run_ping_pong_benchmark<BoostQueueAdapter<boost::lockfree::queue<unsigned, boost::lockfree::capacity<CAPACITY>>>>("boost::lockfree::queue");
 
     run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinlock<unsigned, CAPACITY>>>("pthread_spinlock");
-    run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, FairSpinlock>>>("FairSpinlock");
-    run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, UnfairSpinlock>>>("UnfairSpinlock");
+    // run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, FairSpinlock>>>("FairSpinlock");
+    // run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, UnfairSpinlock>>>("UnfairSpinlock");
 
     run_ping_pong_benchmark<MoodyCamelQueue<unsigned, CAPACITY>>("moodycamel::ConcurrentQueue");
 
@@ -279,9 +293,13 @@ void run_ping_pong_benchmarks() {
     run_ping_pong_benchmark<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, CAPACITY>>("tbb::concurrent_bounded_queue");
 
     run_ping_pong_benchmark<RetryDecorator<AtomicQueue <unsigned, CAPACITY>>>("AtomicQueue");
+    run_ping_pong_benchmark<RetryDecorator<CapacityToConstructor<AtomicQueueB<unsigned>, CAPACITY>>>("AtomicQueueB");
     run_ping_pong_benchmark<AtomicQueue <unsigned, CAPACITY>>("BlockingAtomicQueue");
+    run_ping_pong_benchmark<CapacityToConstructor<AtomicQueueB<unsigned>, CAPACITY>>("BlockingAtomicQueueB");
     run_ping_pong_benchmark<RetryDecorator<AtomicQueue2<unsigned, CAPACITY>>>("AtomicQueue2");
+    run_ping_pong_benchmark<RetryDecorator<CapacityToConstructor<AtomicQueueB2<unsigned>, CAPACITY>>>("AtomicQueueB2");
     run_ping_pong_benchmark<AtomicQueue2<unsigned, CAPACITY>>("BlockingAtomicQueue2");
+    run_ping_pong_benchmark<CapacityToConstructor<AtomicQueueB2<unsigned>, CAPACITY>>("BlockingAtomicQueueB2");
 
     // run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinlockHle<unsigned, CAPACITY>>>("SpinlockHle");
 
