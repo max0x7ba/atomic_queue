@@ -32,7 +32,7 @@ cflags.gcc := -pthread -march=native -W{all,extra} -g -fmessage-length=0 ${cxxfl
 cflags.gcc-8 := ${cflags.gcc}
 
 cxxflags.clang.debug := -O0 -fstack-protector-all
-cxxflags.clang.release := -O3 -mtune=native -ffast-math -falign-{functions,loops}=32 -DNDEBUG
+cxxflags.clang.release := -O3 -mtune=native -ffast-math -falign-functions=32 -DNDEBUG
 cxxflags.clang := -pthread -march=native -std=gnu++14 -W{all,extra,error} -g -fmessage-length=0 ${cxxflags.clang.${BUILD}}
 cxxflags.clang-7 := ${cxxflags.clang}
 
@@ -69,6 +69,9 @@ ${exes} : % : ${build_dir}/%
 	ln -sf ${<:${CURDIR}/%=%}
 
 ${build_dir}/libatomic_queue.a : ${build_dir}/cpu_base_frequency.o
+
+level1_dcache_linesize.h : Makefile
+	echo -e "#pragma once\nnamespace atomic_queue { constexpr int LEVEL1_DCACHE_LINESIZE = $$(getconf LEVEL1_DCACHE_LINESIZE); }\n" > $@
 
 ${build_dir}/benchmarks : cppflags += ${cppflags.tbb} ${cppflags.moodycamel}
 ${build_dir}/benchmarks : ldlibs += ${ldlibs.tbb} ${ldlibs.moodycamel}
@@ -110,13 +113,13 @@ ${build_dir}/%.o : %.c Makefile | ${build_dir}
 %.I : %.cc
 	$(strip ${PREPROCESS.CXX})
 
-${build_dir} :
+${build_dir} : level1_dcache_linesize.h
 	mkdir -p $@
 
 rtags : clean
 	${MAKE} -nk | rc -c -; true
 
 clean :
-	rm -rf ${build_dir}
+	rm -rf ${build_dir} level1_dcache_linesize.h
 
 .PHONY : rtags run_benchmarks clean all run_%
