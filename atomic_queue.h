@@ -5,6 +5,7 @@
 #include "defs.h"
 
 #include <type_traits>
+#include <algorithm>
 #include <cstdint>
 #include <cassert>
 #include <cstddef>

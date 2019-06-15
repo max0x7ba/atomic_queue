@@ -1,6 +1,6 @@
 # time make -rC ~/src/atomic_queue -j8 run_benchmarks
+# time make -rC ~/src/atomic_queue -j8 TOOLSET=clang run_benchmarks
 # time make -rC ~/src/atomic_queue -j8 BUILD=debug run_tests
-# time make -rC ~/src/atomic_queue -j8 BUILD=debug TOOLSET=clang run_tests
 
 SHELL := /bin/bash
 BUILD := release
@@ -26,25 +26,20 @@ AR := ${ar.${TOOLSET}}
 cxxflags.gcc.debug := -Og -fstack-protector-all -fno-omit-frame-pointer # -D_GLIBCXX_DEBUG
 cxxflags.gcc.release := -O3 -mtune=native -ffast-math -falign-{functions,loops}=32 -DNDEBUG
 cxxflags.gcc := -pthread -march=native -std=gnu++14 -W{all,extra,error,no-{maybe-uninitialized,unused-function}} -g -fmessage-length=0 ${cxxflags.gcc.${BUILD}}
-cxxflags.gcc-8 := ${cxxflags.gcc}
 
 cflags.gcc := -pthread -march=native -W{all,extra} -g -fmessage-length=0 ${cxxflags.gcc.${BUILD}}
-cflags.gcc-8 := ${cflags.gcc}
 
 cxxflags.clang.debug := -O0 -fstack-protector-all
 cxxflags.clang.release := -O3 -mtune=native -ffast-math -falign-functions=32 -DNDEBUG
-cxxflags.clang := -pthread -march=native -std=gnu++14 -W{all,extra,error} -g -fmessage-length=0 ${cxxflags.clang.${BUILD}}
-cxxflags.clang-7 := ${cxxflags.clang}
-
-ldflags.debug :=
-ldflags.release :=
+cxxflags.clang := -stdlib=libc++ -pthread -march=native -std=gnu++14 -W{all,extra,error} -g -fmessage-length=0 ${cxxflags.clang.${BUILD}}
+ldflags.clang := -stdlib=libc++ ${ldflags.clang.${BUILD}}
 
 # Additional CPPFLAGS, CXXFLAGS, CFLAGS, LDLIBS, LDFLAGS can come from the command line, e.g. make CXXFLAGS='-march=skylake -mtune=skylake'.
 # However, a clean build is required when changing the flags in the command line.
 cxxflags := ${cxxflags.${TOOLSET}} ${CXXFLAGS}
 cflags := ${cflags.${TOOLSET}} ${CFLAGS}
 cppflags := ${CPPFLAGS}
-ldflags := -fuse-ld=gold -pthread -g ${ldflags.${BUILD}} ${ldflags.${TOOLSET}} ${LDFLAGS}
+ldflags := -fuse-ld=gold -pthread -g ${ldflags.${TOOLSET}} ${LDFLAGS}
 ldlibs := -lrt ${LDLIBS}
 
 cppflags.tbb :=
@@ -69,9 +64,6 @@ ${exes} : % : ${build_dir}/%
 	ln -sf ${<:${CURDIR}/%=%}
 
 ${build_dir}/libatomic_queue.a : ${build_dir}/cpu_base_frequency.o
-
-level1_dcache_linesize.h : Makefile
-	echo -e "#pragma once\nnamespace atomic_queue { constexpr int LEVEL1_DCACHE_LINESIZE = $$(getconf LEVEL1_DCACHE_LINESIZE); }\n" > $@
 
 ${build_dir}/benchmarks : cppflags += ${cppflags.tbb} ${cppflags.moodycamel}
 ${build_dir}/benchmarks : ldlibs += ${ldlibs.tbb} ${ldlibs.moodycamel}
@@ -112,6 +104,9 @@ ${build_dir}/%.o : %.c Makefile | ${build_dir}
 
 %.I : %.cc
 	$(strip ${PREPROCESS.CXX})
+
+level1_dcache_linesize.h : Makefile
+	echo -e "#pragma once\nnamespace atomic_queue { int constexpr LEVEL1_DCACHE_LINESIZE = $$(getconf LEVEL1_DCACHE_LINESIZE); }\n" > $@
 
 ${build_dir} : level1_dcache_linesize.h
 	mkdir -p $@
