@@ -34,6 +34,8 @@ using Type = std::common_type<T>; // Similar to boost::type<>.
 
 namespace {
 
+using SumType = long long;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 double const CPU_FREQ = cpu_base_frequency();
@@ -105,7 +107,7 @@ void throughput_producer(unsigned N, Queue* queue, Barrier* barrier, std::atomic
 }
 
 template<class Queue>
-void throughput_consumer(unsigned N, Queue* queue, Barrier* barrier, std::atomic<long long>* total_sum, std::atomic<unsigned>* last_consumer, uint64_t* t1) {
+void throughput_consumer(unsigned N, Queue* queue, Barrier* barrier, SumType* consumer_sum, std::atomic<unsigned>* last_consumer, uint64_t* t1) {
     unsigned const stop = N + 1;
     long long sum = 0;
 
@@ -123,49 +125,61 @@ void throughput_consumer(unsigned N, Queue* queue, Barrier* barrier, std::atomic
     if(1 == last_consumer->fetch_sub(1, std::memory_order_acq_rel))
         *t1 = t;
 
-    total_sum->fetch_add(sum, std::memory_order_relaxed);
+    *consumer_sum = sum;
 }
 
 template<class Queue>
-uint64_t benchmark_throughput(unsigned N, unsigned producer_count, unsigned consumer_count, long long* total_sum2) {
+uint64_t benchmark_throughput(unsigned N, unsigned producer_count, unsigned consumer_count, SumType* consumer_sums) {
     Queue queue;
     std::atomic<uint64_t> t0{0};
     uint64_t t1 = 0;
     std::atomic<unsigned> last_consumer{consumer_count};
-    std::atomic<long long> total_sum{0};
 
     Barrier barrier;
     std::vector<std::thread> threads(producer_count + consumer_count);
     for(unsigned i = 0; i < producer_count; ++i)
         threads[i] = std::thread(throughput_producer<Queue>, N, &queue, &barrier, &t0);
     for(unsigned i = 0; i < consumer_count; ++i)
-        threads[producer_count + i] = std::thread(throughput_consumer<Queue>, N, &queue, &barrier, &total_sum, &last_consumer, &t1);
+        threads[producer_count + i] = std::thread(throughput_consumer<Queue>, N, &queue, &barrier, consumer_sums + i, &last_consumer, &t1);
 
     barrier.release(producer_count + consumer_count);
     for(auto& t: threads)
         t.join();
 
-    *total_sum2 = total_sum;
     return t1 - t0.load(std::memory_order_relaxed);
 }
 
 template<class Queue>
 void run_throughput_benchmark(char const* name, unsigned M, unsigned thread_count_min, unsigned thread_count_max) {
     int constexpr RUNS = 3;
+    std::vector<SumType> consumer_sums(thread_count_max);
 
     for(unsigned threads = thread_count_min; threads <= thread_count_max; ++threads) {
         unsigned const N = M / threads;
 
+        SumType const expected_sum = (N + 1) / 2. * N;
+        double const expected_sum_inv = 1. / expected_sum;
+
         uint64_t min_time = std::numeric_limits<uint64_t>::max();
         for(unsigned run = RUNS; run--;) {
-            long long total_sum = 0;
-            uint64_t time = benchmark_throughput<Queue>(N, threads, threads, &total_sum);
+            uint64_t time = benchmark_throughput<Queue>(N, threads, threads, consumer_sums.data());
             min_time = std::min(min_time, time);
 
-            // Verify that all messages were received exactly once.
-            long long const expected_sum = (N + 1) / 2. * N * threads;
-            if(auto diff = total_sum - expected_sum)
-                std::fprintf(stderr, "%s: wrong checksum error: producers: %u, expected_sum: %'lld, diff: %'lld.\n", name, threads, expected_sum, diff);
+            // Calculate the checksum.
+            SumType total_sum = 0;
+            for(unsigned i = 0; i < threads; ++i) {
+                auto consumer_sum = consumer_sums[i];
+                total_sum += consumer_sum;
+
+                // Verify that no consumer was starved.
+                auto consumer_sum_frac = consumer_sum * expected_sum_inv;
+                if(consumer_sum_frac < .1)
+                    std::fprintf(stderr, "%s: producers: %u: consumer %u received too few messages: %.2lf%% of expected.\n", name, threads, i, consumer_sum_frac);
+            }
+
+            // Verify that all messages were received exactly once: no duplicates, no omissions.
+            if(auto diff = total_sum - expected_sum * threads)
+                std::fprintf(stderr, "%s: wrong checksum error: producers: %u, expected_sum: %'lld, diff: %'lld.\n", name, threads, expected_sum * threads, diff);
         }
 
         double min_seconds = to_seconds(min_time);
