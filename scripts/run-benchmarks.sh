@@ -13,4 +13,4 @@ function benchmark() {
     done
 }
 
-benchmark |& tee results-${cpucount}.${now}.txt
+benchmark | tee results-${cpucount}.${now}.txt
