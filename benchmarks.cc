@@ -34,7 +34,7 @@ using Type = std::common_type<T>; // Similar to boost::type<>.
 
 namespace {
 
-using SumType = long long;
+using sum_t = long long;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -107,7 +107,7 @@ void throughput_producer(unsigned N, Queue* queue, Barrier* barrier, std::atomic
 }
 
 template<class Queue>
-void throughput_consumer(unsigned N, Queue* queue, Barrier* barrier, SumType* consumer_sum, std::atomic<unsigned>* last_consumer, uint64_t* t1) {
+void throughput_consumer(unsigned N, Queue* queue, Barrier* barrier, sum_t* consumer_sum, std::atomic<unsigned>* last_consumer, uint64_t* t1) {
     unsigned const stop = N + 1;
     long long sum = 0;
 
@@ -129,7 +129,7 @@ void throughput_consumer(unsigned N, Queue* queue, Barrier* barrier, SumType* co
 }
 
 template<class Queue>
-uint64_t benchmark_throughput(unsigned N, unsigned producer_count, unsigned consumer_count, SumType* consumer_sums) {
+uint64_t benchmark_throughput(unsigned N, unsigned producer_count, unsigned consumer_count, sum_t* consumer_sums) {
     Queue queue;
     std::atomic<uint64_t> t0{0};
     uint64_t t1 = 0;
@@ -152,12 +152,12 @@ uint64_t benchmark_throughput(unsigned N, unsigned producer_count, unsigned cons
 template<class Queue>
 void run_throughput_benchmark(char const* name, unsigned M, unsigned thread_count_min, unsigned thread_count_max) {
     int constexpr RUNS = 3;
-    std::vector<SumType> consumer_sums(thread_count_max);
+    std::vector<sum_t> consumer_sums(thread_count_max);
 
     for(unsigned threads = thread_count_min; threads <= thread_count_max; ++threads) {
         unsigned const N = M / threads;
 
-        SumType const expected_sum = (N + 1) / 2. * N;
+        sum_t const expected_sum = (N + 1) / 2. * N;
         double const expected_sum_inv = 1. / expected_sum;
 
         uint64_t min_time = std::numeric_limits<uint64_t>::max();
@@ -166,7 +166,7 @@ void run_throughput_benchmark(char const* name, unsigned M, unsigned thread_coun
             min_time = std::min(min_time, time);
 
             // Calculate the checksum.
-            SumType total_sum = 0;
+            sum_t total_sum = 0;
             for(unsigned i = 0; i < threads; ++i) {
                 auto consumer_sum = consumer_sums[i];
                 total_sum += consumer_sum;

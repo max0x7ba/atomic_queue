@@ -105,16 +105,13 @@ ${build_dir}/%.o : %.c Makefile | ${build_dir}
 %.I : %.cc
 	$(strip ${PREPROCESS.CXX})
 
-level1_dcache_linesize.h : Makefile
-	echo -e "#pragma once\nnamespace atomic_queue { int constexpr LEVEL1_DCACHE_LINESIZE = $$(getconf LEVEL1_DCACHE_LINESIZE); }\n" > $@
-
-${build_dir} : level1_dcache_linesize.h
+${build_dir} :
 	mkdir -p $@
 
 rtags : clean
 	${MAKE} -nk | rc -c -; true
 
 clean :
-	rm -rf ${build_dir} level1_dcache_linesize.h
+	rm -rf ${build_dir}
 
 .PHONY : rtags run_benchmarks clean all run_%
