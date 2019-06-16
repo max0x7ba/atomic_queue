@@ -95,9 +95,8 @@ struct CapacityToConstructor : Queue {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<class Queue>
-void throughput_producer(unsigned N, Queue* queue, Barrier* barrier, std::atomic<uint64_t>* t0) {
+void throughput_producer(unsigned N, Queue* queue, std::atomic<uint64_t>* t0, Barrier* barrier) {
     barrier->wait();
-
     // The first producer saves the start time.
     uint64_t expected = 0;
     t0->compare_exchange_strong(expected, __builtin_ia32_rdtsc(), std::memory_order_acq_rel, std::memory_order_relaxed);
@@ -107,11 +106,9 @@ void throughput_producer(unsigned N, Queue* queue, Barrier* barrier, std::atomic
 }
 
 template<class Queue>
-void throughput_consumer(unsigned N, Queue* queue, Barrier* barrier, sum_t* consumer_sum, std::atomic<unsigned>* last_consumer, uint64_t* t1) {
+void throughput_consumer_impl(unsigned N, Queue* queue, sum_t* consumer_sum, std::atomic<unsigned>* last_consumer, uint64_t* t1) {
     unsigned const stop = N + 1;
-    long long sum = 0;
-
-    barrier->wait();
+    sum_t sum = 0;
 
     for(;;) {
         unsigned n = queue->pop();
@@ -129,6 +126,12 @@ void throughput_consumer(unsigned N, Queue* queue, Barrier* barrier, sum_t* cons
 }
 
 template<class Queue>
+void throughput_consumer(unsigned N, Queue* queue, sum_t* consumer_sum, std::atomic<unsigned>* last_consumer, uint64_t* t1, Barrier* barrier) {
+    barrier->wait();
+    throughput_consumer_impl(N, queue, consumer_sum, last_consumer, t1);
+}
+
+template<class Queue>
 uint64_t benchmark_throughput(unsigned N, unsigned thread_count, bool alternative_placement, sum_t* consumer_sums) {
     Queue queue;
     std::atomic<uint64_t> t0{0};
@@ -136,21 +139,24 @@ uint64_t benchmark_throughput(unsigned N, unsigned thread_count, bool alternativ
     std::atomic<unsigned> last_consumer{thread_count};
 
     Barrier barrier;
-    std::vector<std::thread> threads(thread_count * 2);
+    std::vector<std::thread> threads(thread_count * 2 - 1);
     if(alternative_placement) {
         for(unsigned i = 0; i < thread_count; ++i) {
-            threads[i] = std::thread(throughput_producer<Queue>, N, &queue, &barrier, &t0);
-            threads[thread_count + i] = std::thread(throughput_consumer<Queue>, N, &queue, &barrier, consumer_sums + i, &last_consumer, &t1);
+            threads[i] = std::thread(throughput_producer<Queue>, N, &queue, &t0, &barrier);
+            if(i != thread_count - 1) // This thread is the last consumer.
+                threads[thread_count + i] = std::thread(throughput_consumer<Queue>, N, &queue, consumer_sums + i, &last_consumer, &t1, &barrier);
         }
     }
     else {
         for(unsigned i = 0; i < thread_count; ++i)
-            threads[i] = std::thread(throughput_producer<Queue>, N, &queue, &barrier, &t0);
-        for(unsigned i = 0; i < thread_count; ++i)
-            threads[thread_count + i] = std::thread(throughput_consumer<Queue>, N, &queue, &barrier, consumer_sums + i, &last_consumer, &t1);
+            threads[i] = std::thread(throughput_producer<Queue>, N, &queue, &t0, &barrier);
+        for(unsigned i = 0; i < thread_count - 1; ++i) // This thread is the last consumer.
+            threads[thread_count + i] = std::thread(throughput_consumer<Queue>, N, &queue, consumer_sums + i, &last_consumer, &t1, &barrier);
     }
 
-    barrier.release(thread_count + thread_count);
+    barrier.release(thread_count * 2 - 1);
+    throughput_consumer_impl(N, &queue, consumer_sums + (thread_count - 1), &last_consumer, &t1); // Use this thread for the last consumer.
+
     for(auto& t: threads)
         t.join();
 
@@ -200,7 +206,7 @@ void run_throughput_benchmark(char const* name, unsigned M, unsigned thread_coun
 
 template<class Queue>
 void run_throughput_benchmark(char const* name, Type<Queue>) {
-    unsigned const thread_count_max = std::thread::hardware_concurrency() / 2 - 1; // -1 for the main thread.
+    unsigned const thread_count_max = std::thread::hardware_concurrency() / 2;
     run_throughput_benchmark<Queue>(name, 1000000, 1, thread_count_max);
 }
 
