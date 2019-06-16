@@ -199,7 +199,7 @@ void run_throughput_benchmark(char const* name, unsigned M, unsigned thread_coun
 
             double min_seconds = to_seconds(min_time);
             unsigned msg_per_sec = N * threads / min_seconds;
-            std::printf("%30s,%u,%c: %'11u msg/sec\n", name, threads, alternative_placement ? 'i' : 's' , msg_per_sec);
+            std::printf("%30s,%2u,%c: %'11u msg/sec\n", name, threads, alternative_placement ? 'i' : 's' , msg_per_sec);
         }
     }
 }
