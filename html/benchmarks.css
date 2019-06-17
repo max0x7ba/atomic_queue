@@ -15,15 +15,11 @@ p.copyright {
     font-size: 0.8em;
 }
 
-h1 {
+h1, h2, h3 {
     margin-left: 20px;
 }
 
-h3 {
-    margin-left: 20px;
-}
-
-p {
+p, li {
     color: #A0A0A0;
     margin-left: 20px;
 }

@@ -29,6 +29,25 @@
     <p>One thread posts an integer to another thread and waits for the reply using two queues. The benchmarks measures the total time of 100,000 ping-pongs, best of 10 runs. Contention is minimal here to be able to achieve and measure the lowest latency. Reports the average round-trip time.</p>
     <div class="chart" id="latency-7700k-5GHz"></div>
     <div class="chart" id="latency-xeon-gold-6132"></div>
+    <h2>Systems details</h2>
+    <h3>Intel i7-7700K system</h3>
+    <ul>
+      <li>OS: Ubuntu-18.04 LTS
+      <li>Compiler: gcc-8.1
+      <li>Boost version: 1.65.0
+      <li>atomic_queue version: commit 29ce8d7090cc1ade65c68e5ca7bfa0bacbb12fa5
+      <li>TBB version: 2019_U7, commit 4233fef583b4f8cbf9f781311717600feaaa0694
+      <li>moodycamel version: commit dea078cf5b6e742cd67a0d725e36f872feca4de4
+    </ul>
+    <h3>Intel Xeon Gold 6132 system</h3>
+    <ul>
+      <li>OS: Red Hat Enterprise Linux Server release 6.10 (Santiago)
+      <li>Compiler: gcc-5.4.0
+      <li>Boost version: 1.61.0
+      <li>atomic_queue version: commit 29ce8d7090cc1ade65c68e5ca7bfa0bacbb12fa5
+      <li>TBB version: 2019_U7, commit 4233fef583b4f8cbf9f781311717600feaaa0694
+      <li>moodycamel version: commit dea078cf5b6e742cd67a0d725e36f872feca4de4
+    </ul>
     <h3>Source Code</h3>
     <p><a href="https://github.com/max0x7ba/atomic_queue">github.com/max0x7ba/atomic_queue</a></p>
     <p class="copyright">(C) Maxim Egorushkin 2019</p>
