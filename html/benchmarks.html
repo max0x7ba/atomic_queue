@@ -21,7 +21,7 @@
   </head>
   <body>
     <h1>Scalability Benchmark</h1>
-    <p>N producer threads push a 4-byte integer into one queue, N consumer threads pop the integers from the queue. All producers posts 1,000,000 messages in total. Total time to send and receive all the messages is measured. The benchmark is run for from 1 producer and 1 consumer up to total-number-of-cpus producers/consumers to measure the scalabilty of different queues.</p>
+    <p>N producer threads push a 4-byte integer into one queue, N consumer threads pop the integers from the queue. All producers posts 1,000,000 messages in total. Total time to send and receive all the messages is measured. The benchmark is run for from 1 producer and 1 consumer up to (total-number-of-cpus / 2) producers/consumers to measure the scalabilty of different queues.</p>
     <div class="chart" id="scalability-7700k-5GHz"></div>
     <div class="chart" id="scalability-xeon-gold-6132"></div>
     <p>Note: Intel Xeon Gold 6132 benchmarks use 1 NUMA node for up to 6 producers/consumers, 2 NUMA nodes are used for 7 producers/consumers or more. This is why throughput drops at 7 producers/consumers.</p>
