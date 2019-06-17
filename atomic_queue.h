@@ -116,6 +116,32 @@ protected:
     alignas(CACHE_LINE_SIZE) std::atomic<unsigned> head_ = {};
     alignas(CACHE_LINE_SIZE) std::atomic<unsigned> tail_ = {};
 
+    AtomicQueueCommon() noexcept = default;
+
+    AtomicQueueCommon(AtomicQueueCommon const& b) noexcept
+        : head_(b.head_.load(X))
+        , tail_(b.tail_.load(X))
+    {}
+
+    AtomicQueueCommon& operator=(AtomicQueueCommon const& b) noexcept {
+        head_.store(b.head_.load(X), X);
+        tail_.store(b.tail_.load(X), X);
+        return *this;
+    }
+
+    void swap(AtomicQueueCommon const& b) noexcept {
+        unsigned h = head_.load(X);
+        unsigned t = tail_.load(X);
+        head_.store(b.head_.load(X), X);
+        tail_.store(b.tail_.load(X), X);
+        b.head_.store(h, X);
+        b.tail_.store(t, X);
+    }
+
+    friend void swap(AtomicQueueCommon const& a, AtomicQueueCommon const& b) noexcept {
+        a.swap(b);
+    }
+
 public:
     template<class T>
     bool try_push(T&& element) noexcept {
@@ -208,6 +234,9 @@ public:
             for(auto& element : elements_)
                 element.store(NIL, X);
     }
+
+    AtomicQueue(AtomicQueue const&) = delete;
+    AtomicQueue& operator=(AtomicQueue const&) = delete;
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -263,6 +292,10 @@ class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE>> {
 
 public:
     using value_type = T;
+
+    AtomicQueue2() noexcept = default;
+    AtomicQueue2(AtomicQueue2 const&) = delete;
+    AtomicQueue2& operator=(AtomicQueue2 const&) = delete;
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -320,7 +353,8 @@ public:
     }
 
     AtomicQueueB(AtomicQueueB&& b) noexcept
-        : AllocatorElements(static_cast<AllocatorElements&&>(b)) // TODO: This must be noexcept, static_assert that.
+        : Base(static_cast<Base&&>(b))
+        , AllocatorElements(static_cast<AllocatorElements&&>(b)) // TODO: This must be noexcept, static_assert that.
         , size_(b.size_)
         , elements_(b.elements_)
     {
@@ -340,9 +374,14 @@ public:
 
     void swap(AtomicQueueB& b) noexcept {
         using std::swap;
+        swap(static_cast<Base&>(*this), static_cast<Base&>(b));
         swap(static_cast<AllocatorElements&>(*this), static_cast<AllocatorElements&>(b));
         swap(size_, b.size_);
         swap(elements_, b.elements_);
+    }
+
+    friend void swap(AtomicQueueB& a, AtomicQueueB& b) {
+        a.swap(b);
     }
 };
 
@@ -424,7 +463,8 @@ public:
     }
 
     AtomicQueueB2(AtomicQueueB2&& b) noexcept
-        : AllocatorElements(static_cast<AllocatorElements&&>(b)) // TODO: This must be noexcept, static_assert that.
+        : Base(static_cast<Base&&>(b))
+        , AllocatorElements(static_cast<AllocatorElements&&>(b)) // TODO: This must be noexcept, static_assert that.
         , AllocatorStates(static_cast<AllocatorStates&&>(b)) // TODO: This must be noexcept, static_assert that.
         , size_(b.size_)
         , states_(b.states_)
@@ -453,11 +493,16 @@ public:
 
     void swap(AtomicQueueB2& b) noexcept {
         using std::swap;
+        swap(static_cast<Base&>(*this), static_cast<Base&>(b));
         swap(static_cast<AllocatorElements&>(*this), static_cast<AllocatorElements&>(b));
         swap(static_cast<AllocatorStates&>(*this), static_cast<AllocatorStates&>(b));
         swap(size_, b.size_);
         swap(states_, b.states_);
         swap(elements_, b.elements_);
+    }
+
+    friend void swap(AtomicQueueB2& a, AtomicQueueB2& b) noexcept {
+        a.swap(b);
     }
 };
 
