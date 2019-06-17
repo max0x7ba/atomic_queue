@@ -3,7 +3,7 @@
 import re
 import pandas as pd
 
-_parser = re.compile("\s*(\S+):\s+([,.0-9]+)\s+(\S+)")
+_parser = re.compile("\s*(.+):\s+([,.0-9]+)\s+(\S+)")
 
 def parse_output(f):
     for line in f:
@@ -16,7 +16,7 @@ def parse_output(f):
 
 
 def extract_name_threads(name_theads):
-    name, threads = name_theads.split(',')
+    name, threads, si = name_theads.split(',')
     return name, int(threads)
 
 

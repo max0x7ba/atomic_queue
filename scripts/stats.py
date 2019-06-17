@@ -10,7 +10,7 @@ from collections import defaultdict
 
 results=defaultdict(lambda: defaultdict(list))
 
-r = re.compile("\s*(\S+):\s+([,.0-9]+)\s+(\S+)")
+r = re.compile("\s*(.+):\s+([,.0-9]+)\s+(\S+)")
 for line in sys.stdin:
     m = r.match(line)
     if m:
