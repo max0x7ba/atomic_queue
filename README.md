@@ -16,7 +16,7 @@ Available containers are:
 * `AtomicQueue2` - a fixed size ring-buffer for non-atomic elements.
 * `OptimistAtomicQueue2` - a faster fixed size ring-buffer for non-atomic elements which busy-waits when empty or full.
 
-These containers have corresponding `AtomicQueueB`, `OptimistAtomicQueueB`, `AtomicQueueB2`, `OptimistAtomicQueueB2` versions where the buffer size is specified as an argument to the constructor. The `B` versions are slightly slower.
+These containers have corresponding `AtomicQueueB`, `OptimistAtomicQueueB`, `AtomicQueueB2`, `OptimistAtomicQueueB2` versions where the buffer size is specified as an argument to the constructor. The `B` versions are slower.
 
 A few well-known containers are used for reference in the benchmarks:
 * `boost::lockfree::spsc_queue` - a wait-free single producer single consumer queue from Boost library. This is the absolute best performer because it is wait-free, but it only supports single-producer-single-consumer scenario.
