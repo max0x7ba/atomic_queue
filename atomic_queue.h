@@ -12,8 +12,6 @@
 #include <utility>
 #include <memory>
 
-#include <emmintrin.h>
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 namespace atomic_queue {
@@ -129,7 +127,7 @@ protected:
         return *this;
     }
 
-    void swap(AtomicQueueCommon const& b) noexcept {
+    void swap(AtomicQueueCommon& b) noexcept {
         unsigned h = head_.load(X);
         unsigned t = tail_.load(X);
         head_.store(b.head_.load(X), X);
@@ -138,7 +136,7 @@ protected:
         b.tail_.store(t, X);
     }
 
-    friend void swap(AtomicQueueCommon const& a, AtomicQueueCommon const& b) noexcept {
+    friend void swap(AtomicQueueCommon& a, AtomicQueueCommon& b) noexcept {
         a.swap(b);
     }
 
