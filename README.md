@@ -1,9 +1,14 @@
 # atomic_queue
-Multiple producer multiple consumer C++14 *lock-free* queues based on `std::atomic<>`. The queues employ busy loops, so they are not *wait-free*.
+Multiple producer multiple consumer C++14 *lock-free* queues based on `std::atomic<>`.
 
-The main idea these queues utilize is _simplicity_: fixed size buffer, busy wait.
+The main design idea these queues adhere to is _simplicity_: fixed size buffer, the bare minimum of atomic operations.
 
-These qualities are also limitations: the maximum queue size must be set at compile time, there are no blocking push/pop functionality. Nevertheless, ultra-low-latency applications need just that and nothing more. The simplicity pays off (see the [throughput and latency benchmarks][1]).
+These qualities are also limitations:
+
+* The maximum queue size must be set at compile time (fastest) or construction time (slower).
+* There are no blocking push/pop functions.
+
+Nevertheless, ultra-low-latency applications need just that and nothing more. The simplicity pays off, see the [throughput and latency benchmarks][1].
 
 Available containers are:
 * `AtomicQueue` - a fixed size ring-buffer for atomic elements.
@@ -11,8 +16,10 @@ Available containers are:
 * `AtomicQueue2` - a fixed size ring-buffer for non-atomic elements.
 * `OptimistAtomicQueue2` - a faster fixed size ring-buffer for non-atomic elements which busy-waits when empty or full.
 
+These containers have corresponding `AtomicQueueB`, `OptimistAtomicQueueB`, `AtomicQueueB2`, `OptimistAtomicQueueB2` versions where the buffer size is specified as an argument to the constructor. The `B` versions are slightly slower.
+
 A few well-known containers are used for reference in the benchmarks:
-* `boost::lockfree::spsc_queue` - a wait-free single producer single consumer queue from Boost library.
+* `boost::lockfree::spsc_queue` - a wait-free single producer single consumer queue from Boost library. This is the absolute best performer because it is wait-free, but it only supports single-producer-single-consumer scenario.
 * `boost::lockfree::queue` - a lock-free multiple producer multiple consumer queue from Boost library.
 * `pthread_spinlock` - a locked fixed size ring-buffer with `pthread_spinlock_t`.
 * `moodycamel::ConcurrentQueue` - a lock-free multiple producer multiple consumer queue used in non-blocking mode.
@@ -47,7 +54,7 @@ The containers support the following APIs:
 # Notes
 The available queues here use a ring-buffer array for storing elements. The size of the queue is fixed at compile time.
 
-In a real-world multiple-producer-multiple-consumer scenario the ring-buffer size should be set to the maximum allowable queue size. When the buffer size is exhausted it means that the consumers cannot consume the elements fast enough, fixing which would require either of:
+In a production multiple-producer-multiple-consumer scenario the ring-buffer size should be set to the maximum allowable queue size. When the buffer size is exhausted it means that the consumers cannot consume the elements fast enough, fixing which would require either of:
 
 * increasing the buffer size to be able to handle temporary spikes of produced elements, or
 * increasing the number of consumers to consume elements faster, or
@@ -56,12 +63,14 @@ In a real-world multiple-producer-multiple-consumer scenario the ring-buffer siz
 Using a power-of-2 ring-buffer array size allows a couple of optimizations:
 
 * The writer and reader indexes get mapped into the ring-buffer array index using modulo `% SIZE` binary operator and using a power-of-2 size turns that modulo operator into one plain `and` instruction and that is as fast as it gets.
-* The *element index within the cache line* gets swapped with the *cache line index* within the *ring-buffer array element index*, so that subsequent queue elements actually reside in different cache lines. This eliminates contention between producers and consumers on the ring-buffer cache lines. Instead of N producers together with M consumers competing on the same ring-buffer array cache line in the worst case, it is only one producer competing with one consumer.
+* The *element index within the cache line* gets swapped with the *cache line index* within the *ring-buffer array element index*, so that subsequent queue elements actually reside in different cache lines. This eliminates contention between producers and consumers on the ring-buffer cache lines. Instead of `N` producers together with `M` consumers competing on the same ring-buffer array cache line in the worst case, it is only one producer competing with one consumer.
 
 In other words, power-of-2 ring-buffer array size yields top performance.
 
+The containers use `unsigned` type for size and internal indexes. On x86-64 platform `unsigned` is 32-bit wide, whereas `size_t` is 64-bit wide. 64-bit instructions utilize an extra byte instruction prefix resulting in slightly more pressure on the CPU instruction cache and the front-end. Hence, 32-bit `unsigned` indexes are used to maximize performance. That limits the queue size to 4,294,967,295 elements, which seems to be a reasonable hard limit for many applications.
+
 # Benchmarks
-I have access to x86-64 hardware only. If you use a different architecture you may like to run tests a few times first and make sure that they pass. If they don't you may like to raise an issue.
+I have access to few x86-64 machines. If you have access to different hardware feel free to submit the output file of `scripts/run-benchmarks.sh`, I will include your results in the benchmarks.
 
 [View throughput and latency benchmarks charts][1].
 
