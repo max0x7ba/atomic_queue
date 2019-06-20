@@ -199,7 +199,7 @@ void run_throughput_benchmark(char const* name, unsigned M, unsigned thread_coun
 
             double min_seconds = to_seconds(min_time);
             unsigned msg_per_sec = N * threads / min_seconds;
-            std::printf("%30s,%2u,%c: %'11u msg/sec\n", name, threads, alternative_placement ? 'i' : 's' , msg_per_sec);
+            std::printf("%32s,%2u,%c: %'11u msg/sec\n", name, threads, alternative_placement ? 'i' : 's' , msg_per_sec);
         }
     }
 }
@@ -296,7 +296,7 @@ void run_ping_pong_benchmark(char const* name) {
 
     auto avg_time = (best_times[0] + best_times[1]) / (2 * 1e9 * CPU_FREQ);
     auto round_trip_time = avg_time / N;
-    std::printf("%30s: %.9f sec/round-trip\n", name, round_trip_time);
+    std::printf("%32s: %.9f sec/round-trip\n", name, round_trip_time);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
