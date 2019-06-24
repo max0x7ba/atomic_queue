@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+# Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file LICENSE.
+
 import re
 import pandas as pd
 

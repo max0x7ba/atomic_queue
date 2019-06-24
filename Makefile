@@ -1,3 +1,5 @@
+# Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file LICENSE.
+
 # time make -rC ~/src/atomic_queue -j8 run_benchmarks
 # time make -rC ~/src/atomic_queue -j8 TOOLSET=clang run_benchmarks
 # time make -rC ~/src/atomic_queue -j8 BUILD=debug run_tests

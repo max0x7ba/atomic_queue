@@ -2,6 +2,8 @@
 #ifndef MOODYCAMEL_H_INCLUDED
 #define MOODYCAMEL_H_INCLUDED
 
+// Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file LICENSE.
+
 #include <concurrentqueue/concurrentqueue.h>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

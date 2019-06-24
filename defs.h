@@ -2,6 +2,8 @@
 #ifndef ATOMIC_QUEUE_DEFS_H_INCLUDED
 #define ATOMIC_QUEUE_DEFS_H_INCLUDED
 
+// Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file LICENSE.
+
 #include <atomic>
 
 #include <emmintrin.h> // _mm_pause

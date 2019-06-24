@@ -1,5 +1,7 @@
 'use strict';
 
+// Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file LICENSE.
+
 Highcharts.theme = {
     chart: {
         backgroundColor: 'black',

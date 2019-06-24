@@ -1,5 +1,7 @@
 "use strict";
 
+// Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file LICENSE.
+
 $(function() {
     const settings = {
      "boost::lockfree::spsc_queue": ['#8E44AD',  0],

@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file LICENSE.
+
 now=$(date --utc +%Y%m%dT%H%M%S)
 cpucount=$(grep -c ^processor /proc/cpuinfo)
 exe="$(dirname "$0")/../benchmarks"

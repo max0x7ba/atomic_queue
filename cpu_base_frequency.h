@@ -2,6 +2,8 @@
 #ifndef CPU_BASE_FREQUENCY_H_INCLUDED
 #define CPU_BASE_FREQUENCY_H_INCLUDED
 
+// Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file LICENSE.
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 namespace atomic_queue {

@@ -2,6 +2,8 @@
 #ifndef ATOMIC_QUEUE_SPIN_LOCK_H_INCLUDED
 #define ATOMIC_QUEUE_SPIN_LOCK_H_INCLUDED
 
+// Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file LICENSE.
+
 #include "defs.h"
 
 #include <cstdlib>
