@@ -214,9 +214,14 @@ void run_throughput_benchmark(char const* name, Type<Queue>) {
 }
 
 template<class... Args>
-void run_throughput_benchmark(char const* name, Type<BoostSpScAdapter<boost::lockfree::spsc_queue<Args...>>>) {
+void run_throughput_spsc_benchmark(char const* name, Type<BoostSpScAdapter<boost::lockfree::spsc_queue<Args...>>>) {
     using Queue = BoostSpScAdapter<boost::lockfree::spsc_queue<Args...>>;
     run_throughput_benchmark<Queue>(name, 1000000, 1, 1); // spsc_queue can only handle 1 producer and 1 consumer.
+}
+
+template<class Queue>
+void run_throughput_spsc_benchmark(char const* name, Type<Queue>) {
+    run_throughput_benchmark<Queue>(name, 1000000, 1, 1); // ReaderWriterQueue can only handle 1 producer and 1 consumer.
 }
 
 void run_throughput_benchmarks() {
@@ -224,24 +229,25 @@ void run_throughput_benchmarks() {
 
     int constexpr CAPACITY = 65536;
 
-    run_throughput_benchmark("boost::lockfree::spsc_queue", Type<BoostSpScAdapter<boost::lockfree::spsc_queue<unsigned, boost::lockfree::capacity<CAPACITY>>>>{});
+    run_throughput_spsc_benchmark("boost::lockfree::spsc_queue", Type<BoostSpScAdapter<boost::lockfree::spsc_queue<unsigned, boost::lockfree::capacity<CAPACITY>>>>{});
     run_throughput_benchmark("boost::lockfree::queue", Type<BoostQueueAdapter<boost::lockfree::queue<unsigned, boost::lockfree::capacity<CAPACITY - 2>>>>{});
-
+    
     run_throughput_benchmark("pthread_spinlock", Type<RetryDecorator<AtomicQueueSpinlock<unsigned, CAPACITY>>>{});
     // run_throughput_benchmark("FairSpinlock", Type<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, FairSpinlock>>>{});
     // run_throughput_benchmark("UnfairSpinlock", Type<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, UnfairSpinlock>>>{});
 
+    run_throughput_spsc_benchmark("moodycamel::ReaderWriterQueue", Type<MoodyCamelReaderWriterQueue<unsigned, CAPACITY>>{});
     run_throughput_benchmark("moodycamel::ConcurrentQueue", Type<MoodyCamelQueue<unsigned, CAPACITY>>{});
-
+    
     run_throughput_benchmark("tbb::spin_mutex", Type<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, tbb::spin_mutex>>>{});
     run_throughput_benchmark("tbb::speculative_spin_mutex", Type<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, tbb::speculative_spin_mutex>>>{});
     run_throughput_benchmark("tbb::concurrent_bounded_queue", Type<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, CAPACITY>>{});
-
+    
     run_throughput_benchmark("AtomicQueue", Type<RetryDecorator<AtomicQueue<unsigned, CAPACITY>>>{});
     run_throughput_benchmark("AtomicQueueB", Type<RetryDecorator<CapacityToConstructor<AtomicQueueB<unsigned>, CAPACITY>>>{});
     run_throughput_benchmark("OptimistAtomicQueue", Type<AtomicQueue<unsigned, CAPACITY>>{});
     run_throughput_benchmark("OptimistAtomicQueueB", Type<CapacityToConstructor<AtomicQueueB<unsigned>, CAPACITY>>{});
-
+    
     run_throughput_benchmark("AtomicQueue2", Type<RetryDecorator<AtomicQueue2<unsigned, CAPACITY>>>{});
     run_throughput_benchmark("AtomicQueueB2", Type<RetryDecorator<CapacityToConstructor<AtomicQueueB2<unsigned>, CAPACITY>>>{});
     run_throughput_benchmark("OptimistAtomicQueue2", Type<AtomicQueue2<unsigned, CAPACITY>>{});
@@ -318,7 +324,8 @@ void run_ping_pong_benchmarks() {
     run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinlock<unsigned, CAPACITY>>>("pthread_spinlock");
     // run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, FairSpinlock>>>("FairSpinlock");
     // run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, UnfairSpinlock>>>("UnfairSpinlock");
-
+    
+    run_ping_pong_benchmark<MoodyCamelReaderWriterQueue<unsigned, CAPACITY>>("moodycamel::ReaderWriterQueue");
     run_ping_pong_benchmark<MoodyCamelQueue<unsigned, CAPACITY>>("moodycamel::ConcurrentQueue");
 
     run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, tbb::spin_mutex>>>("tbb::spin_mutex");
