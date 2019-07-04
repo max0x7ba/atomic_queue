@@ -15,8 +15,7 @@ namespace atomic_queue {
 template<class T, unsigned Capacity>
 struct MoodyCamelQueue : moodycamel::ConcurrentQueue<T> {
     MoodyCamelQueue()
-        : moodycamel::ConcurrentQueue<T>(Capacity)
-    {}
+        : moodycamel::ConcurrentQueue<T>(Capacity) {}
 
     void push(T element) {
         while(!this->try_enqueue(element))
@@ -33,7 +32,7 @@ struct MoodyCamelQueue : moodycamel::ConcurrentQueue<T> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-} // quorum
+} // namespace atomic_queue
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

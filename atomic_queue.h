@@ -6,21 +6,21 @@
 
 #include "defs.h"
 
-#include <type_traits>
 #include <algorithm>
-#include <cstdint>
 #include <cassert>
 #include <cstddef>
-#include <utility>
+#include <cstdint>
 #include <memory>
+#include <type_traits>
+#include <utility>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 namespace atomic_queue {
 
-using std::uint8_t;
 using std::uint32_t;
 using std::uint64_t;
+using std::uint8_t;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -33,13 +33,34 @@ struct IsPowerOf2 {
     static bool constexpr value = !(N & (N - 1));
 };
 
-template<size_t elements_per_cache_line> struct GetCacheLineIndexBits { static int constexpr value = 0; };
-template<> struct GetCacheLineIndexBits<64> { static int constexpr value = 6; };
-template<> struct GetCacheLineIndexBits<32> { static int constexpr value = 5; };
-template<> struct GetCacheLineIndexBits<16> { static int constexpr value = 4; };
-template<> struct GetCacheLineIndexBits< 8> { static int constexpr value = 3; };
-template<> struct GetCacheLineIndexBits< 4> { static int constexpr value = 2; };
-template<> struct GetCacheLineIndexBits< 2> { static int constexpr value = 1; };
+template<size_t elements_per_cache_line>
+struct GetCacheLineIndexBits {
+    static int constexpr value = 0;
+};
+template<>
+struct GetCacheLineIndexBits<64> {
+    static int constexpr value = 6;
+};
+template<>
+struct GetCacheLineIndexBits<32> {
+    static int constexpr value = 5;
+};
+template<>
+struct GetCacheLineIndexBits<16> {
+    static int constexpr value = 4;
+};
+template<>
+struct GetCacheLineIndexBits<8> {
+    static int constexpr value = 3;
+};
+template<>
+struct GetCacheLineIndexBits<4> {
+    static int constexpr value = 2;
+};
+template<>
+struct GetCacheLineIndexBits<2> {
+    static int constexpr value = 1;
+};
 
 template<bool minimize_contention, unsigned array_size, size_t elements_per_cache_line>
 struct GetIndexShuffleBits {
@@ -106,7 +127,7 @@ constexpr uint64_t round_up_to_power_of_2(uint64_t a) noexcept {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-} // details
+} // namespace details
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -120,8 +141,7 @@ protected:
 
     AtomicQueueCommon(AtomicQueueCommon const& b) noexcept
         : head_(b.head_.load(X))
-        , tail_(b.tail_.load(X))
-    {}
+        , tail_(b.tail_.load(X)) {}
 
     AtomicQueueCommon& operator=(AtomicQueueCommon const& b) noexcept {
         head_.store(b.head_.load(X), X);
@@ -193,12 +213,7 @@ public:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<
-    class T,
-    unsigned SIZE,
-    T NIL = T{},
-    bool MinimizeContention = details::IsPowerOf2<SIZE>::value
->
+template<class T, unsigned SIZE, T NIL = T{}, bool MinimizeContention = details::IsPowerOf2<SIZE>::value>
 class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL>> {
     alignas(CACHE_LINE_SIZE) std::atomic<T> elements_[SIZE] = {}; // Empty elements are NIL.
 
@@ -206,7 +221,8 @@ class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL>> {
     friend Base;
 
     static constexpr auto size_ = SIZE;
-    static constexpr int SHUFFLE_BITS = details::GetIndexShuffleBits<MinimizeContention, SIZE, CACHE_LINE_SIZE / sizeof(std::atomic<T>)>::value;
+    static constexpr int SHUFFLE_BITS =
+        details::GetIndexShuffleBits<MinimizeContention, SIZE, CACHE_LINE_SIZE / sizeof(std::atomic<T>)>::value;
 
     T do_pop(unsigned tail) noexcept {
         std::atomic<T>& q_element = details::map<SHUFFLE_BITS>(elements_, tail % SIZE);
@@ -221,7 +237,8 @@ class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL>> {
     void do_push(T element, unsigned head) noexcept {
         assert(element != NIL);
         std::atomic<T>& q_element = details::map<SHUFFLE_BITS>(elements_, head % SIZE);
-        for(T expected = NIL; !q_element.compare_exchange_strong(expected, element, R, X); expected = NIL) // (1) Wait for store (2) to complete.
+        for(T expected = NIL; !q_element.compare_exchange_strong(expected, element, R, X);
+            expected = NIL) // (1) Wait for store (2) to complete.
             _mm_pause();
     }
 
@@ -241,27 +258,19 @@ public:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<
-    class T,
-    unsigned SIZE,
-    bool MinimizeContention = details::IsPowerOf2<SIZE>::value
-    >
+template<class T, unsigned SIZE, bool MinimizeContention = details::IsPowerOf2<SIZE>::value>
 class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE>> {
     using Base = AtomicQueueCommon<AtomicQueue2<T, SIZE>>;
     friend Base;
 
-    enum State : unsigned char {
-        EMPTY,
-        STORING,
-        STORED,
-        LOADING
-    };
+    enum State : unsigned char { EMPTY, STORING, STORED, LOADING };
 
     alignas(CACHE_LINE_SIZE) std::atomic<unsigned char> states_[SIZE] = {};
     alignas(CACHE_LINE_SIZE) T elements_[SIZE] = {};
 
     static constexpr auto size_ = SIZE;
-    static constexpr int SHUFFLE_BITS = details::GetIndexShuffleBits<MinimizeContention, SIZE, CACHE_LINE_SIZE / sizeof(State)>::value;
+    static constexpr int SHUFFLE_BITS =
+        details::GetIndexShuffleBits<MinimizeContention, SIZE, CACHE_LINE_SIZE / sizeof(State)>::value;
 
     T do_pop(unsigned tail) noexcept {
         unsigned index = details::remap_index<SHUFFLE_BITS>(tail % SIZE);
@@ -300,15 +309,9 @@ public:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<
-    class T,
-    class A = std::allocator<T>,
-    T NIL = T{}
->
-class AtomicQueueB
-    : public AtomicQueueCommon<AtomicQueueB<T, A, NIL>>
-    , private std::allocator_traits<A>::template rebind_alloc<std::atomic<T>>
-{
+template<class T, class A = std::allocator<T>, T NIL = T{}>
+class AtomicQueueB : public AtomicQueueCommon<AtomicQueueB<T, A, NIL>>,
+                     private std::allocator_traits<A>::template rebind_alloc<std::atomic<T>> {
     using Base = AtomicQueueCommon<AtomicQueueB<T, A, NIL>>;
     friend Base;
 
@@ -336,7 +339,8 @@ class AtomicQueueB
     void do_push(T element, unsigned head) noexcept {
         assert(element != NIL);
         std::atomic<T>& q_element = details::map<SHUFFLE_BITS>(elements_, head & (size_ - 1));
-        for(T expected = NIL; !q_element.compare_exchange_strong(expected, element, R, X); expected = NIL) // (1) Wait for store (2) to complete.
+        for(T expected = NIL; !q_element.compare_exchange_strong(expected, element, R, X);
+            expected = NIL) // (1) Wait for store (2) to complete.
             _mm_pause();
     }
 
@@ -345,8 +349,7 @@ public:
 
     AtomicQueueB(unsigned size)
         : size_(std::max(details::round_up_to_power_of_2(size), 1u << (SHUFFLE_BITS * 2)))
-        , elements_(AllocatorElements::allocate(size_))
-    {
+        , elements_(AllocatorElements::allocate(size_)) {
         assert(std::atomic<T>{NIL}.is_lock_free());
         for(auto p = elements_, q = elements_ + size_; p < q; ++p)
             p->store(NIL, X);
@@ -356,8 +359,7 @@ public:
         : Base(static_cast<Base&&>(b))
         , AllocatorElements(static_cast<AllocatorElements&&>(b)) // TODO: This must be noexcept, static_assert that.
         , size_(b.size_)
-        , elements_(b.elements_)
-    {
+        , elements_(b.elements_) {
         b.size_ = 0;
         b.elements_ = 0;
     }
@@ -387,27 +389,17 @@ public:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<
-    class T,
-    class A = std::allocator<T>
-    >
-class AtomicQueueB2
-    : public AtomicQueueCommon<AtomicQueueB2<T, A>>
-    , private A
-    , private std::allocator_traits<A>::template rebind_alloc<std::atomic<uint8_t>>
-{
+template<class T, class A = std::allocator<T>>
+class AtomicQueueB2 : public AtomicQueueCommon<AtomicQueueB2<T, A>>,
+                      private A,
+                      private std::allocator_traits<A>::template rebind_alloc<std::atomic<uint8_t>> {
     using Base = AtomicQueueCommon<AtomicQueueB2<T, A>>;
     friend Base;
 
     using AllocatorElements = A;
     using AllocatorStates = typename std::allocator_traits<A>::template rebind_alloc<std::atomic<uint8_t>>;
 
-    enum State : uint8_t {
-        EMPTY,
-        STORING,
-        STORED,
-        LOADING
-    };
+    enum State : uint8_t { EMPTY, STORING, STORED, LOADING };
 
     unsigned size_;
     std::atomic<uint8_t>* states_;
@@ -452,8 +444,7 @@ public:
     AtomicQueueB2(unsigned size)
         : size_(std::max(details::round_up_to_power_of_2(size), 1u << (SHUFFLE_BITS * 2)))
         , states_(AllocatorStates::allocate(size_))
-        , elements_(AllocatorElements::allocate(size_))
-    {
+        , elements_(AllocatorElements::allocate(size_)) {
         for(auto p = states_, q = states_ + size_; p < q; ++p)
             p->store(EMPTY, X);
 
@@ -465,11 +456,10 @@ public:
     AtomicQueueB2(AtomicQueueB2&& b) noexcept
         : Base(static_cast<Base&&>(b))
         , AllocatorElements(static_cast<AllocatorElements&&>(b)) // TODO: This must be noexcept, static_assert that.
-        , AllocatorStates(static_cast<AllocatorStates&&>(b)) // TODO: This must be noexcept, static_assert that.
+        , AllocatorStates(static_cast<AllocatorStates&&>(b))     // TODO: This must be noexcept, static_assert that.
         , size_(b.size_)
         , states_(b.states_)
-        , elements_(b.elements_)
-    {
+        , elements_(b.elements_) {
         b.size_ = 0;
         b.states_ = 0;
         b.elements_ = 0;
@@ -529,7 +519,7 @@ struct RetryDecorator : Queue {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-} // atomic_queue
+} // namespace atomic_queue
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
