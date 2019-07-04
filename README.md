@@ -83,6 +83,8 @@ One thread posts an integer to another thread and waits for the reply using two 
 # Contributing
 The project uses `.editorconfig` and `.clang-format` to automate formatting. Pull requests are expected to be formatted using these settings.
 
+---
+
 Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file LICENSE.
 
 [1]: https://max0x7ba.github.io/atomic_queue/html/benchmarks.html
