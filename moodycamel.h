@@ -6,6 +6,8 @@
 
 #include <concurrentqueue/concurrentqueue.h>
 
+#include <emmintrin.h> // _mm_pause
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 namespace atomic_queue {
@@ -19,13 +21,13 @@ struct MoodyCamelQueue : moodycamel::ConcurrentQueue<T> {
 
     void push(T element) {
         while(!this->try_enqueue(element))
-            ;
+            _mm_pause();
     }
 
     T pop() {
         T element;
         while(!this->try_dequeue(element))
-            ;
+            _mm_pause();
         return element;
     }
 };
