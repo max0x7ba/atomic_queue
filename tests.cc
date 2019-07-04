@@ -6,10 +6,10 @@
 #define BOOST_TEST_MODULE atomic_queue
 #include <boost/test/unit_test.hpp>
 
-#include "atomic_queue_mutex.h"
 #include "atomic_queue.h"
-#include "moodycamel.h"
+#include "atomic_queue_mutex.h"
 #include "barrier.h"
+#include "moodycamel.h"
 
 #include <cstdint>
 #include <thread>
@@ -19,10 +19,6 @@
 using namespace ::atomic_queue;
 
 namespace {
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -39,25 +35,25 @@ void stress() {
     std::thread producers[PRODUCERS];
     for(unsigned i = 0; i < PRODUCERS; ++i)
         producers[i] = std::thread([&q, &barrier]() {
-                barrier.wait();
-                for(unsigned n = N; n; --n)
-                    q.push(n);
-            });
+            barrier.wait();
+            for(unsigned n = N; n; --n)
+                q.push(n);
+        });
 
     uint64_t results[CONSUMERS];
     std::thread consumers[CONSUMERS];
     for(unsigned i = 0; i < CONSUMERS; ++i)
         consumers[i] = std::thread([&q, &barrier, &r = results[i]]() {
-                barrier.wait();
-                uint64_t result = 0;
-                for(;;) {
-                    unsigned n = q.pop();
-                    result += n;
-                    if(n == 1)
-                        break;
-                }
-                r = result;
-            });
+            barrier.wait();
+            uint64_t result = 0;
+            for(;;) {
+                unsigned n = q.pop();
+                result += n;
+                if(n == 1)
+                    break;
+            }
+            r = result;
+        });
 
     barrier.release(PRODUCERS + CONSUMERS);
 
@@ -70,7 +66,8 @@ void stress() {
 
     uint64_t result = 0;
     for(auto& r : results) {
-        BOOST_CHECK_GT(r, expected_result / (CONSUMERS + 1)); // Make sure a consumer didn't starve. False positives are possible here.
+        BOOST_CHECK_GT(r, expected_result /
+                              (CONSUMERS + 1)); // Make sure a consumer didn't starve. False positives are possible here.
         result += r;
     }
 
@@ -87,7 +84,7 @@ void stress() {
 constexpr unsigned CAPACITY = 1024;
 
 BOOST_AUTO_TEST_CASE(stress_AtomicQueue) {
-    stress<RetryDecorator<AtomicQueue <unsigned, CAPACITY>>>();
+    stress<RetryDecorator<AtomicQueue<unsigned, CAPACITY>>>();
 }
 
 BOOST_AUTO_TEST_CASE(stress_BlockingAtomicQueue) {

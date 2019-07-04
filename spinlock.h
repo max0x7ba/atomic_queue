@@ -6,8 +6,8 @@
 
 #include "defs.h"
 
-#include <cstdlib>
 #include <atomic>
+#include <cstdlib>
 #include <mutex>
 
 // #include <emmintrin.h>
@@ -21,6 +21,7 @@ namespace atomic_queue {
 
 class Spinlock {
     pthread_spinlock_t s_;
+
 public:
     using scoped_lock = std::lock_guard<Spinlock>;
 
@@ -49,6 +50,7 @@ public:
 class FairSpinlock {
     alignas(CACHE_LINE_SIZE) std::atomic<unsigned> ticket_{0};
     alignas(CACHE_LINE_SIZE) std::atomic<unsigned> next_{0};
+
 public:
     using scoped_lock = std::lock_guard<FairSpinlock>;
 
@@ -67,6 +69,7 @@ public:
 
 class UnfairSpinlock {
     std::atomic<unsigned> lock_{0};
+
 public:
     using scoped_lock = std::lock_guard<UnfairSpinlock>;
 
@@ -100,7 +103,9 @@ public:
     using scoped_lock = std::lock_guard<Spinlock>;
 
     void lock() noexcept {
-        for(int expected = 0; !__atomic_compare_exchange_n(&lock_, &expected, 1, false, __ATOMIC_ACQUIRE | HLE_ACQUIRE, __ATOMIC_RELAXED); expected = 0)
+        for(int expected = 0;
+            !__atomic_compare_exchange_n(&lock_, &expected, 1, false, __ATOMIC_ACQUIRE | HLE_ACQUIRE, __ATOMIC_RELAXED);
+            expected = 0)
             _mm_pause();
     }
 
@@ -111,7 +116,7 @@ public:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-} // atomic_queue
+} // namespace atomic_queue
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
