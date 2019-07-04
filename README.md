@@ -80,6 +80,9 @@ N producer threads push a 4-byte integer into one queue, N consumer threads pop 
 ## Ping-pong benchmark
 One thread posts an integer to another thread and waits for the reply using two queues. The benchmarks measures the total time of 100,000 ping-pongs, best of 10 runs. Contention is minimal here to be able to achieve and measure the lowest latency. Reports the average round-trip time.
 
+# Contributing
+The project uses `.editorconfig` and `.clang-format` to automate formatting. Pull requests are expected to be formatted using these settings.
+
 Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file LICENSE.
 
 [1]: https://max0x7ba.github.io/atomic_queue/html/benchmarks.html
