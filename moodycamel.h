@@ -15,10 +15,10 @@ namespace atomic_queue {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<class T, unsigned Capacity>
-struct MoodyCamelQueue : moodycamel::ConcurrentQueue<T> {
-    MoodyCamelQueue()
-        : moodycamel::ConcurrentQueue<T>(Capacity) {}
+template<class T, unsigned Capacity, class Queue>
+struct MoodyCamelAdapter : Queue {
+    MoodyCamelAdapter()
+        : Queue(Capacity) {}
 
     void push(T element) {
         while(!this->try_enqueue(element))
@@ -34,23 +34,10 @@ struct MoodyCamelQueue : moodycamel::ConcurrentQueue<T> {
 };
 
 template<class T, unsigned Capacity>
-struct MoodyCamelReaderWriterQueue : moodycamel::ReaderWriterQueue<T> {
-    MoodyCamelReaderWriterQueue()
-        : moodycamel::ReaderWriterQueue<T>(Capacity)
-    {}
+using MoodyCamelQueue = MoodyCamelAdapter<T, Capacity, moodycamel::ConcurrentQueue<T>>;
 
-    void push(T element) {
-        while(!this->try_enqueue(element))
-            ;
-    }
-
-    T pop() {
-        T element;
-        while(!this->try_dequeue(element))
-            ;
-        return element;
-    }
-};
+template<class T, unsigned Capacity>
+using MoodyCamelReaderWriterQueue = MoodyCamelAdapter<T, Capacity, moodycamel::ReaderWriterQueue<T>>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
