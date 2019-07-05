@@ -23,6 +23,7 @@ A few well-known containers are used for reference in the benchmarks:
 * `boost::lockfree::queue` - a lock-free multiple producer multiple consumer queue from Boost library.
 * `pthread_spinlock` - a locked fixed size ring-buffer with `pthread_spinlock_t`.
 * `moodycamel::ConcurrentQueue` - a lock-free multiple producer multiple consumer queue used in non-blocking mode.
+* `moodycamel::ReaderWriterQueue` - a lock-free single producer single consumer queue used in non-blocking mode.
 * `tbb::spin_mutex` - a locked fixed size ring-buffer with `tbb::spin_mutex` from Intel Threading Building Blocks.
 * `tbb::speculative_spin_mutex` - a locked fixed size ring-buffer with `tbb::speculative_spin_mutex` from Intel Threading Building Blocks.
 * `tbb::concurrent_bounded_queue` - eponymous queue used in non-blocking mode from Intel Threading Building Blocks.
