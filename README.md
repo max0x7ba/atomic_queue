@@ -34,6 +34,7 @@ Building is neccessary to run the tests and benchmarks.
 
 ```
 git clone https://github.com/cameron314/concurrentqueue.git
+git clone https://github.com/cameron314/readerwriterqueue.git
 git clone https://github.com/max0x7ba/atomic_queue.git
 cd atomic_queue
 make -r -j4 run_tests

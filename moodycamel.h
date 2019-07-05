@@ -5,6 +5,9 @@
 // Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file LICENSE.
 
 #include <concurrentqueue/concurrentqueue.h>
+#include <readerwriterqueue/readerwriterqueue.h>
+
+#include <emmintrin.h> // _mm_pause
 
 #include <emmintrin.h> // _mm_pause
 
@@ -14,10 +17,10 @@ namespace atomic_queue {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<class T, unsigned Capacity>
-struct MoodyCamelQueue : moodycamel::ConcurrentQueue<T> {
-    MoodyCamelQueue()
-        : moodycamel::ConcurrentQueue<T>(Capacity) {}
+template<class T, unsigned Capacity, class Queue>
+struct MoodyCamelAdapter : Queue {
+    MoodyCamelAdapter()
+        : Queue(Capacity) {}
 
     void push(T element) {
         while(!this->try_enqueue(element))
@@ -31,6 +34,12 @@ struct MoodyCamelQueue : moodycamel::ConcurrentQueue<T> {
         return element;
     }
 };
+
+template<class T, unsigned Capacity>
+using MoodyCamelQueue = MoodyCamelAdapter<T, Capacity, moodycamel::ConcurrentQueue<T>>;
+
+template<class T, unsigned Capacity>
+using MoodyCamelReaderWriterQueue = MoodyCamelAdapter<T, Capacity, moodycamel::ReaderWriterQueue<T>>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
