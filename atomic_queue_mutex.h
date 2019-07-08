@@ -15,9 +15,9 @@ namespace atomic_queue {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<class T, class Mutex, unsigned SIZE, bool MinimizeContention>
+template<class T, class Mutex, unsigned SIZE, bool MINIMIZE_CONTENTION>
 class AtomicQueueMutexT {
-    static constexpr unsigned size_ = MinimizeContention ? details::round_up_to_power_of_2(SIZE) : SIZE;
+    static constexpr unsigned size_ = MINIMIZE_CONTENTION ? details::round_up_to_power_of_2(SIZE) : SIZE;
 
     Mutex mutex_;
     unsigned head_ = 0;
@@ -25,7 +25,7 @@ class AtomicQueueMutexT {
     alignas(CACHE_LINE_SIZE) T q_[size_] = {};
 
     static constexpr int SHUFFLE_BITS =
-        details::GetIndexShuffleBits<MinimizeContention, size_, CACHE_LINE_SIZE / sizeof(T)>::value;
+        details::GetIndexShuffleBits<MINIMIZE_CONTENTION, size_, CACHE_LINE_SIZE / sizeof(T)>::value;
     using ScopedLock = typename Mutex::scoped_lock;
 
 public:
@@ -61,14 +61,14 @@ public:
     }
 };
 
-template<class T, unsigned SIZE, class Mutex, bool MinimizeContention = true>
-using AtomicQueueMutex = AtomicQueueMutexT<T, Mutex, SIZE, MinimizeContention>;
+template<class T, unsigned SIZE, class Mutex, bool MINIMIZE_CONTENTION = true>
+using AtomicQueueMutex = AtomicQueueMutexT<T, Mutex, SIZE, MINIMIZE_CONTENTION>;
 
-template<class T, unsigned SIZE, bool MinimizeContention = true>
-using AtomicQueueSpinlock = AtomicQueueMutexT<T, Spinlock, SIZE, MinimizeContention>;
+template<class T, unsigned SIZE, bool MINIMIZE_CONTENTION = true>
+using AtomicQueueSpinlock = AtomicQueueMutexT<T, Spinlock, SIZE, MINIMIZE_CONTENTION>;
 
-template<class T, unsigned SIZE, bool MinimizeContention = true>
-using AtomicQueueSpinlockHle = AtomicQueueMutexT<T, SpinlockHle, SIZE, MinimizeContention>;
+template<class T, unsigned SIZE, bool MINIMIZE_CONTENTION = true>
+using AtomicQueueSpinlockHle = AtomicQueueMutexT<T, SpinlockHle, SIZE, MINIMIZE_CONTENTION>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

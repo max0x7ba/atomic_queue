@@ -164,7 +164,7 @@ public:
         do {
             if(static_cast<int>(head - tail_.load(X)) >= static_cast<int>(static_cast<Derived&>(*this).size_))
                 return false;
-        } while(!head_.compare_exchange_strong(head, head + 1, A, X));
+        } while(!head_.compare_exchange_strong(head, head + 1, A, X)); // This loop is not FIFO.
 
         static_cast<Derived&>(*this).do_push(std::forward<T>(element), head);
         return true;
@@ -176,7 +176,7 @@ public:
         do {
             if(static_cast<int>(head_.load(X) - tail) <= 0)
                 return false;
-        } while(!tail_.compare_exchange_strong(tail, tail + 1, A, X));
+        } while(!tail_.compare_exchange_strong(tail, tail + 1, A, X)); // This loop is not FIFO.
 
         element = static_cast<Derived&>(*this).do_pop(tail);
         return true;
@@ -184,12 +184,14 @@ public:
 
     template<class T>
     void push(T&& element) noexcept {
-        auto head = head_.fetch_add(1, A);
+        constexpr auto memory_order = Derived::total_order_ ? std::memory_order_seq_cst : std::memory_order_acquire;
+        auto head = head_.fetch_add(1, memory_order);
         static_cast<Derived&>(*this).do_push(std::forward<T>(element), head);
     }
 
     auto pop() noexcept {
-        auto tail = tail_.fetch_add(1, A);
+        constexpr auto memory_order = Derived::total_order_ ? std::memory_order_seq_cst : std::memory_order_acquire;
+        auto tail = tail_.fetch_add(1, memory_order);
         return static_cast<Derived&>(*this).do_pop(tail);
     }
 
@@ -208,13 +210,15 @@ public:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<class T, unsigned SIZE, T NIL = T{}, bool MinimizeContention = true>
-class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL, MinimizeContention>> {
-    using Base = AtomicQueueCommon<AtomicQueue<T, SIZE, NIL, MinimizeContention>>;
+template<class T, unsigned SIZE, T NIL = T{}, bool MINIMIZE_CONTENTION = true, bool TOTAL_ORDER = false>
+class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL, MINIMIZE_CONTENTION, TOTAL_ORDER>> {
+    using Base = AtomicQueueCommon<AtomicQueue<T, SIZE, NIL, MINIMIZE_CONTENTION, TOTAL_ORDER>>;
     friend Base;
 
-    static constexpr unsigned size_ = MinimizeContention ? details::round_up_to_power_of_2(SIZE) : SIZE;
-    static constexpr int SHUFFLE_BITS = details::GetIndexShuffleBits<MinimizeContention, size_, CACHE_LINE_SIZE / sizeof(std::atomic<T>)>::value;
+    static constexpr unsigned size_ = MINIMIZE_CONTENTION ? details::round_up_to_power_of_2(SIZE) : SIZE;
+    static constexpr int SHUFFLE_BITS =
+        details::GetIndexShuffleBits<MINIMIZE_CONTENTION, size_, CACHE_LINE_SIZE / sizeof(std::atomic<T>)>::value;
+    static constexpr bool total_order_ = TOTAL_ORDER;
 
     alignas(CACHE_LINE_SIZE) std::atomic<T> elements_[size_] = {}; // Empty elements are NIL.
 
@@ -252,16 +256,17 @@ public:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<class T, unsigned SIZE, bool MinimizeContention = true>
-class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE, MinimizeContention>> {
-    using Base = AtomicQueueCommon<AtomicQueue2<T, SIZE, MinimizeContention>>;
+template<class T, unsigned SIZE, bool MINIMIZE_CONTENTION = true, bool TOTAL_ORDER = false>
+class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE, MINIMIZE_CONTENTION, TOTAL_ORDER>> {
+    using Base = AtomicQueueCommon<AtomicQueue2<T, SIZE, MINIMIZE_CONTENTION, TOTAL_ORDER>>;
     friend Base;
 
     enum State : unsigned char { EMPTY, STORING, STORED, LOADING };
 
-    static constexpr unsigned size_ = MinimizeContention ? details::round_up_to_power_of_2(SIZE) : SIZE;
+    static constexpr unsigned size_ = MINIMIZE_CONTENTION ? details::round_up_to_power_of_2(SIZE) : SIZE;
     static constexpr int SHUFFLE_BITS =
-        details::GetIndexShuffleBits<MinimizeContention, size_, CACHE_LINE_SIZE / sizeof(State)>::value;
+        details::GetIndexShuffleBits<MINIMIZE_CONTENTION, size_, CACHE_LINE_SIZE / sizeof(State)>::value;
+    static constexpr bool total_order_ = TOTAL_ORDER;
 
     alignas(CACHE_LINE_SIZE) std::atomic<unsigned char> states_[size_] = {};
     alignas(CACHE_LINE_SIZE) T elements_[size_] = {};
@@ -303,11 +308,13 @@ public:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<class T, class A = std::allocator<T>, T NIL = T{}>
-class AtomicQueueB : public AtomicQueueCommon<AtomicQueueB<T, A, NIL>>,
+template<class T, class A = std::allocator<T>, T NIL = T{}, bool TOTAL_ORDER = false>
+class AtomicQueueB : public AtomicQueueCommon<AtomicQueueB<T, A, NIL, TOTAL_ORDER>>,
                      private std::allocator_traits<A>::template rebind_alloc<std::atomic<T>> {
-    using Base = AtomicQueueCommon<AtomicQueueB<T, A, NIL>>;
+    using Base = AtomicQueueCommon<AtomicQueueB<T, A, NIL, TOTAL_ORDER>>;
     friend Base;
+
+    static constexpr bool total_order_ = TOTAL_ORDER;
 
     using AllocatorElements = typename std::allocator_traits<A>::template rebind_alloc<std::atomic<T>>;
 
@@ -383,12 +390,14 @@ public:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<class T, class A = std::allocator<T>>
-class AtomicQueueB2 : public AtomicQueueCommon<AtomicQueueB2<T, A>>,
+template<class T, class A = std::allocator<T>, bool TOTAL_ORDER = false>
+class AtomicQueueB2 : public AtomicQueueCommon<AtomicQueueB2<T, A, TOTAL_ORDER>>,
                       private A,
                       private std::allocator_traits<A>::template rebind_alloc<std::atomic<uint8_t>> {
-    using Base = AtomicQueueCommon<AtomicQueueB2<T, A>>;
+    using Base = AtomicQueueCommon<AtomicQueueB2<T, A, TOTAL_ORDER>>;
     friend Base;
+
+    static constexpr bool total_order_ = TOTAL_ORDER;
 
     using AllocatorElements = A;
     using AllocatorStates = typename std::allocator_traits<A>::template rebind_alloc<std::atomic<uint8_t>>;

@@ -18,6 +18,8 @@ Available containers are:
 
 These containers have corresponding `AtomicQueueB`, `OptimistAtomicQueueB`, `AtomicQueueB2`, `OptimistAtomicQueueB2` versions where the buffer size is specified as an argument to the constructor. The `B` versions are slower.
 
+The queues also support the totally ordered mode. In this mode consumers receive messages in the same FIFO order the messages were posted. This mode is supported for `push` and `pop` functions, but for not the `try_` versions. On Intel x86 the totally ordered mode comes at 0 cost.
+
 A few well-known containers are used for reference in the benchmarks:
 * `boost::lockfree::spsc_queue` - a wait-free single producer single consumer queue from Boost library. This is the absolute best performer because it is wait-free, but it only supports single-producer-single-consumer scenario.
 * `boost::lockfree::queue` - a lock-free multiple producer multiple consumer queue from Boost library.
@@ -48,8 +50,8 @@ The benchmark also requires Intel TBB library to be available. It assumes that i
 The containers support the following APIs:
 * `try_push` - Appends an element to the end of the queue. Returns `false` when the queue is full.
 * `try_pop` - Removes an element from the front of the queue. Returns `false` when the queue is empty.
-* `push` - Appends an element to the end of the queue. Busy waits when the queue is full. Faster than `try_push` when the queue is not full.
-* `pop` - Removes an element from the front of the queue. Busy waits when the queue is empty. Faster than `try_pop` when the queue is not empty.
+* `push` - Appends an element to the end of the queue. Busy waits when the queue is full. Faster than `try_push` when the queue is not full. Optional FIFO producer queueing and total order.
+* `pop` - Removes an element from the front of the queue. Busy waits when the queue is empty. Faster than `try_pop` when the queue is not empty. Optional FIFO consumer queueing and total order.
 * `was_empty` - Returns `true` if the container was empty during the call. The state may have changed by the time the return value is examined.
 * `was_full` - Returns `true` if the container was full during the call. The state may have changed by the time the return value is examined.
 
@@ -66,8 +68,6 @@ Using a power-of-2 ring-buffer array size allows a couple of optimizations:
 
 * The writer and reader indexes get mapped into the ring-buffer array index using modulo `% SIZE` binary operator and using a power-of-2 size turns that modulo operator into one plain `and` instruction and that is as fast as it gets.
 * The *element index within the cache line* gets swapped with the *cache line index* within the *ring-buffer array element index*, so that subsequent queue elements actually reside in different cache lines. This eliminates contention between producers and consumers on the ring-buffer cache lines. Instead of `N` producers together with `M` consumers competing on the same ring-buffer array cache line in the worst case, it is only one producer competing with one consumer.
-
-In other words, power-of-2 ring-buffer array size yields top performance.
 
 The containers use `unsigned` type for size and internal indexes. On x86-64 platform `unsigned` is 32-bit wide, whereas `size_t` is 64-bit wide. 64-bit instructions utilize an extra byte instruction prefix resulting in slightly more pressure on the CPU instruction cache and the front-end. Hence, 32-bit `unsigned` indexes are used to maximize performance. That limits the queue size to 4,294,967,295 elements, which seems to be a reasonable hard limit for many applications.
 
