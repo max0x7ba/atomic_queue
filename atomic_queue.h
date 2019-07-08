@@ -28,11 +28,6 @@ namespace details {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<unsigned N>
-struct IsPowerOf2 {
-    static bool constexpr value = !(N & (N - 1));
-};
-
 template<size_t elements_per_cache_line>
 struct GetCacheLineIndexBits {
     static int constexpr value = 0;
@@ -213,19 +208,18 @@ public:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<class T, unsigned SIZE, T NIL = T{}, bool MinimizeContention = details::IsPowerOf2<SIZE>::value>
-class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL>> {
-    alignas(CACHE_LINE_SIZE) std::atomic<T> elements_[SIZE] = {}; // Empty elements are NIL.
-
-    using Base = AtomicQueueCommon<AtomicQueue<T, SIZE, NIL>>;
+template<class T, unsigned SIZE, T NIL = T{}, bool MinimizeContention = true>
+class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL, MinimizeContention>> {
+    using Base = AtomicQueueCommon<AtomicQueue<T, SIZE, NIL, MinimizeContention>>;
     friend Base;
 
-    static constexpr auto size_ = SIZE;
-    static constexpr int SHUFFLE_BITS =
-        details::GetIndexShuffleBits<MinimizeContention, SIZE, CACHE_LINE_SIZE / sizeof(std::atomic<T>)>::value;
+    static constexpr unsigned size_ = MinimizeContention ? details::round_up_to_power_of_2(SIZE) : SIZE;
+    static constexpr int SHUFFLE_BITS = details::GetIndexShuffleBits<MinimizeContention, size_, CACHE_LINE_SIZE / sizeof(std::atomic<T>)>::value;
+
+    alignas(CACHE_LINE_SIZE) std::atomic<T> elements_[size_] = {}; // Empty elements are NIL.
 
     T do_pop(unsigned tail) noexcept {
-        std::atomic<T>& q_element = details::map<SHUFFLE_BITS>(elements_, tail % SIZE);
+        std::atomic<T>& q_element = details::map<SHUFFLE_BITS>(elements_, tail % size_);
         for(;;) {
             T element = q_element.exchange(NIL, R);
             if(element != NIL)
@@ -236,7 +230,7 @@ class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL>> {
 
     void do_push(T element, unsigned head) noexcept {
         assert(element != NIL);
-        std::atomic<T>& q_element = details::map<SHUFFLE_BITS>(elements_, head % SIZE);
+        std::atomic<T>& q_element = details::map<SHUFFLE_BITS>(elements_, head % size_);
         for(T expected = NIL; !q_element.compare_exchange_strong(expected, element, R, X);
             expected = NIL) // (1) Wait for store (2) to complete.
             _mm_pause();
@@ -258,22 +252,22 @@ public:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<class T, unsigned SIZE, bool MinimizeContention = details::IsPowerOf2<SIZE>::value>
-class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE>> {
-    using Base = AtomicQueueCommon<AtomicQueue2<T, SIZE>>;
+template<class T, unsigned SIZE, bool MinimizeContention = true>
+class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE, MinimizeContention>> {
+    using Base = AtomicQueueCommon<AtomicQueue2<T, SIZE, MinimizeContention>>;
     friend Base;
 
     enum State : unsigned char { EMPTY, STORING, STORED, LOADING };
 
-    alignas(CACHE_LINE_SIZE) std::atomic<unsigned char> states_[SIZE] = {};
-    alignas(CACHE_LINE_SIZE) T elements_[SIZE] = {};
-
-    static constexpr auto size_ = SIZE;
+    static constexpr unsigned size_ = MinimizeContention ? details::round_up_to_power_of_2(SIZE) : SIZE;
     static constexpr int SHUFFLE_BITS =
-        details::GetIndexShuffleBits<MinimizeContention, SIZE, CACHE_LINE_SIZE / sizeof(State)>::value;
+        details::GetIndexShuffleBits<MinimizeContention, size_, CACHE_LINE_SIZE / sizeof(State)>::value;
+
+    alignas(CACHE_LINE_SIZE) std::atomic<unsigned char> states_[size_] = {};
+    alignas(CACHE_LINE_SIZE) T elements_[size_] = {};
 
     T do_pop(unsigned tail) noexcept {
-        unsigned index = details::remap_index<SHUFFLE_BITS>(tail % SIZE);
+        unsigned index = details::remap_index<SHUFFLE_BITS>(tail % size_);
         for(;;) {
             unsigned char expected = STORED;
             if(states_[index].compare_exchange_strong(expected, LOADING, X, X)) {
@@ -287,7 +281,7 @@ class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE>> {
 
     template<class U>
     void do_push(U&& element, unsigned head) noexcept {
-        unsigned index = details::remap_index<SHUFFLE_BITS>(head % SIZE);
+        unsigned index = details::remap_index<SHUFFLE_BITS>(head % size_);
         for(;;) {
             unsigned char expected = EMPTY;
             if(states_[index].compare_exchange_strong(expected, STORING, X, X)) {

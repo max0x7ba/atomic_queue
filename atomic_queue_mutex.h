@@ -17,13 +17,15 @@ namespace atomic_queue {
 
 template<class T, class Mutex, unsigned SIZE, bool MinimizeContention>
 class AtomicQueueMutexT {
+    static constexpr unsigned size_ = MinimizeContention ? details::round_up_to_power_of_2(SIZE) : SIZE;
+
     Mutex mutex_;
     unsigned head_ = 0;
     unsigned tail_ = 0;
-    alignas(CACHE_LINE_SIZE) T q_[SIZE] = {};
+    alignas(CACHE_LINE_SIZE) T q_[size_] = {};
 
     static constexpr int SHUFFLE_BITS =
-        details::GetIndexShuffleBits<MinimizeContention, SIZE, CACHE_LINE_SIZE / sizeof(T)>::value;
+        details::GetIndexShuffleBits<MinimizeContention, size_, CACHE_LINE_SIZE / sizeof(T)>::value;
     using ScopedLock = typename Mutex::scoped_lock;
 
 public:
@@ -32,8 +34,8 @@ public:
     template<class U>
     bool try_push(U&& element) noexcept {
         ScopedLock lock(this->mutex_);
-        if(this->head_ - this->tail_ < SIZE) {
-            q_[details::remap_index<SHUFFLE_BITS>(this->head_ % SIZE)] = std::forward<U>(element);
+        if(this->head_ - this->tail_ < size_) {
+            q_[details::remap_index<SHUFFLE_BITS>(this->head_ % size_)] = std::forward<U>(element);
             ++this->head_;
             return true;
         }
@@ -43,7 +45,7 @@ public:
     bool try_pop(T& element) noexcept {
         ScopedLock lock(this->mutex_);
         if(this->head_ != this->tail_) {
-            element = std::move(q_[details::remap_index<SHUFFLE_BITS>(this->tail_ % SIZE)]);
+            element = std::move(q_[details::remap_index<SHUFFLE_BITS>(this->tail_ % size_)]);
             ++this->tail_;
             return true;
         }
@@ -55,17 +57,17 @@ public:
     }
 
     bool was_full() const noexcept {
-        return static_cast<int>(this->head_ - this->tail_) >= static_cast<int>(SIZE);
+        return static_cast<int>(this->head_ - this->tail_) >= static_cast<int>(size_);
     }
 };
 
-template<class T, unsigned SIZE, class Mutex, bool MinimizeContention = details::IsPowerOf2<SIZE>::value>
+template<class T, unsigned SIZE, class Mutex, bool MinimizeContention = true>
 using AtomicQueueMutex = AtomicQueueMutexT<T, Mutex, SIZE, MinimizeContention>;
 
-template<class T, unsigned SIZE, bool MinimizeContention = details::IsPowerOf2<SIZE>::value>
+template<class T, unsigned SIZE, bool MinimizeContention = true>
 using AtomicQueueSpinlock = AtomicQueueMutexT<T, Spinlock, SIZE, MinimizeContention>;
 
-template<class T, unsigned SIZE, bool MinimizeContention = details::IsPowerOf2<SIZE>::value>
+template<class T, unsigned SIZE, bool MinimizeContention = true>
 using AtomicQueueSpinlockHle = AtomicQueueMutexT<T, SpinlockHle, SIZE, MinimizeContention>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
