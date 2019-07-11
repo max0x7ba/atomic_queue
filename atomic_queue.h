@@ -129,8 +129,11 @@ constexpr uint64_t round_up_to_power_of_2(uint64_t a) noexcept {
 template<class Derived>
 class AtomicQueueCommon {
 protected:
+    // Put these on different cache lines to avoid false sharing between readers and writers.
     alignas(CACHE_LINE_SIZE) std::atomic<unsigned> head_ = {};
     alignas(CACHE_LINE_SIZE) std::atomic<unsigned> tail_ = {};
+
+    // The special member functions are not thread-safe.
 
     AtomicQueueCommon() noexcept = default;
 
@@ -342,6 +345,8 @@ class AtomicQueueB : public AtomicQueueCommon<AtomicQueueB<T, A, NIL, TOTAL_ORDE
 public:
     using value_type = T;
 
+    // The special member functions are not thread-safe.
+
     AtomicQueueB(unsigned size)
         : size_(std::max(details::round_up_to_power_of_2(size), 1u << (SHUFFLE_BITS * 2)))
         , elements_(AllocatorElements::allocate(size_)) {
@@ -437,6 +442,8 @@ class AtomicQueueB2 : public AtomicQueueCommon<AtomicQueueB2<T, A, TOTAL_ORDER>>
 
 public:
     using value_type = T;
+
+    // The special member functions are not thread-safe.
 
     AtomicQueueB2(unsigned size)
         : size_(std::max(details::round_up_to_power_of_2(size), 1u << (SHUFFLE_BITS * 2)))
