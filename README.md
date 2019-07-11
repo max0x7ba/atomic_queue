@@ -1,7 +1,7 @@
 # atomic_queue
-Multiple producer multiple consumer C++14 *lock-free* queues based on `std::atomic<>`.
+multiple-producer-multiple-consumer C++14 *lock-free* queues based on `std::atomic<>`.
 
-The main design idea these queues adhere to is _simplicity_: fixed size buffer, the bare minimum of atomic operations.
+The main design principle these queues adhere to is _simplicity_: fixed size buffer, the bare minimum of atomic operations.
 
 These qualities are also limitations:
 
@@ -18,14 +18,14 @@ Available containers are:
 
 These containers have corresponding `AtomicQueueB`, `OptimistAtomicQueueB`, `AtomicQueueB2`, `OptimistAtomicQueueB2` versions where the buffer size is specified as an argument to the constructor. The `B` versions are slower.
 
-The queues also support the totally ordered mode. In this mode consumers receive messages in the same FIFO order the messages were posted. This mode is supported for `push` and `pop` functions, but for not the `try_` versions. On Intel x86 the totally ordered mode comes at 0 cost.
+The queues also support the totally ordered mode. In this mode consumers receive messages in the same FIFO order the messages were posted. This mode is supported for `push` and `pop` functions, but for not the `try_` versions. On Intel x86 the totally ordered mode has 0 cost, as of 2019.
 
 A few well-known containers are used for reference in the benchmarks:
-* `boost::lockfree::spsc_queue` - a wait-free single producer single consumer queue from Boost library. This is the absolute best performer because it is wait-free, but it only supports single-producer-single-consumer scenario.
-* `boost::lockfree::queue` - a lock-free multiple producer multiple consumer queue from Boost library.
+* `boost::lockfree::spsc_queue` - a wait-free single-producer-single-consumer queue from Boost library.
+* `boost::lockfree::queue` - a lock-free multiple-producer-multiple-consumer queue from Boost library.
 * `pthread_spinlock` - a locked fixed size ring-buffer with `pthread_spinlock_t`.
-* `moodycamel::ConcurrentQueue` - a lock-free multiple producer multiple consumer queue used in non-blocking mode.
-* `moodycamel::ReaderWriterQueue` - a lock-free single producer single consumer queue used in non-blocking mode.
+* `moodycamel::ConcurrentQueue` - a lock-free multiple-producer-multiple-consumer queue used in non-blocking mode.
+* `moodycamel::ReaderWriterQueue` - a lock-free single-producer-single-consumer queue used in non-blocking mode.
 * `tbb::spin_mutex` - a locked fixed size ring-buffer with `tbb::spin_mutex` from Intel Threading Building Blocks.
 * `tbb::speculative_spin_mutex` - a locked fixed size ring-buffer with `tbb::speculative_spin_mutex` from Intel Threading Building Blocks.
 * `tbb::concurrent_bounded_queue` - eponymous queue used in non-blocking mode from Intel Threading Building Blocks.
@@ -55,8 +55,10 @@ The containers support the following APIs:
 * `was_empty` - Returns `true` if the container was empty during the call. The state may have changed by the time the return value is examined.
 * `was_full` - Returns `true` if the container was full during the call. The state may have changed by the time the return value is examined.
 
+TODO: full API reference.
+
 # Notes
-The available queues here use a ring-buffer array for storing elements. The size of the queue is fixed at compile time.
+The available queues here use a ring-buffer array for storing elements. The size of the queue is fixed at compile time or construction time.
 
 In a production multiple-producer-multiple-consumer scenario the ring-buffer size should be set to the maximum allowable queue size. When the buffer size is exhausted it means that the consumers cannot consume the elements fast enough, fixing which would require either of:
 
@@ -64,10 +66,10 @@ In a production multiple-producer-multiple-consumer scenario the ring-buffer siz
 * increasing the number of consumers to consume elements faster, or
 * decreasing the number of producers to producer fewer elements.
 
-Using a power-of-2 ring-buffer array size allows a couple of optimizations:
+Using a power-of-2 ring-buffer array size allows a couple of important optimizations:
 
 * The writer and reader indexes get mapped into the ring-buffer array index using modulo `% SIZE` binary operator and using a power-of-2 size turns that modulo operator into one plain `and` instruction and that is as fast as it gets.
-* The *element index within the cache line* gets swapped with the *cache line index* within the *ring-buffer array element index*, so that subsequent queue elements actually reside in different cache lines. This eliminates contention between producers and consumers on the ring-buffer cache lines. Instead of `N` producers together with `M` consumers competing on the same ring-buffer array cache line in the worst case, it is only one producer competing with one consumer. This optimization scales better with the number of producers and consumers, and element size. With low number of producers and consumers (up to about 2 of each in these benchmarks) disabling this optimization may yield better throughput (but with higher variance).
+* The *element index within the cache line* gets swapped with the *cache line index* within the *ring-buffer array element index*, so that subsequent queue elements actually reside in different cache lines. This eliminates contention between producers and consumers on the ring-buffer cache lines. Instead of `N` producers together with `M` consumers competing on the same ring-buffer array cache line in the worst case, it is only one producer competing with one consumer. This optimization scales better with the number of producers and consumers, and element size. With low number of producers and consumers (up to about 2 of each in these benchmarks) disabling this optimization may yield better throughput (but higher variance across runs).
 
 The containers use `unsigned` type for size and internal indexes. On x86-64 platform `unsigned` is 32-bit wide, whereas `size_t` is 64-bit wide. 64-bit instructions utilize an extra byte instruction prefix resulting in slightly more pressure on the CPU instruction cache and the front-end. Hence, 32-bit `unsigned` indexes are used to maximize performance. That limits the queue size to 4,294,967,295 elements, which seems to be a reasonable hard limit for many applications.
 
