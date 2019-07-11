@@ -181,13 +181,13 @@ public:
     template<class T>
     void push(T&& element) noexcept {
         constexpr auto memory_order = Derived::total_order_ ? std::memory_order_seq_cst : std::memory_order_acquire;
-        auto head = head_.fetch_add(1, memory_order);
+        auto head = head_.fetch_add(1, memory_order); // FIFO and total order on Intel regardless, as of 2019.
         static_cast<Derived&>(*this).do_push(std::forward<T>(element), head);
     }
 
     auto pop() noexcept {
         constexpr auto memory_order = Derived::total_order_ ? std::memory_order_seq_cst : std::memory_order_acquire;
-        auto tail = tail_.fetch_add(1, memory_order);
+        auto tail = tail_.fetch_add(1, memory_order); // FIFO and total order on Intel regardless, as of 2019.
         return static_cast<Derived&>(*this).do_pop(tail);
     }
 
@@ -221,7 +221,7 @@ class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL, MINIMIZE_
     T do_pop(unsigned tail) noexcept {
         std::atomic<T>& q_element = details::map<SHUFFLE_BITS>(elements_, tail % size_);
         for(;;) {
-            T element = q_element.exchange(NIL, R);
+            T element = q_element.exchange(NIL, R); // (2) The store to wait for.
             if(element != NIL)
                 return element;
             spin_loop_pause();
@@ -325,7 +325,7 @@ class AtomicQueueB : public AtomicQueueCommon<AtomicQueueB<T, A, NIL, TOTAL_ORDE
     T do_pop(unsigned tail) noexcept {
         std::atomic<T>& q_element = details::map<SHUFFLE_BITS>(elements_, tail & (size_ - 1));
         for(;;) {
-            T element = q_element.exchange(NIL, R);
+            T element = q_element.exchange(NIL, R); // (2) The store to wait for.
             if(element != NIL)
                 return element;
             spin_loop_pause();
