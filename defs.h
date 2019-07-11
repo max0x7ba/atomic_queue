@@ -6,15 +6,29 @@
 
 #include <atomic>
 
-#include <emmintrin.h> // _mm_pause
+#if defined(__x86_64__)
+#include <emmintrin.h>
+namespace atomic_queue {
+constexpr int CACHE_LINE_SIZE = 64;
+static inline void spin_loop_pause() noexcept {
+    _mm_pause();
+}
+} // namespace atomic_queue
+#elif defined(__arm__)
+// TODO: These need to be verified as I do not have access to ARM platform.
+namespace atomic_queue {
+constexpr int CACHE_LINE_SIZE = 64;
+static inline void spin_loop_pause() noexcept {
+    __asm__ __volatile__("yield");
+}
+} // namespace atomic_queue
+#else
+#error "Unknown CPU architecture."
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 namespace atomic_queue {
-
-#if defined(__x86_64__)
-constexpr int CACHE_LINE_SIZE = 64;
-#endif
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

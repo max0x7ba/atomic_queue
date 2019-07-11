@@ -7,9 +7,7 @@
 #include <concurrentqueue/concurrentqueue.h>
 #include <readerwriterqueue/readerwriterqueue.h>
 
-#include <emmintrin.h> // _mm_pause
-
-#include <emmintrin.h> // _mm_pause
+#include "defs.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -24,13 +22,13 @@ struct MoodyCamelAdapter : Queue {
 
     void push(T element) {
         while(!this->try_enqueue(element))
-            _mm_pause();
+            spin_loop_pause();
     }
 
     T pop() {
         T element;
         while(!this->try_dequeue(element))
-            _mm_pause();
+            spin_loop_pause();
         return element;
     }
 };

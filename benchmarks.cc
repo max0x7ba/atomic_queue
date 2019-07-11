@@ -24,8 +24,6 @@
 #include <thread>
 #include <vector>
 
-#include <emmintrin.h>
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 using std::uint64_t;
@@ -56,13 +54,13 @@ struct BoostSpScAdapter : Queue {
 
     void push(T element) {
         while(!this->Queue::push(element))
-            _mm_pause();
+            spin_loop_pause();
     }
 
     T pop() {
         T element;
         while(!this->Queue::pop(element))
-            _mm_pause();
+            spin_loop_pause();
         return element;
     }
 };
@@ -73,7 +71,7 @@ struct BoostQueueAdapter : BoostSpScAdapter<Queue> {
 
     void push(T element) {
         while(!this->Queue::bounded_push(element))
-            _mm_pause();
+            spin_loop_pause();
     }
 };
 

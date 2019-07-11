@@ -10,7 +10,6 @@
 #include <cstdlib>
 #include <mutex>
 
-// #include <emmintrin.h>
 #include <pthread.h>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -57,7 +56,7 @@ public:
     void lock() noexcept {
         auto ticket = ticket_.fetch_add(1, std::memory_order_relaxed);
         while(next_.load(std::memory_order_acquire) != ticket)
-            _mm_pause();
+            spin_loop_pause();
     }
 
     void unlock() noexcept {
@@ -77,7 +76,7 @@ public:
         for(;;) {
             if(!lock_.load(std::memory_order_relaxed) && !lock_.exchange(1, std::memory_order_acquire))
                 return;
-            _mm_pause();
+            spin_loop_pause();
         }
     }
 
@@ -106,7 +105,7 @@ public:
         for(int expected = 0;
             !__atomic_compare_exchange_n(&lock_, &expected, 1, false, __ATOMIC_ACQUIRE | HLE_ACQUIRE, __ATOMIC_RELAXED);
             expected = 0)
-            _mm_pause();
+            spin_loop_pause();
     }
 
     void unlock() noexcept {

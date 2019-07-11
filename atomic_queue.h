@@ -228,7 +228,7 @@ class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL, MINIMIZE_
             T element = q_element.exchange(NIL, R);
             if(element != NIL)
                 return element;
-            _mm_pause();
+            spin_loop_pause();
         }
     }
 
@@ -237,7 +237,7 @@ class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL, MINIMIZE_
         std::atomic<T>& q_element = details::map<SHUFFLE_BITS>(elements_, head % size_);
         for(T expected = NIL; !q_element.compare_exchange_strong(expected, element, R, X);
             expected = NIL) // (1) Wait for store (2) to complete.
-            _mm_pause();
+            spin_loop_pause();
     }
 
 public:
@@ -280,7 +280,7 @@ class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE, MINIMIZE_CON
                 states_[index].store(EMPTY, R);
                 return element;
             }
-            _mm_pause();
+            spin_loop_pause();
         }
     }
 
@@ -294,7 +294,7 @@ class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE, MINIMIZE_CON
                 states_[index].store(STORED, R);
                 return;
             }
-            _mm_pause();
+            spin_loop_pause();
         }
     }
 
@@ -333,7 +333,7 @@ class AtomicQueueB : public AtomicQueueCommon<AtomicQueueB<T, A, NIL, TOTAL_ORDE
             T element = q_element.exchange(NIL, R);
             if(element != NIL)
                 return element;
-            _mm_pause();
+            spin_loop_pause();
         }
     }
 
@@ -342,7 +342,7 @@ class AtomicQueueB : public AtomicQueueCommon<AtomicQueueB<T, A, NIL, TOTAL_ORDE
         std::atomic<T>& q_element = details::map<SHUFFLE_BITS>(elements_, head & (size_ - 1));
         for(T expected = NIL; !q_element.compare_exchange_strong(expected, element, R, X);
             expected = NIL) // (1) Wait for store (2) to complete.
-            _mm_pause();
+            spin_loop_pause();
     }
 
 public:
@@ -423,7 +423,7 @@ class AtomicQueueB2 : public AtomicQueueCommon<AtomicQueueB2<T, A, TOTAL_ORDER>>
                 states_[index].store(EMPTY, R);
                 return element;
             }
-            _mm_pause();
+            spin_loop_pause();
         }
     }
 
@@ -437,7 +437,7 @@ class AtomicQueueB2 : public AtomicQueueCommon<AtomicQueueB2<T, A, TOTAL_ORDER>>
                 states_[index].store(STORED, R);
                 return;
             }
-            _mm_pause();
+            spin_loop_pause();
         }
     }
 
@@ -509,13 +509,13 @@ struct RetryDecorator : Queue {
 
     void push(T element) noexcept {
         while(!this->try_push(element))
-            _mm_pause();
+            spin_loop_pause();
     }
 
     T pop() noexcept {
         T element;
         while(!this->try_pop(element))
-            _mm_pause();
+            spin_loop_pause();
         return element;
     }
 };
