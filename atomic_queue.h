@@ -153,10 +153,6 @@ protected:
         b.tail_.store(t, X);
     }
 
-    friend void swap(AtomicQueueCommon& a, AtomicQueueCommon& b) noexcept {
-        a.swap(b);
-    }
-
 public:
     template<class T>
     bool try_push(T&& element) noexcept {
@@ -235,9 +231,8 @@ class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL, MINIMIZE_
     void do_push(T element, unsigned head) noexcept {
         assert(element != NIL);
         std::atomic<T>& q_element = details::map<SHUFFLE_BITS>(elements_, head % size_);
-        for(T expected = NIL; !q_element.compare_exchange_strong(expected, element, R, X);
-            expected = NIL) // (1) Wait for store (2) to complete.
-            spin_loop_pause();
+        for(T expected = NIL; !q_element.compare_exchange_strong(expected, element, R, X); expected = NIL)
+            spin_loop_pause(); // (1) Wait for store (2) to complete.
     }
 
 public:
@@ -340,9 +335,8 @@ class AtomicQueueB : public AtomicQueueCommon<AtomicQueueB<T, A, NIL, TOTAL_ORDE
     void do_push(T element, unsigned head) noexcept {
         assert(element != NIL);
         std::atomic<T>& q_element = details::map<SHUFFLE_BITS>(elements_, head & (size_ - 1));
-        for(T expected = NIL; !q_element.compare_exchange_strong(expected, element, R, X);
-            expected = NIL) // (1) Wait for store (2) to complete.
-            spin_loop_pause();
+        for(T expected = NIL; !q_element.compare_exchange_strong(expected, element, R, X); expected = NIL)
+            spin_loop_pause(); // (1) Wait for store (2) to complete.
     }
 
 public:
