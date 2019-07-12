@@ -235,7 +235,7 @@ void run_throughput_benchmarks() {
     run_throughput_spsc_benchmark(
         "boost::lockfree::spsc_queue",
         Type<BoostSpScAdapter<boost::lockfree::spsc_queue<unsigned, boost::lockfree::capacity<CAPACITY>>>>{});
-    run_throughput_spsc_benchmark(
+    run_throughput_benchmark(
         "boost::lockfree::queue",
         Type<BoostQueueAdapter<boost::lockfree::queue<unsigned, boost::lockfree::capacity<CAPACITY - 2>>>>{});
 
