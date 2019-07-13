@@ -19,7 +19,7 @@ double atomic_queue::cpu_base_frequency() {
         if(m.size() == 2)
             return std::stod(m[1]);
     }
-    return 1e9;
+    return 1; // Fallback to cycles, should it fail to parse.
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

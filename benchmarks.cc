@@ -39,11 +39,11 @@ using sum_t = long long;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-double const CPU_FREQ = cpu_base_frequency();
+double const TSC_TO_SECONDS = 1e-9 / cpu_base_frequency();
 
 template<class T>
 inline double to_seconds(T tsc) {
-    return tsc / CPU_FREQ * 1e-9;
+    return tsc * TSC_TO_SECONDS;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -311,7 +311,7 @@ void run_ping_pong_benchmark(char const* name) {
             best_times = times;
     }
 
-    auto avg_time = (best_times[0] + best_times[1]) / (2 * 1e9 * CPU_FREQ);
+    auto avg_time = to_seconds((best_times[0] + best_times[1]) / 2);
     auto round_trip_time = avg_time / N;
     std::printf("%32s: %.9f sec/round-trip\n", name, round_trip_time);
 }
