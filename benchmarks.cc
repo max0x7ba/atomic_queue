@@ -211,9 +211,9 @@ void run_throughput_benchmark(char const* name, unsigned M, unsigned thread_coun
 }
 
 template<class Queue>
-void run_throughput_benchmark(char const* name, Type<Queue>) {
+void run_throughput_benchmark(char const* name, Type<Queue>, unsigned thread_count_min = 1) {
     unsigned const thread_count_max = std::thread::hardware_concurrency() / 2;
-    run_throughput_benchmark<Queue>(name, 1000000, 1, thread_count_max);
+    run_throughput_benchmark<Queue>(name, 1000000, thread_count_min, thread_count_max);
 }
 
 template<class... Args>
@@ -252,14 +252,28 @@ void run_throughput_benchmarks() {
     run_throughput_benchmark("tbb::concurrent_bounded_queue",
                              Type<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, CAPACITY>>{});
 
-    run_throughput_benchmark("AtomicQueue", Type<RetryDecorator<AtomicQueue<unsigned, CAPACITY>>>{});
+    // Enable MINIMIZE_CONTENTION for 2 or more producers/consumers.
+    run_throughput_spsc_benchmark("AtomicQueue", Type<RetryDecorator<AtomicQueue<unsigned, CAPACITY, 0u, false>>>{});
+    run_throughput_benchmark("AtomicQueue", Type<RetryDecorator<AtomicQueue<unsigned, CAPACITY, 0u, true>>>{}, 2);
+
     run_throughput_benchmark("AtomicQueueB", Type<RetryDecorator<CapacityToConstructor<AtomicQueueB<unsigned>, CAPACITY>>>{});
-    run_throughput_benchmark("OptimistAtomicQueue", Type<AtomicQueue<unsigned, CAPACITY>>{});
+
+    // Enable MINIMIZE_CONTENTION for 2 or more producers/consumers.
+    run_throughput_spsc_benchmark("OptimistAtomicQueue", Type<AtomicQueue<unsigned, CAPACITY, 0u, false>>{});
+    run_throughput_benchmark("OptimistAtomicQueue", Type<AtomicQueue<unsigned, CAPACITY, 0u, true>>{}, 2);
+
     run_throughput_benchmark("OptimistAtomicQueueB", Type<CapacityToConstructor<AtomicQueueB<unsigned>, CAPACITY>>{});
 
-    run_throughput_benchmark("AtomicQueue2", Type<RetryDecorator<AtomicQueue2<unsigned, CAPACITY>>>{});
+    // Enable MINIMIZE_CONTENTION for 2 or more producers/consumers.
+    run_throughput_spsc_benchmark("AtomicQueue2", Type<RetryDecorator<AtomicQueue2<unsigned, CAPACITY, false>>>{});
+    run_throughput_benchmark("AtomicQueue2", Type<RetryDecorator<AtomicQueue2<unsigned, CAPACITY, true>>>{}, 2);
+
     run_throughput_benchmark("AtomicQueueB2", Type<RetryDecorator<CapacityToConstructor<AtomicQueueB2<unsigned>, CAPACITY>>>{});
-    run_throughput_benchmark("OptimistAtomicQueue2", Type<AtomicQueue2<unsigned, CAPACITY>>{});
+
+    // Enable MINIMIZE_CONTENTION for 2 or more producers/consumers.
+    run_throughput_spsc_benchmark("OptimistAtomicQueue2", Type<AtomicQueue2<unsigned, CAPACITY, false>>{});
+    run_throughput_benchmark("OptimistAtomicQueue2", Type<AtomicQueue2<unsigned, CAPACITY, true>>{}, 2);
+
     run_throughput_benchmark("OptimistAtomicQueueB2", Type<CapacityToConstructor<AtomicQueueB2<unsigned>, CAPACITY>>{});
 
     // run_throughput_benchmark<RetryDecorator<AtomicQueueSpinlockHle<unsigned, CAPACITY>>>("SpinlockHle");
@@ -343,13 +357,13 @@ void run_ping_pong_benchmarks() {
         "tbb::speculative_spin_mutex");
     run_ping_pong_benchmark<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, CAPACITY>>("tbb::concurrent_bounded_queue");
 
-    run_ping_pong_benchmark<RetryDecorator<AtomicQueue<unsigned, CAPACITY>>>("AtomicQueue");
+    run_ping_pong_benchmark<RetryDecorator<AtomicQueue<unsigned, CAPACITY, 0u, false>>>("AtomicQueue");
     run_ping_pong_benchmark<RetryDecorator<CapacityToConstructor<AtomicQueueB<unsigned>, CAPACITY>>>("AtomicQueueB");
-    run_ping_pong_benchmark<AtomicQueue<unsigned, CAPACITY>>("OptimistAtomicQueue");
+    run_ping_pong_benchmark<AtomicQueue<unsigned, CAPACITY, 0u, false>>("OptimistAtomicQueue");
     run_ping_pong_benchmark<CapacityToConstructor<AtomicQueueB<unsigned>, CAPACITY>>("OptimistAtomicQueueB");
-    run_ping_pong_benchmark<RetryDecorator<AtomicQueue2<unsigned, CAPACITY>>>("AtomicQueue2");
+    run_ping_pong_benchmark<RetryDecorator<AtomicQueue2<unsigned, CAPACITY, false>>>("AtomicQueue2");
     run_ping_pong_benchmark<RetryDecorator<CapacityToConstructor<AtomicQueueB2<unsigned>, CAPACITY>>>("AtomicQueueB2");
-    run_ping_pong_benchmark<AtomicQueue2<unsigned, CAPACITY>>("OptimistAtomicQueue2");
+    run_ping_pong_benchmark<AtomicQueue2<unsigned, CAPACITY, false>>("OptimistAtomicQueue2");
     run_ping_pong_benchmark<CapacityToConstructor<AtomicQueueB2<unsigned>, CAPACITY>>("OptimistAtomicQueueB2");
 
     // run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinlockHle<unsigned, CAPACITY>>>("SpinlockHle");
