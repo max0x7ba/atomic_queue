@@ -227,15 +227,18 @@ class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL, MINIMIZE_
             T element = q_element.exchange(NIL, R); // (2) The store to wait for.
             if(element != NIL)
                 return element;
-            spin_loop_pause();
+            do spin_loop_pause();
+            while(q_element.load(X) == NIL); // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
         }
     }
 
     void do_push(T element, unsigned head) noexcept {
         assert(element != NIL);
         std::atomic<T>& q_element = details::map<SHUFFLE_BITS>(elements_, head % size_);
-        for(T expected = NIL; !q_element.compare_exchange_strong(expected, element, R, X); expected = NIL)
-            spin_loop_pause(); // (1) Wait for store (2) to complete.
+        for(T expected = NIL; !q_element.compare_exchange_strong(expected, element, R, X); expected = NIL) {
+            do spin_loop_pause(); // (1) Wait for store (2) to complete.
+            while(q_element.load(X) != NIL); // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
+        }
     }
 
 public:
@@ -271,28 +274,32 @@ class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE, MINIMIZE_CON
 
     T do_pop(unsigned tail) noexcept {
         unsigned index = details::remap_index<SHUFFLE_BITS>(tail % size_);
+        auto& state = states_[index];
         for(;;) {
             unsigned char expected = STORED;
-            if(states_[index].compare_exchange_strong(expected, LOADING, X, X)) {
+            if(state.compare_exchange_strong(expected, LOADING, X, X)) {
                 T element{std::move(elements_[index])};
-                states_[index].store(EMPTY, R);
+                state.store(EMPTY, R);
                 return element;
             }
-            spin_loop_pause();
+            do spin_loop_pause();
+            while(state.load(X) != STORED); // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
         }
     }
 
     template<class U>
     void do_push(U&& element, unsigned head) noexcept {
         unsigned index = details::remap_index<SHUFFLE_BITS>(head % size_);
+        auto& state = states_[index];
         for(;;) {
             unsigned char expected = EMPTY;
-            if(states_[index].compare_exchange_strong(expected, STORING, X, X)) {
+            if(state.compare_exchange_strong(expected, STORING, X, X)) {
                 elements_[index] = std::forward<U>(element);
-                states_[index].store(STORED, R);
+                state.store(STORED, R);
                 return;
             }
-            spin_loop_pause();
+            do spin_loop_pause();
+            while(state.load(X) != EMPTY); // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
         }
     }
 
@@ -331,15 +338,18 @@ class AtomicQueueB : public AtomicQueueCommon<AtomicQueueB<T, A, NIL, TOTAL_ORDE
             T element = q_element.exchange(NIL, R); // (2) The store to wait for.
             if(element != NIL)
                 return element;
-            spin_loop_pause();
+            do spin_loop_pause();
+            while(q_element.load(X) == NIL); // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
         }
     }
 
     void do_push(T element, unsigned head) noexcept {
         assert(element != NIL);
         std::atomic<T>& q_element = details::map<SHUFFLE_BITS>(elements_, head & (size_ - 1));
-        for(T expected = NIL; !q_element.compare_exchange_strong(expected, element, R, X); expected = NIL)
-            spin_loop_pause(); // (1) Wait for store (2) to complete.
+        for(T expected = NIL; !q_element.compare_exchange_strong(expected, element, R, X); expected = NIL) {
+            do spin_loop_pause(); // (1) Wait for store (2) to complete.
+            while(q_element.load(X) != NIL); // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
+        }
     }
 
 public:
@@ -415,28 +425,32 @@ class AtomicQueueB2 : public AtomicQueueCommon<AtomicQueueB2<T, A, TOTAL_ORDER>>
 
     T do_pop(unsigned tail) noexcept {
         unsigned index = details::remap_index<SHUFFLE_BITS>(tail % (size_ - 1));
+        auto& state = states_[index];
         for(;;) {
             uint8_t expected = STORED;
-            if(states_[index].compare_exchange_strong(expected, LOADING, X, X)) {
+            if(state.compare_exchange_strong(expected, LOADING, X, X)) {
                 T element{std::move(elements_[index])};
-                states_[index].store(EMPTY, R);
+                state.store(EMPTY, R);
                 return element;
             }
-            spin_loop_pause();
+            do spin_loop_pause();
+            while(state.load(X) != STORED); // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
         }
     }
 
     template<class U>
     void do_push(U&& element, unsigned head) noexcept {
         unsigned index = details::remap_index<SHUFFLE_BITS>(head % (size_ - 1));
+        auto& state = states_[index];
         for(;;) {
             uint8_t expected = EMPTY;
-            if(states_[index].compare_exchange_strong(expected, STORING, X, X)) {
+            if(state.compare_exchange_strong(expected, STORING, X, X)) {
                 elements_[index] = std::forward<U>(element);
-                states_[index].store(STORED, R);
+                state.store(STORED, R);
                 return;
             }
-            spin_loop_pause();
+            do spin_loop_pause();
+            while(state.load(X) != EMPTY); // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
         }
     }
 
