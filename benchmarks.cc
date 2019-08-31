@@ -357,13 +357,13 @@ void run_ping_pong_benchmarks() {
         "tbb::speculative_spin_mutex");
     run_ping_pong_benchmark<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, CAPACITY>>("tbb::concurrent_bounded_queue");
 
-    run_ping_pong_benchmark<RetryDecorator<AtomicQueue<unsigned, CAPACITY, 0u, false>>>("AtomicQueue");
+    run_ping_pong_benchmark<RetryDecorator<AtomicQueue<unsigned, CAPACITY>>>("AtomicQueue");
     run_ping_pong_benchmark<RetryDecorator<CapacityToConstructor<AtomicQueueB<unsigned>, CAPACITY>>>("AtomicQueueB");
-    run_ping_pong_benchmark<AtomicQueue<unsigned, CAPACITY, 0u, false>>("OptimistAtomicQueue");
+    run_ping_pong_benchmark<AtomicQueue<unsigned, CAPACITY>>("OptimistAtomicQueue");
     run_ping_pong_benchmark<CapacityToConstructor<AtomicQueueB<unsigned>, CAPACITY>>("OptimistAtomicQueueB");
-    run_ping_pong_benchmark<RetryDecorator<AtomicQueue2<unsigned, CAPACITY, false>>>("AtomicQueue2");
+    run_ping_pong_benchmark<RetryDecorator<AtomicQueue2<unsigned, CAPACITY>>>("AtomicQueue2");
     run_ping_pong_benchmark<RetryDecorator<CapacityToConstructor<AtomicQueueB2<unsigned>, CAPACITY>>>("AtomicQueueB2");
-    run_ping_pong_benchmark<AtomicQueue2<unsigned, CAPACITY, false>>("OptimistAtomicQueue2");
+    run_ping_pong_benchmark<AtomicQueue2<unsigned, CAPACITY>>("OptimistAtomicQueue2");
     run_ping_pong_benchmark<CapacityToConstructor<AtomicQueueB2<unsigned>, CAPACITY>>("OptimistAtomicQueueB2");
 
     // run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinlockHle<unsigned, CAPACITY>>>("SpinlockHle");
