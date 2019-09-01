@@ -88,7 +88,7 @@ ${build_dir}/%.a : Makefile | ${build_dir}
 
 run_benchmarks : ${build_dir}/benchmarks
 	@echo "---- running $< ----"
-	sudo chrt -f 50 $<
+	nice -20 $<
 #	sudo chrt -f 50 perf stat -d $<
 
 run_tests : ${build_dir}/tests
