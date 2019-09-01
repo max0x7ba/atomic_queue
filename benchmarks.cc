@@ -106,8 +106,7 @@ void throughput_producer(unsigned N, Queue* queue, std::atomic<uint64_t>* t0, Ba
 }
 
 template<class Queue>
-void throughput_consumer_impl(unsigned N, Queue* queue, sum_t* consumer_sum, std::atomic<unsigned>* last_consumer,
-                              uint64_t* t1) {
+void throughput_consumer_impl(unsigned N, Queue* queue, sum_t* consumer_sum, std::atomic<unsigned>* last_consumer, uint64_t* t1) {
     unsigned const stop = N + 1;
     sum_t sum = 0;
 
@@ -127,8 +126,7 @@ void throughput_consumer_impl(unsigned N, Queue* queue, sum_t* consumer_sum, std
 }
 
 template<class Queue>
-void throughput_consumer(unsigned N, Queue* queue, sum_t* consumer_sum, std::atomic<unsigned>* last_consumer, uint64_t* t1,
-                         Barrier* barrier) {
+void throughput_consumer(unsigned N, Queue* queue, sum_t* consumer_sum, std::atomic<unsigned>* last_consumer, uint64_t* t1, Barrier* barrier) {
     barrier->wait();
     throughput_consumer_impl(N, queue, consumer_sum, last_consumer, t1);
 }
@@ -146,15 +144,13 @@ uint64_t benchmark_throughput(unsigned N, unsigned thread_count, bool alternativ
         for(unsigned i = 0; i < thread_count; ++i) {
             threads[i] = std::thread(throughput_producer<Queue>, N, &queue, &t0, &barrier);
             if(i != thread_count - 1) // This thread is the last consumer.
-                threads[thread_count + i] =
-                    std::thread(throughput_consumer<Queue>, N, &queue, consumer_sums + i, &last_consumer, &t1, &barrier);
+                threads[thread_count + i] = std::thread(throughput_consumer<Queue>, N, &queue, consumer_sums + i, &last_consumer, &t1, &barrier);
         }
     } else {
         for(unsigned i = 0; i < thread_count; ++i)
             threads[i] = std::thread(throughput_producer<Queue>, N, &queue, &t0, &barrier);
         for(unsigned i = 0; i < thread_count - 1; ++i) // This thread is the last consumer.
-            threads[thread_count + i] =
-                std::thread(throughput_consumer<Queue>, N, &queue, consumer_sums + i, &last_consumer, &t1, &barrier);
+            threads[thread_count + i] = std::thread(throughput_consumer<Queue>, N, &queue, consumer_sums + i, &last_consumer, &t1, &barrier);
     }
 
     barrier.release(thread_count * 2 - 1);
@@ -193,14 +189,14 @@ void run_throughput_benchmark(char const* name, unsigned M, unsigned thread_coun
                     // Verify that no consumer was starved.
                     auto consumer_sum_frac = consumer_sum * expected_sum_inv;
                     if(consumer_sum_frac < .1)
-                        std::fprintf(stderr, "%s: producers: %u: consumer %u received too few messages: %.2lf%% of expected.\n",
-                                     name, threads, i, consumer_sum_frac);
+                        std::fprintf(stderr, "%s: producers: %u: consumer %u received too few messages: %.2lf%% of expected.\n", name, threads, i,
+                                     consumer_sum_frac);
                 }
 
                 // Verify that all messages were received exactly once: no duplicates, no omissions.
                 if(auto diff = total_sum - expected_sum * threads)
-                    std::fprintf(stderr, "%s: wrong checksum error: producers: %u, expected_sum: %'lld, diff: %'lld.\n", name,
-                                 threads, expected_sum * threads, diff);
+                    std::fprintf(stderr, "%s: wrong checksum error: producers: %u, expected_sum: %'lld, diff: %'lld.\n", name, threads, expected_sum * threads,
+                                 diff);
             }
 
             double min_seconds = to_seconds(min_time);
@@ -232,12 +228,9 @@ void run_throughput_benchmarks() {
 
     int constexpr CAPACITY = 65536;
 
-    run_throughput_spsc_benchmark(
-        "boost::lockfree::spsc_queue",
-        Type<BoostSpScAdapter<boost::lockfree::spsc_queue<unsigned, boost::lockfree::capacity<CAPACITY>>>>{});
-    run_throughput_benchmark(
-        "boost::lockfree::queue",
-        Type<BoostQueueAdapter<boost::lockfree::queue<unsigned, boost::lockfree::capacity<CAPACITY - 2>>>>{});
+    run_throughput_spsc_benchmark("boost::lockfree::spsc_queue",
+                                  Type<BoostSpScAdapter<boost::lockfree::spsc_queue<unsigned, boost::lockfree::capacity<CAPACITY>>>>{});
+    run_throughput_benchmark("boost::lockfree::queue", Type<BoostQueueAdapter<boost::lockfree::queue<unsigned, boost::lockfree::capacity<CAPACITY - 2>>>>{});
 
     run_throughput_benchmark("pthread_spinlock", Type<RetryDecorator<AtomicQueueSpinlock<unsigned, CAPACITY>>>{});
     // run_throughput_benchmark("FairSpinlock", Type<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, FairSpinlock>>>{});
@@ -247,10 +240,8 @@ void run_throughput_benchmarks() {
     run_throughput_benchmark("moodycamel::ConcurrentQueue", Type<MoodyCamelQueue<unsigned, CAPACITY>>{});
 
     run_throughput_benchmark("tbb::spin_mutex", Type<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, tbb::spin_mutex>>>{});
-    run_throughput_benchmark("tbb::speculative_spin_mutex",
-                             Type<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, tbb::speculative_spin_mutex>>>{});
-    run_throughput_benchmark("tbb::concurrent_bounded_queue",
-                             Type<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, CAPACITY>>{});
+    run_throughput_benchmark("tbb::speculative_spin_mutex", Type<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, tbb::speculative_spin_mutex>>>{});
+    run_throughput_benchmark("tbb::concurrent_bounded_queue", Type<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, CAPACITY>>{});
 
     // Enable MINIMIZE_CONTENTION for 2 or more producers/consumers.
     run_throughput_spsc_benchmark("AtomicQueue", Type<RetryDecorator<AtomicQueue<unsigned, CAPACITY, 0u, false>>>{});
@@ -340,10 +331,8 @@ void run_ping_pong_benchmarks() {
     // preclude aggressive optimizations.
     constexpr unsigned CAPACITY = 8;
 
-    run_ping_pong_benchmark<BoostSpScAdapter<boost::lockfree::spsc_queue<unsigned, boost::lockfree::capacity<CAPACITY>>>>(
-        "boost::lockfree::spsc_queue");
-    run_ping_pong_benchmark<BoostQueueAdapter<boost::lockfree::queue<unsigned, boost::lockfree::capacity<CAPACITY>>>>(
-        "boost::lockfree::queue");
+    run_ping_pong_benchmark<BoostSpScAdapter<boost::lockfree::spsc_queue<unsigned, boost::lockfree::capacity<CAPACITY>>>>("boost::lockfree::spsc_queue");
+    run_ping_pong_benchmark<BoostQueueAdapter<boost::lockfree::queue<unsigned, boost::lockfree::capacity<CAPACITY>>>>("boost::lockfree::queue");
 
     run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinlock<unsigned, CAPACITY>>>("pthread_spinlock");
     // run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, FairSpinlock>>>("FairSpinlock");
@@ -353,8 +342,7 @@ void run_ping_pong_benchmarks() {
     run_ping_pong_benchmark<MoodyCamelQueue<unsigned, CAPACITY>>("moodycamel::ConcurrentQueue");
 
     run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, tbb::spin_mutex>>>("tbb::spin_mutex");
-    run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, tbb::speculative_spin_mutex>>>(
-        "tbb::speculative_spin_mutex");
+    run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, tbb::speculative_spin_mutex>>>("tbb::speculative_spin_mutex");
     run_ping_pong_benchmark<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, CAPACITY>>("tbb::concurrent_bounded_queue");
 
     run_ping_pong_benchmark<RetryDecorator<AtomicQueue<unsigned, CAPACITY>>>("AtomicQueue");

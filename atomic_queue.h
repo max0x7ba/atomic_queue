@@ -215,8 +215,7 @@ class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL, MINIMIZE_
     friend Base;
 
     static constexpr unsigned size_ = MINIMIZE_CONTENTION ? details::round_up_to_power_of_2(SIZE) : SIZE;
-    static constexpr int SHUFFLE_BITS =
-        details::GetIndexShuffleBits<MINIMIZE_CONTENTION, size_, CACHE_LINE_SIZE / sizeof(std::atomic<T>)>::value;
+    static constexpr int SHUFFLE_BITS = details::GetIndexShuffleBits<MINIMIZE_CONTENTION, size_, CACHE_LINE_SIZE / sizeof(std::atomic<T>)>::value;
     static constexpr bool total_order_ = TOTAL_ORDER;
 
     alignas(CACHE_LINE_SIZE) std::atomic<T> elements_[size_] = {}; // Empty elements are NIL.
@@ -227,7 +226,8 @@ class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL, MINIMIZE_
             T element = q_element.exchange(NIL, R); // (2) The store to wait for.
             if(element != NIL)
                 return element;
-            do spin_loop_pause();
+            do
+                spin_loop_pause();
             while(q_element.load(X) == NIL); // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
         }
     }
@@ -236,7 +236,8 @@ class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL, MINIMIZE_
         assert(element != NIL);
         std::atomic<T>& q_element = details::map<SHUFFLE_BITS>(elements_, head % size_);
         for(T expected = NIL; !q_element.compare_exchange_strong(expected, element, R, X); expected = NIL) {
-            do spin_loop_pause(); // (1) Wait for store (2) to complete.
+            do
+                spin_loop_pause();           // (1) Wait for store (2) to complete.
             while(q_element.load(X) != NIL); // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
         }
     }
@@ -265,8 +266,7 @@ class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE, MINIMIZE_CON
     enum State : unsigned char { EMPTY, STORING, STORED, LOADING };
 
     static constexpr unsigned size_ = MINIMIZE_CONTENTION ? details::round_up_to_power_of_2(SIZE) : SIZE;
-    static constexpr int SHUFFLE_BITS =
-        details::GetIndexShuffleBits<MINIMIZE_CONTENTION, size_, CACHE_LINE_SIZE / sizeof(State)>::value;
+    static constexpr int SHUFFLE_BITS = details::GetIndexShuffleBits<MINIMIZE_CONTENTION, size_, CACHE_LINE_SIZE / sizeof(State)>::value;
     static constexpr bool total_order_ = TOTAL_ORDER;
 
     alignas(CACHE_LINE_SIZE) std::atomic<unsigned char> states_[size_] = {};
@@ -282,7 +282,8 @@ class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE, MINIMIZE_CON
                 state.store(EMPTY, R);
                 return element;
             }
-            do spin_loop_pause();
+            do
+                spin_loop_pause();
             while(state.load(X) != STORED); // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
         }
     }
@@ -298,7 +299,8 @@ class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE, MINIMIZE_CON
                 state.store(STORED, R);
                 return;
             }
-            do spin_loop_pause();
+            do
+                spin_loop_pause();
             while(state.load(X) != EMPTY); // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
         }
     }
@@ -314,8 +316,7 @@ public:
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<class T, class A = std::allocator<T>, T NIL = T{}, bool TOTAL_ORDER = false>
-class AtomicQueueB : public AtomicQueueCommon<AtomicQueueB<T, A, NIL, TOTAL_ORDER>>,
-                     private std::allocator_traits<A>::template rebind_alloc<std::atomic<T>> {
+class AtomicQueueB : public AtomicQueueCommon<AtomicQueueB<T, A, NIL, TOTAL_ORDER>>, private std::allocator_traits<A>::template rebind_alloc<std::atomic<T>> {
     using Base = AtomicQueueCommon<AtomicQueueB<T, A, NIL, TOTAL_ORDER>>;
     friend Base;
 
@@ -338,7 +339,8 @@ class AtomicQueueB : public AtomicQueueCommon<AtomicQueueB<T, A, NIL, TOTAL_ORDE
             T element = q_element.exchange(NIL, R); // (2) The store to wait for.
             if(element != NIL)
                 return element;
-            do spin_loop_pause();
+            do
+                spin_loop_pause();
             while(q_element.load(X) == NIL); // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
         }
     }
@@ -347,7 +349,8 @@ class AtomicQueueB : public AtomicQueueCommon<AtomicQueueB<T, A, NIL, TOTAL_ORDE
         assert(element != NIL);
         std::atomic<T>& q_element = details::map<SHUFFLE_BITS>(elements_, head & (size_ - 1));
         for(T expected = NIL; !q_element.compare_exchange_strong(expected, element, R, X); expected = NIL) {
-            do spin_loop_pause(); // (1) Wait for store (2) to complete.
+            do
+                spin_loop_pause();           // (1) Wait for store (2) to complete.
             while(q_element.load(X) != NIL); // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
         }
     }
@@ -433,7 +436,8 @@ class AtomicQueueB2 : public AtomicQueueCommon<AtomicQueueB2<T, A, TOTAL_ORDER>>
                 state.store(EMPTY, R);
                 return element;
             }
-            do spin_loop_pause();
+            do
+                spin_loop_pause();
             while(state.load(X) != STORED); // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
         }
     }
@@ -449,7 +453,8 @@ class AtomicQueueB2 : public AtomicQueueCommon<AtomicQueueB2<T, A, TOTAL_ORDER>>
                 state.store(STORED, R);
                 return;
             }
-            do spin_loop_pause();
+            do
+                spin_loop_pause();
             while(state.load(X) != EMPTY); // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
         }
     }
