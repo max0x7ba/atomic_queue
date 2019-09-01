@@ -209,9 +209,9 @@ public:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<class T, unsigned SIZE, T NIL = T{}, bool MINIMIZE_CONTENTION = true, bool TOTAL_ORDER = false>
-class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL, MINIMIZE_CONTENTION, TOTAL_ORDER>> {
-    using Base = AtomicQueueCommon<AtomicQueue<T, SIZE, NIL, MINIMIZE_CONTENTION, TOTAL_ORDER>>;
+template<class T, unsigned SIZE, T NIL = T{}, bool MINIMIZE_CONTENTION = true, bool MAXIMIZE_THROUGHPUT = true, bool TOTAL_ORDER = false>
+class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, TOTAL_ORDER>> {
+    using Base = AtomicQueueCommon<AtomicQueue<T, SIZE, NIL, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, TOTAL_ORDER>>;
     friend Base;
 
     static constexpr unsigned size_ = MINIMIZE_CONTENTION ? details::round_up_to_power_of_2(SIZE) : SIZE;
@@ -226,9 +226,10 @@ class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL, MINIMIZE_
             T element = q_element.exchange(NIL, R); // (2) The store to wait for.
             if(element != NIL)
                 return element;
+            // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
             do
                 spin_loop_pause();
-            while(q_element.load(X) == NIL); // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
+            while(MAXIMIZE_THROUGHPUT && q_element.load(X) == NIL);
         }
     }
 
@@ -236,9 +237,10 @@ class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL, MINIMIZE_
         assert(element != NIL);
         std::atomic<T>& q_element = details::map<SHUFFLE_BITS>(elements_, head % size_);
         for(T expected = NIL; !q_element.compare_exchange_strong(expected, element, R, X); expected = NIL) {
+            // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
             do
-                spin_loop_pause();           // (1) Wait for store (2) to complete.
-            while(q_element.load(X) != NIL); // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
+                spin_loop_pause(); // (1) Wait for store (2) to complete.
+            while(MAXIMIZE_THROUGHPUT && q_element.load(X) != NIL);
         }
     }
 
@@ -258,9 +260,9 @@ public:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<class T, unsigned SIZE, bool MINIMIZE_CONTENTION = true, bool TOTAL_ORDER = false>
-class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE, MINIMIZE_CONTENTION, TOTAL_ORDER>> {
-    using Base = AtomicQueueCommon<AtomicQueue2<T, SIZE, MINIMIZE_CONTENTION, TOTAL_ORDER>>;
+template<class T, unsigned SIZE, bool MINIMIZE_CONTENTION = true, bool MAXIMIZE_THROUGHPUT = true, bool TOTAL_ORDER = false>
+class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, TOTAL_ORDER>> {
+    using Base = AtomicQueueCommon<AtomicQueue2<T, SIZE, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, TOTAL_ORDER>>;
     friend Base;
 
     enum State : unsigned char { EMPTY, STORING, STORED, LOADING };
@@ -282,9 +284,10 @@ class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE, MINIMIZE_CON
                 state.store(EMPTY, R);
                 return element;
             }
+            // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
             do
                 spin_loop_pause();
-            while(state.load(X) != STORED); // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
+            while(MAXIMIZE_THROUGHPUT && state.load(X) != STORED);
         }
     }
 
@@ -299,9 +302,10 @@ class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE, MINIMIZE_CON
                 state.store(STORED, R);
                 return;
             }
+            // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
             do
                 spin_loop_pause();
-            while(state.load(X) != EMPTY); // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
+            while(MAXIMIZE_THROUGHPUT && state.load(X) != EMPTY);
         }
     }
 
@@ -315,9 +319,10 @@ public:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<class T, class A = std::allocator<T>, T NIL = T{}, bool TOTAL_ORDER = false>
-class AtomicQueueB : public AtomicQueueCommon<AtomicQueueB<T, A, NIL, TOTAL_ORDER>>, private std::allocator_traits<A>::template rebind_alloc<std::atomic<T>> {
-    using Base = AtomicQueueCommon<AtomicQueueB<T, A, NIL, TOTAL_ORDER>>;
+template<class T, class A = std::allocator<T>, T NIL = T{}, bool MAXIMIZE_THROUGHPUT = true, bool TOTAL_ORDER = false>
+class AtomicQueueB : public AtomicQueueCommon<AtomicQueueB<T, A, NIL, MAXIMIZE_THROUGHPUT, TOTAL_ORDER>>,
+                     private std::allocator_traits<A>::template rebind_alloc<std::atomic<T>> {
+    using Base = AtomicQueueCommon<AtomicQueueB<T, A, NIL, MAXIMIZE_THROUGHPUT, TOTAL_ORDER>>;
     friend Base;
 
     static constexpr bool total_order_ = TOTAL_ORDER;
@@ -339,9 +344,10 @@ class AtomicQueueB : public AtomicQueueCommon<AtomicQueueB<T, A, NIL, TOTAL_ORDE
             T element = q_element.exchange(NIL, R); // (2) The store to wait for.
             if(element != NIL)
                 return element;
+            // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
             do
                 spin_loop_pause();
-            while(q_element.load(X) == NIL); // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
+            while(MAXIMIZE_THROUGHPUT && q_element.load(X) == NIL);
         }
     }
 
@@ -349,9 +355,10 @@ class AtomicQueueB : public AtomicQueueCommon<AtomicQueueB<T, A, NIL, TOTAL_ORDE
         assert(element != NIL);
         std::atomic<T>& q_element = details::map<SHUFFLE_BITS>(elements_, head & (size_ - 1));
         for(T expected = NIL; !q_element.compare_exchange_strong(expected, element, R, X); expected = NIL) {
+            // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
             do
-                spin_loop_pause();           // (1) Wait for store (2) to complete.
-            while(q_element.load(X) != NIL); // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
+                spin_loop_pause(); // (1) Wait for store (2) to complete.
+            while(MAXIMIZE_THROUGHPUT && q_element.load(X) != NIL);
         }
     }
 
@@ -402,11 +409,11 @@ public:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<class T, class A = std::allocator<T>, bool TOTAL_ORDER = false>
-class AtomicQueueB2 : public AtomicQueueCommon<AtomicQueueB2<T, A, TOTAL_ORDER>>,
+template<class T, class A = std::allocator<T>, bool MAXIMIZE_THROUGHPUT = true, bool TOTAL_ORDER = false>
+class AtomicQueueB2 : public AtomicQueueCommon<AtomicQueueB2<T, A, MAXIMIZE_THROUGHPUT, TOTAL_ORDER>>,
                       private A,
                       private std::allocator_traits<A>::template rebind_alloc<std::atomic<uint8_t>> {
-    using Base = AtomicQueueCommon<AtomicQueueB2<T, A, TOTAL_ORDER>>;
+    using Base = AtomicQueueCommon<AtomicQueueB2<T, A, MAXIMIZE_THROUGHPUT, TOTAL_ORDER>>;
     friend Base;
 
     static constexpr bool total_order_ = TOTAL_ORDER;
@@ -436,9 +443,10 @@ class AtomicQueueB2 : public AtomicQueueCommon<AtomicQueueB2<T, A, TOTAL_ORDER>>
                 state.store(EMPTY, R);
                 return element;
             }
+            // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
             do
                 spin_loop_pause();
-            while(state.load(X) != STORED); // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
+            while(MAXIMIZE_THROUGHPUT && state.load(X) != STORED);
         }
     }
 
@@ -453,9 +461,10 @@ class AtomicQueueB2 : public AtomicQueueCommon<AtomicQueueB2<T, A, TOTAL_ORDER>>
                 state.store(STORED, R);
                 return;
             }
+            // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
             do
                 spin_loop_pause();
-            while(state.load(X) != EMPTY); // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
+            while(MAXIMIZE_THROUGHPUT && state.load(X) != EMPTY);
         }
     }
 
