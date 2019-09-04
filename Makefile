@@ -65,7 +65,9 @@ all : ${exes}
 ${exes} : % : ${build_dir}/%
 	ln -sf ${<:${CURDIR}/%=%}
 
-${build_dir}/libatomic_queue.a : ${build_dir}/cpu_base_frequency.o
+${build_dir}/libatomic_queue.a : $(addprefix ${build_dir}/,cpu_base_frequency.o huge_pages.o)
+-include ${build_dir}/cpu_base_frequency.d
+-include ${build_dir}/huge_pages.d
 
 ${build_dir}/benchmarks : cppflags += ${cppflags.tbb} ${cppflags.moodycamel}
 ${build_dir}/benchmarks : ldlibs += ${ldlibs.tbb} ${ldlibs.moodycamel}
@@ -89,6 +91,7 @@ ${build_dir}/%.a : Makefile | ${build_dir}
 run_benchmarks : ${build_dir}/benchmarks
 	@echo "---- running $< ----"
 	nice -20 $<
+#	nice -20 perf stat -ddd $<
 #	sudo chrt -f 50 perf stat -d $<
 
 run_tests : ${build_dir}/tests
