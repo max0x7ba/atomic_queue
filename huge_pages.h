@@ -128,6 +128,8 @@ struct HugePageAllocator : HugePageAllocatorBase
     static bool constexpr propagate_on_container_move_assignment = true;
     static bool constexpr propagate_on_container_swap = true;
 
+    template<class U> struct rebind { using other = HugePageAllocator<U>; };
+
     using value_type = T;
 
     T* allocate(size_t n) const {
