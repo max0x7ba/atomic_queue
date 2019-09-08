@@ -482,7 +482,7 @@ public:
 
         AllocatorElements& ae = *this;
         for(auto p = elements_, q = elements_ + size_; p < q; ++p)
-            ae.construct(p);
+            std::allocator_traits<AllocatorElements>::construct(ae, p);
     }
 
     AtomicQueueB2(AtomicQueueB2&& b) noexcept
@@ -506,9 +506,8 @@ public:
         if(elements_) {
             AllocatorElements& ae = *this;
             for(auto p = elements_, q = elements_ + size_; p < q; ++p)
-                ae.destroy(p);
+                std::allocator_traits<AllocatorElements>::destroy(ae, p);
             AllocatorElements::deallocate(elements_, size_); // TODO: This must be noexcept, static_assert that.
-
             AllocatorStates::deallocate(states_, size_); // TODO: This must be noexcept, static_assert that.
         }
     }

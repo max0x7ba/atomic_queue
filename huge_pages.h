@@ -116,6 +116,39 @@ public:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+struct HugePageAllocatorBase {
+    static HugePages* hp;
+};
+
+template<class T>
+struct HugePageAllocator : HugePageAllocatorBase
+{
+    static bool constexpr is_always_equal = false;
+    static bool constexpr propagate_on_container_copy_assignment = true;
+    static bool constexpr propagate_on_container_move_assignment = true;
+    static bool constexpr propagate_on_container_swap = true;
+
+    using value_type = T;
+
+    T* allocate(size_t n) const {
+        return static_cast<T*>(hp->allocate(n * sizeof(T)));
+    }
+
+    void deallocate(T* p, size_t n) const {
+        hp->deallocate(p, n * sizeof(T));
+    }
+
+    bool operator==(HugePageAllocator b) const {
+        return hp == b.hp;
+    }
+
+    bool operator!=(HugePageAllocator b) const {
+        return hp != b.hp;
+    }
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 } // atomic_queue
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

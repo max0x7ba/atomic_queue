@@ -371,7 +371,7 @@ void run_ping_pong_benchmarks(HugePages& hp, std::vector<unsigned> const& hw_thr
     run_ping_pong_benchmark<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, CAPACITY>>("tbb::concurrent_bounded_queue", hp, hw_thread_ids);
 
     // Use MAXIMIZE_THROUGHPUT=false for better latency.
-    using A = std::allocator<unsigned>;
+    using A = HugePageAllocator<unsigned>;
     constexpr bool MT = false; // MAXIMIZE_THROUGHPUT
     constexpr bool MC = true; // MINIMIZE_CONTENTION
     run_ping_pong_benchmark<RetryDecorator<AtomicQueue<unsigned, CAPACITY, 0u, MC, MT>>>("AtomicQueue", hp, hw_thread_ids);
@@ -399,6 +399,7 @@ int main() {
 
     size_t constexpr GB = 1024u * 1024 * 1024;
     HugePages hp(HugePages::PAGE_1GB, 1 * GB); // Allocate one 1GB huge page to minimize TLB misses.
+    HugePageAllocatorBase::hp = &hp;
 
     auto hw_thread_ids = sort_hw_threads_by_core_id(get_cpu_topology_info());
     if(hw_thread_ids.size() < 2)
