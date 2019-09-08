@@ -9,6 +9,7 @@
 #include <tuple>
 #include <regex>
 #include <string>
+#include <thread>
 
 #include <pthread.h>
 
@@ -30,6 +31,7 @@ double atomic_queue::cpu_base_frequency() {
 
 std::vector<atomic_queue::CpuTopologyInfo> atomic_queue::get_cpu_topology_info() {
     std::vector<CpuTopologyInfo> r;
+
     std::regex res[2] = {
         std::regex("processor\\s+:\\s+([0-9]+)"),
         std::regex("core id\\s+:\\s+([0-9]+)")
@@ -47,6 +49,10 @@ std::vector<atomic_queue::CpuTopologyInfo> atomic_queue::get_cpu_topology_info()
         if(!re_idx)
             r.push_back(CpuTopologyInfo{values[0], values[1]});
     }
+
+    if(std::thread::hardware_concurrency() != r.size())
+        throw std::runtime_error("get_cpu_topology_info() invariant broken.");
+
     return r;
 }
 
@@ -56,15 +62,25 @@ std::vector<atomic_queue::CpuTopologyInfo> atomic_queue::sort_by_core_id(std::ve
     return u;
 }
 
+std::vector<unsigned> atomic_queue::sort_hw_threads_by_core_id(std::vector<atomic_queue::CpuTopologyInfo> const& v) {
+    auto u = sort_by_core_id(v);
+    std::vector<unsigned> w(u.size());
+    for(unsigned i = 0, j = u.size(); i < j; ++i)
+        w[i] = u[i].hw_thread_id;
+    return w;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void atomic_queue::set_thread_affinity(unsigned hw_thread_id) {
-    auto thread = pthread_self();
+    // TODO: Investigate whether setting the thread affinity after starting the thread can cause the
+    // thread stack to be on a remote NUMA node.
+    auto thread = ::pthread_self();
     cpu_set_t cpuset;
     CPU_ZERO(&cpuset);
     CPU_SET(hw_thread_id, &cpuset);
     if(int err = ::pthread_setaffinity_np(thread, sizeof cpuset, &cpuset))
-        throw std::system_error(err, std::system_category());
+        throw std::system_error(err, std::system_category(), "pthread_setaffinity_np");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -23,6 +23,8 @@ struct CpuTopologyInfo {
 std::vector<CpuTopologyInfo> get_cpu_topology_info();
 std::vector<CpuTopologyInfo> sort_by_core_id(std::vector<CpuTopologyInfo> const&);
 
+std::vector<unsigned> sort_hw_threads_by_core_id(std::vector<CpuTopologyInfo> const&);
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void set_thread_affinity(unsigned hw_thread_id);

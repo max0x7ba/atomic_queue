@@ -95,7 +95,8 @@ struct CapacityToConstructor : Queue {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<class Queue>
-void throughput_producer(unsigned N, Queue* queue, std::atomic<uint64_t>* t0, Barrier* barrier) {
+void throughput_producer(unsigned N, Queue* queue, std::atomic<uint64_t>* t0, Barrier* barrier, unsigned cpu) {
+    set_thread_affinity(cpu);
     barrier->wait();
     // The first producer saves the start time.
     uint64_t expected = 0;
@@ -126,13 +127,17 @@ void throughput_consumer_impl(unsigned N, Queue* queue, sum_t* consumer_sum, std
 }
 
 template<class Queue>
-void throughput_consumer(unsigned N, Queue* queue, sum_t* consumer_sum, std::atomic<unsigned>* last_consumer, uint64_t* t1, Barrier* barrier) {
+void throughput_consumer(unsigned N, Queue* queue, sum_t* consumer_sum, std::atomic<unsigned>* last_consumer, uint64_t* t1, Barrier* barrier, unsigned cpu) {
+    set_thread_affinity(cpu);
     barrier->wait();
     throughput_consumer_impl(N, queue, consumer_sum, last_consumer, t1);
 }
 
 template<class Queue>
-uint64_t benchmark_throughput(HugePages& hp, unsigned N, unsigned thread_count, bool alternative_placement, sum_t* consumer_sums) {
+uint64_t benchmark_throughput(HugePages& hp, std::vector<unsigned> const& hw_thread_ids, unsigned N, unsigned thread_count, bool alternative_placement, sum_t* consumer_sums) {
+    set_thread_affinity(hw_thread_ids.back()); // Use this thread for the last consumer.
+    unsigned cpu_idx = 0;
+
     auto queue = hp.create_unique_ptr<Queue>();
     std::atomic<uint64_t> t0{0};
     uint64_t t1 = 0;
@@ -142,20 +147,19 @@ uint64_t benchmark_throughput(HugePages& hp, unsigned N, unsigned thread_count, 
     std::vector<std::thread> threads(thread_count * 2 - 1);
     if(alternative_placement) {
         for(unsigned i = 0; i < thread_count; ++i) {
-            threads[i] = std::thread(throughput_producer<Queue>, N, queue.get(), &t0, &barrier);
+            threads[i] = std::thread(throughput_producer<Queue>, N, queue.get(), &t0, &barrier, hw_thread_ids[cpu_idx++]);
             if(i != thread_count - 1) // This thread is the last consumer.
-                threads[thread_count + i] = std::thread(throughput_consumer<Queue>, N, queue.get(), consumer_sums + i, &last_consumer, &t1, &barrier);
+                threads[thread_count + i] = std::thread(throughput_consumer<Queue>, N, queue.get(), consumer_sums + i, &last_consumer, &t1, &barrier, hw_thread_ids[cpu_idx++]);
         }
     } else {
         for(unsigned i = 0; i < thread_count; ++i)
-            threads[i] = std::thread(throughput_producer<Queue>, N, queue.get(), &t0, &barrier);
+            threads[i] = std::thread(throughput_producer<Queue>, N, queue.get(), &t0, &barrier, hw_thread_ids[cpu_idx++]);
         for(unsigned i = 0; i < thread_count - 1; ++i) // This thread is the last consumer.
-            threads[thread_count + i] = std::thread(throughput_consumer<Queue>, N, queue.get(), consumer_sums + i, &last_consumer, &t1, &barrier);
+            threads[thread_count + i] = std::thread(throughput_consumer<Queue>, N, queue.get(), consumer_sums + i, &last_consumer, &t1, &barrier, hw_thread_ids[cpu_idx++]);
     }
 
     barrier.release(thread_count * 2 - 1);
-    throughput_consumer_impl(N, queue.get(), consumer_sums + (thread_count - 1), &last_consumer,
-                             &t1); // Use this thread for the last consumer.
+    throughput_consumer_impl(N, queue.get(), consumer_sums + (thread_count - 1), &last_consumer, &t1); // Use this thread for the last consumer.
 
     for(auto& t : threads)
         t.join();
@@ -164,7 +168,7 @@ uint64_t benchmark_throughput(HugePages& hp, unsigned N, unsigned thread_count, 
 }
 
 template<class Queue>
-void run_throughput_benchmark(char const* name, HugePages& hp, unsigned M, unsigned thread_count_min, unsigned thread_count_max) {
+void run_throughput_benchmark(char const* name, HugePages& hp, std::vector<unsigned> const& hw_thread_ids, unsigned M, unsigned thread_count_min, unsigned thread_count_max) {
     int constexpr RUNS = 3;
     std::vector<sum_t> consumer_sums(thread_count_max);
 
@@ -177,7 +181,7 @@ void run_throughput_benchmark(char const* name, HugePages& hp, unsigned M, unsig
 
             uint64_t min_time = std::numeric_limits<uint64_t>::max();
             for(unsigned run = RUNS; run--;) {
-                uint64_t time = benchmark_throughput<Queue>(hp, N, threads, alternative_placement, consumer_sums.data());
+                uint64_t time = benchmark_throughput<Queue>(hp, hw_thread_ids, N, threads, alternative_placement, consumer_sums.data());
                 min_time = std::min(min_time, time);
 
                 // Calculate the checksum.
@@ -207,65 +211,65 @@ void run_throughput_benchmark(char const* name, HugePages& hp, unsigned M, unsig
 }
 
 template<class Queue>
-void run_throughput_benchmark(char const* name, HugePages& hp, Type<Queue>, unsigned thread_count_min = 1) {
-    unsigned const thread_count_max = std::thread::hardware_concurrency() / 2;
-    run_throughput_benchmark<Queue>(name, hp, 1000000, thread_count_min, thread_count_max);
+void run_throughput_benchmark(char const* name, HugePages& hp, std::vector<unsigned> const& hw_thread_ids, Type<Queue>, unsigned thread_count_min = 1) {
+    unsigned const thread_count_max = hw_thread_ids.size() / 2;
+    run_throughput_benchmark<Queue>(name, hp, hw_thread_ids, 1000000, thread_count_min, thread_count_max);
 }
 
 template<class... Args>
-void run_throughput_spsc_benchmark(char const* name, HugePages& hp, Type<BoostSpScAdapter<boost::lockfree::spsc_queue<Args...>>>) {
+void run_throughput_spsc_benchmark(char const* name, HugePages& hp, std::vector<unsigned> const& hw_thread_ids, Type<BoostSpScAdapter<boost::lockfree::spsc_queue<Args...>>>) {
     using Queue = BoostSpScAdapter<boost::lockfree::spsc_queue<Args...>>;
-    run_throughput_benchmark<Queue>(name, hp, 1000000, 1, 1); // spsc_queue can only handle 1 producer and 1 consumer.
+    run_throughput_benchmark<Queue>(name, hp, hw_thread_ids, 1000000, 1, 1); // spsc_queue can only handle 1 producer and 1 consumer.
 }
 
 template<class Queue>
-void run_throughput_spsc_benchmark(char const* name, HugePages& hp, Type<Queue>) {
-    run_throughput_benchmark<Queue>(name, hp, 1000000, 1, 1); // ReaderWriterQueue can only handle 1 producer and 1 consumer.
+void run_throughput_spsc_benchmark(char const* name, HugePages& hp, std::vector<unsigned> const& hw_thread_ids, Type<Queue>) {
+    run_throughput_benchmark<Queue>(name, hp, hw_thread_ids, 1000000, 1, 1); // ReaderWriterQueue can only handle 1 producer and 1 consumer.
 }
 
-void run_throughput_benchmarks(HugePages& hp) {
+void run_throughput_benchmarks(HugePages& hp, std::vector<unsigned> const& hw_thread_ids) {
     std::printf("---- Running throughput benchmarks (higher is better) ----\n");
 
     int constexpr CAPACITY = 65536;
 
-    run_throughput_spsc_benchmark("boost::lockfree::spsc_queue", hp,
+    run_throughput_spsc_benchmark("boost::lockfree::spsc_queue", hp, hw_thread_ids,
                                   Type<BoostSpScAdapter<boost::lockfree::spsc_queue<unsigned, boost::lockfree::capacity<CAPACITY>>>>{});
-    run_throughput_benchmark("boost::lockfree::queue", hp, Type<BoostQueueAdapter<boost::lockfree::queue<unsigned, boost::lockfree::capacity<CAPACITY - 2>>>>{});
+    run_throughput_benchmark("boost::lockfree::queue", hp, hw_thread_ids, Type<BoostQueueAdapter<boost::lockfree::queue<unsigned, boost::lockfree::capacity<CAPACITY - 2>>>>{});
 
-    run_throughput_benchmark("pthread_spinlock", hp, Type<RetryDecorator<AtomicQueueSpinlock<unsigned, CAPACITY>>>{});
-    // run_throughput_benchmark("FairSpinlock", hp, Type<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, FairSpinlock>>>{});
-    // run_throughput_benchmark("UnfairSpinlock", hp, Type<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, UnfairSpinlock>>>{});
+    run_throughput_benchmark("pthread_spinlock", hp, hw_thread_ids, Type<RetryDecorator<AtomicQueueSpinlock<unsigned, CAPACITY>>>{});
+    // run_throughput_benchmark("FairSpinlock", hp, hw_thread_ids, Type<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, FairSpinlock>>>{});
+    // run_throughput_benchmark("UnfairSpinlock", hp, hw_thread_ids, Type<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, UnfairSpinlock>>>{});
 
-    run_throughput_spsc_benchmark("moodycamel::ReaderWriterQueue", hp, Type<MoodyCamelReaderWriterQueue<unsigned, CAPACITY>>{});
-    run_throughput_benchmark("moodycamel::ConcurrentQueue", hp, Type<MoodyCamelQueue<unsigned, CAPACITY>>{});
+    run_throughput_spsc_benchmark("moodycamel::ReaderWriterQueue", hp, hw_thread_ids, Type<MoodyCamelReaderWriterQueue<unsigned, CAPACITY>>{});
+    run_throughput_benchmark("moodycamel::ConcurrentQueue", hp, hw_thread_ids, Type<MoodyCamelQueue<unsigned, CAPACITY>>{});
 
-    run_throughput_benchmark("tbb::spin_mutex", hp, Type<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, tbb::spin_mutex>>>{});
-    run_throughput_benchmark("tbb::speculative_spin_mutex", hp, Type<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, tbb::speculative_spin_mutex>>>{});
-    run_throughput_benchmark("tbb::concurrent_bounded_queue", hp, Type<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, CAPACITY>>{});
-
-    // Enable MINIMIZE_CONTENTION for 2 or more producers/consumers.
-    run_throughput_spsc_benchmark("AtomicQueue", hp, Type<RetryDecorator<AtomicQueue<unsigned, CAPACITY, 0u, false>>>{});
-    run_throughput_benchmark("AtomicQueue", hp, Type<RetryDecorator<AtomicQueue<unsigned, CAPACITY, 0u, true>>>{}, 2);
-
-    run_throughput_benchmark("AtomicQueueB", hp, Type<RetryDecorator<CapacityToConstructor<AtomicQueueB<unsigned>, CAPACITY>>>{});
+    run_throughput_benchmark("tbb::spin_mutex", hp, hw_thread_ids, Type<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, tbb::spin_mutex>>>{});
+    run_throughput_benchmark("tbb::speculative_spin_mutex", hp, hw_thread_ids, Type<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, tbb::speculative_spin_mutex>>>{});
+    run_throughput_benchmark("tbb::concurrent_bounded_queue", hp, hw_thread_ids, Type<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, CAPACITY>>{});
 
     // Enable MINIMIZE_CONTENTION for 2 or more producers/consumers.
-    run_throughput_spsc_benchmark("OptimistAtomicQueue", hp, Type<AtomicQueue<unsigned, CAPACITY, 0u, false>>{});
-    run_throughput_benchmark("OptimistAtomicQueue", hp, Type<AtomicQueue<unsigned, CAPACITY, 0u, true>>{}, 2);
+    run_throughput_spsc_benchmark("AtomicQueue", hp, hw_thread_ids, Type<RetryDecorator<AtomicQueue<unsigned, CAPACITY, 0u, false>>>{});
+    run_throughput_benchmark("AtomicQueue", hp, hw_thread_ids, Type<RetryDecorator<AtomicQueue<unsigned, CAPACITY, 0u, true>>>{}, 2);
 
-    run_throughput_benchmark("OptimistAtomicQueueB", hp, Type<CapacityToConstructor<AtomicQueueB<unsigned>, CAPACITY>>{});
-
-    // Enable MINIMIZE_CONTENTION for 2 or more producers/consumers.
-    run_throughput_spsc_benchmark("AtomicQueue2", hp, Type<RetryDecorator<AtomicQueue2<unsigned, CAPACITY, false>>>{});
-    run_throughput_benchmark("AtomicQueue2", hp, Type<RetryDecorator<AtomicQueue2<unsigned, CAPACITY, true>>>{}, 2);
-
-    run_throughput_benchmark("AtomicQueueB2", hp, Type<RetryDecorator<CapacityToConstructor<AtomicQueueB2<unsigned>, CAPACITY>>>{});
+    run_throughput_benchmark("AtomicQueueB", hp, hw_thread_ids, Type<RetryDecorator<CapacityToConstructor<AtomicQueueB<unsigned>, CAPACITY>>>{});
 
     // Enable MINIMIZE_CONTENTION for 2 or more producers/consumers.
-    run_throughput_spsc_benchmark("OptimistAtomicQueue2", hp, Type<AtomicQueue2<unsigned, CAPACITY, false>>{});
-    run_throughput_benchmark("OptimistAtomicQueue2", hp, Type<AtomicQueue2<unsigned, CAPACITY, true>>{}, 2);
+    run_throughput_spsc_benchmark("OptimistAtomicQueue", hp, hw_thread_ids, Type<AtomicQueue<unsigned, CAPACITY, 0u, false>>{});
+    run_throughput_benchmark("OptimistAtomicQueue", hp, hw_thread_ids, Type<AtomicQueue<unsigned, CAPACITY, 0u, true>>{}, 2);
 
-    run_throughput_benchmark("OptimistAtomicQueueB2", hp, Type<CapacityToConstructor<AtomicQueueB2<unsigned>, CAPACITY>>{});
+    run_throughput_benchmark("OptimistAtomicQueueB", hp, hw_thread_ids, Type<CapacityToConstructor<AtomicQueueB<unsigned>, CAPACITY>>{});
+
+    // Enable MINIMIZE_CONTENTION for 2 or more producers/consumers.
+    run_throughput_spsc_benchmark("AtomicQueue2", hp, hw_thread_ids, Type<RetryDecorator<AtomicQueue2<unsigned, CAPACITY, false>>>{});
+    run_throughput_benchmark("AtomicQueue2", hp, hw_thread_ids, Type<RetryDecorator<AtomicQueue2<unsigned, CAPACITY, true>>>{}, 2);
+
+    run_throughput_benchmark("AtomicQueueB2", hp, hw_thread_ids, Type<RetryDecorator<CapacityToConstructor<AtomicQueueB2<unsigned>, CAPACITY>>>{});
+
+    // Enable MINIMIZE_CONTENTION for 2 or more producers/consumers.
+    run_throughput_spsc_benchmark("OptimistAtomicQueue2", hp, hw_thread_ids, Type<AtomicQueue2<unsigned, CAPACITY, false>>{});
+    run_throughput_benchmark("OptimistAtomicQueue2", hp, hw_thread_ids, Type<AtomicQueue2<unsigned, CAPACITY, true>>{}, 2);
+
+    run_throughput_benchmark("OptimistAtomicQueueB2", hp, hw_thread_ids, Type<CapacityToConstructor<AtomicQueueB2<unsigned>, CAPACITY>>{});
 
     // run_throughput_benchmark<RetryDecorator<AtomicQueueSpinlockHle<unsigned, CAPACITY>>>("SpinlockHle");
 
@@ -318,15 +322,11 @@ inline std::array<uint64_t, 2> ping_pong_benchmark(unsigned N, HugePages& hp, un
 }
 
 template<class Queue>
-void run_ping_pong_benchmark(char const* name, HugePages& hp) {
+void run_ping_pong_benchmark(char const* name, HugePages& hp, std::vector<unsigned> const& hw_thread_ids) {
     int constexpr N = 100000;
     int constexpr RUNS = 10;
 
-    // Select 2 CPUs on the same core (hyper-threads), if possible.
-    auto cores_and_cpus = sort_by_core_id(get_cpu_topology_info());
-    if(cores_and_cpus.size() < 2)
-        throw std::runtime_error("A CPU with at least 2 hardware threads is required.");
-    unsigned const cpus[2] = {cores_and_cpus[0].hw_thread_id, cores_and_cpus[1].hw_thread_id};
+    unsigned const cpus[2] = {hw_thread_ids[0], hw_thread_ids[1]}; // With HT enabled this selects 2 threads on the same core.
 
     // Select the best of RUNS runs.
     std::array<uint64_t, 2> best_times = {std::numeric_limits<int64_t>::max(), std::numeric_limits<int64_t>::max()};
@@ -348,7 +348,7 @@ void run_ping_pong_benchmark(char const* name, HugePages& hp) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void run_ping_pong_benchmarks(HugePages& hp) {
+void run_ping_pong_benchmarks(HugePages& hp, std::vector<unsigned> const& hw_thread_ids) {
     std::printf("---- Running ping-pong benchmarks (lower is better) ----\n");
 
     // This benchmarks doesn't require queue capacity greater than 1, however, capacity of 1 elides
@@ -356,32 +356,32 @@ void run_ping_pong_benchmarks(HugePages& hp) {
     // preclude aggressive optimizations.
     constexpr unsigned CAPACITY = 8;
 
-    run_ping_pong_benchmark<BoostSpScAdapter<boost::lockfree::spsc_queue<unsigned, boost::lockfree::capacity<CAPACITY>>>>("boost::lockfree::spsc_queue", hp);
-    run_ping_pong_benchmark<BoostQueueAdapter<boost::lockfree::queue<unsigned, boost::lockfree::capacity<CAPACITY>>>>("boost::lockfree::queue", hp);
+    run_ping_pong_benchmark<BoostSpScAdapter<boost::lockfree::spsc_queue<unsigned, boost::lockfree::capacity<CAPACITY>>>>("boost::lockfree::spsc_queue", hp, hw_thread_ids);
+    run_ping_pong_benchmark<BoostQueueAdapter<boost::lockfree::queue<unsigned, boost::lockfree::capacity<CAPACITY>>>>("boost::lockfree::queue", hp, hw_thread_ids);
 
-    run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinlock<unsigned, CAPACITY>>>("pthread_spinlock", hp);
-    // run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, FairSpinlock>>>("FairSpinlock", hp);
-    // run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, UnfairSpinlock>>>("UnfairSpinlock", hp);
+    run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinlock<unsigned, CAPACITY>>>("pthread_spinlock", hp, hw_thread_ids);
+    // run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, FairSpinlock>>>("FairSpinlock", hp, hw_thread_ids);
+    // run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, UnfairSpinlock>>>("UnfairSpinlock", hp, hw_thread_ids);
 
-    run_ping_pong_benchmark<MoodyCamelReaderWriterQueue<unsigned, CAPACITY>>("moodycamel::ReaderWriterQueue", hp);
-    run_ping_pong_benchmark<MoodyCamelQueue<unsigned, CAPACITY>>("moodycamel::ConcurrentQueue", hp);
+    run_ping_pong_benchmark<MoodyCamelReaderWriterQueue<unsigned, CAPACITY>>("moodycamel::ReaderWriterQueue", hp, hw_thread_ids);
+    run_ping_pong_benchmark<MoodyCamelQueue<unsigned, CAPACITY>>("moodycamel::ConcurrentQueue", hp, hw_thread_ids);
 
-    run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, tbb::spin_mutex>>>("tbb::spin_mutex", hp);
-    run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, tbb::speculative_spin_mutex>>>("tbb::speculative_spin_mutex", hp);
-    run_ping_pong_benchmark<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, CAPACITY>>("tbb::concurrent_bounded_queue", hp);
+    run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, tbb::spin_mutex>>>("tbb::spin_mutex", hp, hw_thread_ids);
+    run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, CAPACITY, tbb::speculative_spin_mutex>>>("tbb::speculative_spin_mutex", hp, hw_thread_ids);
+    run_ping_pong_benchmark<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, CAPACITY>>("tbb::concurrent_bounded_queue", hp, hw_thread_ids);
 
     // Use MAXIMIZE_THROUGHPUT=false for better latency.
     using A = std::allocator<unsigned>;
     constexpr bool MT = false; // MAXIMIZE_THROUGHPUT
     constexpr bool MC = true; // MINIMIZE_CONTENTION
-    run_ping_pong_benchmark<RetryDecorator<AtomicQueue<unsigned, CAPACITY, 0u, MC, MT>>>("AtomicQueue", hp);
-    run_ping_pong_benchmark<RetryDecorator<CapacityToConstructor<AtomicQueueB<unsigned, A, 0u, MT>, CAPACITY>>>("AtomicQueueB", hp);
-    run_ping_pong_benchmark<AtomicQueue<unsigned, CAPACITY, 0u, MC, MT>>("OptimistAtomicQueue", hp);
-    run_ping_pong_benchmark<CapacityToConstructor<AtomicQueueB<unsigned, A, 0u, MT>, CAPACITY>>("OptimistAtomicQueueB", hp);
-    run_ping_pong_benchmark<RetryDecorator<AtomicQueue2<unsigned, CAPACITY, MC, MT>>>("AtomicQueue2", hp);
-    run_ping_pong_benchmark<RetryDecorator<CapacityToConstructor<AtomicQueueB2<unsigned, A, MT>, CAPACITY>>>("AtomicQueueB2", hp);
-    run_ping_pong_benchmark<AtomicQueue2<unsigned, CAPACITY, MC, MT>>("OptimistAtomicQueue2", hp);
-    run_ping_pong_benchmark<CapacityToConstructor<AtomicQueueB2<unsigned, A, MT>, CAPACITY>>("OptimistAtomicQueueB2", hp);
+    run_ping_pong_benchmark<RetryDecorator<AtomicQueue<unsigned, CAPACITY, 0u, MC, MT>>>("AtomicQueue", hp, hw_thread_ids);
+    run_ping_pong_benchmark<RetryDecorator<CapacityToConstructor<AtomicQueueB<unsigned, A, 0u, MT>, CAPACITY>>>("AtomicQueueB", hp, hw_thread_ids);
+    run_ping_pong_benchmark<AtomicQueue<unsigned, CAPACITY, 0u, MC, MT>>("OptimistAtomicQueue", hp, hw_thread_ids);
+    run_ping_pong_benchmark<CapacityToConstructor<AtomicQueueB<unsigned, A, 0u, MT>, CAPACITY>>("OptimistAtomicQueueB", hp, hw_thread_ids);
+    run_ping_pong_benchmark<RetryDecorator<AtomicQueue2<unsigned, CAPACITY, MC, MT>>>("AtomicQueue2", hp, hw_thread_ids);
+    run_ping_pong_benchmark<RetryDecorator<CapacityToConstructor<AtomicQueueB2<unsigned, A, MT>, CAPACITY>>>("AtomicQueueB2", hp, hw_thread_ids);
+    run_ping_pong_benchmark<AtomicQueue2<unsigned, CAPACITY, MC, MT>>("OptimistAtomicQueue2", hp, hw_thread_ids);
+    run_ping_pong_benchmark<CapacityToConstructor<AtomicQueueB2<unsigned, A, MT>, CAPACITY>>("OptimistAtomicQueueB2", hp, hw_thread_ids);
 
     // run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinlockHle<unsigned, CAPACITY>>>("SpinlockHle");
 
@@ -400,8 +400,12 @@ int main() {
     size_t constexpr GB = 1024u * 1024 * 1024;
     HugePages hp(HugePages::PAGE_1GB, 1 * GB); // Allocate one 1GB huge page to minimize TLB misses.
 
-    run_throughput_benchmarks(hp);
-    run_ping_pong_benchmarks(hp);
+    auto hw_thread_ids = sort_hw_threads_by_core_id(get_cpu_topology_info());
+    if(hw_thread_ids.size() < 2)
+        throw std::runtime_error("A CPU with at least 2 hardware threads is required.");
+
+    run_throughput_benchmarks(hp, hw_thread_ids);
+    run_ping_pong_benchmarks(hp, hw_thread_ids);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
