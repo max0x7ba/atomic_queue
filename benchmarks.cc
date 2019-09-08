@@ -19,7 +19,6 @@
 #include <clocale>
 #include <cstdint>
 #include <cstdlib>
-#include <future>
 #include <limits>
 #include <stdexcept>
 #include <thread>
@@ -276,9 +275,7 @@ void run_throughput_benchmarks(HugePages& hp) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<class Queue, bool Sender>
-uint64_t ping_pong_thread(Barrier* barrier, Queue* q1, Queue* q2, unsigned N) {
-    barrier->wait();
-
+void ping_pong_thread_impl(Queue* q1, Queue* q2, unsigned N, uint64_t* time) {
     uint64_t t0 = __builtin_ia32_rdtsc();
     for(unsigned i = 1, j = 0; j < N; ++i) {
         if(Sender) {
@@ -291,18 +288,33 @@ uint64_t ping_pong_thread(Barrier* barrier, Queue* q1, Queue* q2, unsigned N) {
     }
     uint64_t t1 = __builtin_ia32_rdtsc();
 
-    return t1 - t0;
+    *time = t1 - t0;
 }
 
 template<class Queue>
-inline std::array<uint64_t, 2> ping_pong_benchmark(unsigned N, HugePages& hp) {
+inline void ping_pong_thread_receiver(Barrier* barrier, Queue* q1, Queue* q2, unsigned N, uint64_t* time, unsigned cpu) {
+    set_thread_affinity(cpu);
+    barrier->wait();
+    ping_pong_thread_impl<Queue, false>(q1, q2, N, time);
+}
+
+template<class Queue>
+inline void ping_pong_thread_sender(Barrier* barrier, Queue* q1, Queue* q2, unsigned N, uint64_t* time, unsigned cpu) {
+    set_thread_affinity(cpu);
+    barrier->release(1);
+    ping_pong_thread_impl<Queue, true>(q1, q2, N, time);
+}
+
+template<class Queue>
+inline std::array<uint64_t, 2> ping_pong_benchmark(unsigned N, HugePages& hp, unsigned const(&cpus)[2]) {
     auto q1 = hp.create_unique_ptr<Queue>();
     auto q2 = hp.create_unique_ptr<Queue>();
     Barrier barrier;
-    auto time1 = std::async(std::launch::async, ping_pong_thread<Queue, false>, &barrier, q1.get(), q2.get(), N);
-    auto time2 = std::async(std::launch::async, ping_pong_thread<Queue, true>, &barrier, q1.get(), q2.get(), N);
-    barrier.release(2);
-    return {time1.get(), time2.get()};
+    std::array<uint64_t, 2> times;
+    std::thread receiver(ping_pong_thread_receiver<Queue>, &barrier, q1.get(), q2.get(), N, &times[0], cpus[1]);
+    ping_pong_thread_sender<Queue>(&barrier, q1.get(), q2.get(), N, &times[1], cpus[0]);
+    receiver.join();
+    return times;
 }
 
 template<class Queue>
@@ -310,10 +322,16 @@ void run_ping_pong_benchmark(char const* name, HugePages& hp) {
     int constexpr N = 100000;
     int constexpr RUNS = 10;
 
+    // Select 2 CPUs on the same core (hyper-threads), if possible.
+    auto cores_and_cpus = sort_by_core_id(get_cpu_topology_info());
+    if(cores_and_cpus.size() < 2)
+        throw std::runtime_error("A CPU with at least 2 hardware threads is required.");
+    unsigned const cpus[2] = {cores_and_cpus[0].hw_thread_id, cores_and_cpus[1].hw_thread_id};
+
     // Select the best of RUNS runs.
     std::array<uint64_t, 2> best_times = {std::numeric_limits<int64_t>::max(), std::numeric_limits<int64_t>::max()};
     for(unsigned run = RUNS; run--;) {
-        auto times = ping_pong_benchmark<Queue>(N, hp);
+        auto times = ping_pong_benchmark<Queue>(N, hp, cpus);
         if(best_times[0] + best_times[1] > times[0] + times[1])
             best_times = times;
 
@@ -379,7 +397,8 @@ void run_ping_pong_benchmarks(HugePages& hp) {
 int main() {
     std::setlocale(LC_NUMERIC, "");
 
-    HugePages hp(HugePages::PAGE_2MB, 8 * (2 * 1024 * 1024)); // 8 x 2MB pages.
+    size_t constexpr GB = 1024u * 1024 * 1024;
+    HugePages hp(HugePages::PAGE_1GB, 1 * GB); // Allocate one 1GB huge page to minimize TLB misses.
 
     run_throughput_benchmarks(hp);
     run_ping_pong_benchmarks(hp);
