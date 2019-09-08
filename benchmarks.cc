@@ -159,14 +159,15 @@ void throughput_consumer_impl(unsigned N, Queue* queue, sum_t* consumer_sum, std
 
 template<class Queue>
 void throughput_consumer(unsigned N, Queue* queue, sum_t* consumer_sum, std::atomic<unsigned>* last_consumer, uint64_t* t1, Barrier* barrier, unsigned cpu) {
-    set_thread_affinity(cpu);
+    // set_thread_affinity(cpu);
+    static_cast<void>(cpu);
     barrier->wait();
     throughput_consumer_impl(N, queue, consumer_sum, last_consumer, t1);
 }
 
 template<class Queue>
 uint64_t benchmark_throughput(HugePages& hp, std::vector<unsigned> const& hw_thread_ids, unsigned N, unsigned thread_count, bool alternative_placement, sum_t* consumer_sums) {
-    set_thread_affinity(hw_thread_ids.back()); // Use this thread for the last consumer.
+    // set_thread_affinity(hw_thread_ids.back()); // Use this thread for the last consumer.
     unsigned cpu_idx = 0;
 
     auto queue = hp.create_unique_ptr<Queue>();
@@ -257,7 +258,7 @@ void run_throughput_spsc_benchmark(char const* name, HugePages& hp, std::vector<
 
 template<class Queue>
 void run_throughput_spsc_benchmark(char const* name, HugePages& hp, std::vector<unsigned> const& hw_thread_ids, Type<Queue>) {
-    run_throughput_benchmark<Queue>(name, hp, hw_thread_ids, 1000000, 1, 1); // ReaderWriterQueue can only handle 1 producer and 1 consumer.
+    run_throughput_benchmark<Queue>(name, hp, hw_thread_ids, 1000000, 1, 1); // Special case for 1 producer and 1 consumer.
 }
 
 void run_throughput_benchmarks(HugePages& hp, std::vector<unsigned> const& hw_thread_ids) {
