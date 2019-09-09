@@ -92,15 +92,33 @@ std::vector<unsigned> atomic_queue::hw_thread_id(std::vector<atomic_queue::CpuTo
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void atomic_queue::set_thread_affinity(unsigned hw_thread_id) {
+namespace {
+
+void set_thread_affinity_(cpu_set_t const& cpuset) {
     // TODO: Investigate whether setting the thread affinity after starting the thread can cause the
     // thread stack to be on a remote NUMA node.
     auto thread = ::pthread_self();
+    if(int err = ::pthread_setaffinity_np(thread, sizeof cpuset, &cpuset))
+        throw std::system_error(err, std::system_category(), "pthread_setaffinity_np");
+}
+
+} // namespace
+
+void atomic_queue::set_thread_affinity(unsigned hw_thread_id) {
+    // TODO: Investigate whether setting the thread affinity after starting the thread can cause the
+    // thread stack to be on a remote NUMA node.
     cpu_set_t cpuset;
     CPU_ZERO(&cpuset);
     CPU_SET(hw_thread_id, &cpuset);
-    if(int err = ::pthread_setaffinity_np(thread, sizeof cpuset, &cpuset))
-        throw std::system_error(err, std::system_category(), "pthread_setaffinity_np");
+    set_thread_affinity_(cpuset);
+}
+
+void atomic_queue::reset_thread_affinity() {
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    for(unsigned i = 0, j = std::thread::hardware_concurrency(); i < j; ++i)
+        CPU_SET(i, &cpuset);
+    set_thread_affinity_(cpuset);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
