@@ -126,7 +126,8 @@ struct QueueTypes {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<class Queue>
-void throughput_producer(unsigned N, Queue* queue, std::atomic<uint64_t>* t0, Barrier* barrier) {
+void throughput_producer(unsigned N, Queue* queue, std::atomic<uint64_t>* t0, Barrier* barrier, unsigned cpu) {
+    set_thread_affinity(cpu);
     barrier->wait();
 
     atomic_thread_fence(std::memory_order_seq_cst);
@@ -137,12 +138,6 @@ void throughput_producer(unsigned N, Queue* queue, std::atomic<uint64_t>* t0, Ba
 
     for(unsigned n = 1, stop = N + 1; n <= stop; ++n)
         queue->push(n);
-}
-
-template<class Queue>
-void throughput_producer_affinity(unsigned N, Queue* queue, std::atomic<uint64_t>* t0, Barrier* barrier, unsigned cpu) {
-    set_thread_affinity(cpu);
-    throughput_producer(N, queue, t0, barrier);
 }
 
 template<class Queue>
@@ -170,16 +165,16 @@ void throughput_consumer_impl(unsigned N, Queue* queue, sum_t* consumer_sum, std
 }
 
 template<class Queue>
-void throughput_consumer(unsigned N, Queue* queue, sum_t* consumer_sum, std::atomic<unsigned>* last_consumer, uint64_t* t1, Barrier* barrier) {
+void throughput_consumer(unsigned N, Queue* queue, sum_t* consumer_sum, std::atomic<unsigned>* last_consumer, uint64_t* t1, Barrier* barrier, unsigned cpu) {
+    set_thread_affinity(cpu);
     barrier->wait();
     throughput_consumer_impl(N, queue, consumer_sum, last_consumer, t1);
 }
 
 template<class Queue>
-uint64_t benchmark_throughput(HugePages& hp, std::vector<unsigned> const& hw_thread_ids, unsigned N, unsigned thread_count, bool alternative_placement,
-                              sum_t* consumer_sums) {
-    if(thread_count == 1 && alternative_placement) // Force HT, if enabled.
-        set_thread_affinity(hw_thread_ids[1]); // Use this thread for the last consumer.
+uint64_t benchmark_throughput(HugePages& hp, std::vector<unsigned> const& hw_thread_ids, unsigned N, unsigned thread_count, bool alternative_placement, sum_t* consumer_sums) {
+    set_thread_affinity(hw_thread_ids.back()); // Use this thread for the last consumer.
+    unsigned cpu_idx = 0;
 
     auto queue = hp.create_unique_ptr<Queue>();
     std::atomic<uint64_t> t0{0};
@@ -189,19 +184,16 @@ uint64_t benchmark_throughput(HugePages& hp, std::vector<unsigned> const& hw_thr
     Barrier barrier;
     std::vector<std::thread> threads(thread_count * 2 - 1);
     if(alternative_placement) {
-        if(thread_count == 1) { // Force HT, if enabled.
-            threads[0] = std::thread(throughput_producer_affinity<Queue>, N, queue.get(), &t0, &barrier, hw_thread_ids[0]);
-        }
-        else for(unsigned i = 0; i < thread_count; ++i) {
-            threads[i] = std::thread(throughput_producer<Queue>, N, queue.get(), &t0, &barrier);
+        for(unsigned i = 0; i < thread_count; ++i) {
+            threads[i] = std::thread(throughput_producer<Queue>, N, queue.get(), &t0, &barrier, hw_thread_ids[cpu_idx++]);
             if(i != thread_count - 1) // This thread is the last consumer.
-                threads[thread_count + i] = std::thread(throughput_consumer<Queue>, N, queue.get(), consumer_sums + i, &last_consumer, &t1, &barrier);
+                threads[thread_count + i] = std::thread(throughput_consumer<Queue>, N, queue.get(), consumer_sums + i, &last_consumer, &t1, &barrier, hw_thread_ids[cpu_idx++]);
         }
     } else {
         for(unsigned i = 0; i < thread_count; ++i)
-            threads[i] = std::thread(throughput_producer<Queue>, N, queue.get(), &t0, &barrier);
+            threads[i] = std::thread(throughput_producer<Queue>, N, queue.get(), &t0, &barrier, hw_thread_ids[cpu_idx++]);
         for(unsigned i = 0; i < thread_count - 1; ++i) // This thread is the last consumer.
-            threads[thread_count + i] = std::thread(throughput_consumer<Queue>, N, queue.get(), consumer_sums + i, &last_consumer, &t1, &barrier);
+            threads[thread_count + i] = std::thread(throughput_consumer<Queue>, N, queue.get(), consumer_sums + i, &last_consumer, &t1, &barrier, hw_thread_ids[cpu_idx++]);
     }
 
     barrier.release(thread_count * 2 - 1);
@@ -210,8 +202,7 @@ uint64_t benchmark_throughput(HugePages& hp, std::vector<unsigned> const& hw_thr
     for(auto& t : threads)
         t.join();
 
-    if(thread_count == 1 && alternative_placement)
-        reset_thread_affinity();
+    reset_thread_affinity();
 
     return t1 - t0.load(std::memory_order_relaxed);
 }
@@ -281,7 +272,7 @@ void run_throughput_spsc_benchmark(char const* name, HugePages& hp, std::vector<
 }
 
 void run_throughput_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const& cpu_topology) {
-    auto hw_thread_ids = hw_thread_id(sort_by_core_id(cpu_topology)); // Cores 0 and 1 are HT if HT is enabled. Otherwise, the same socket.
+    auto hw_thread_ids = hw_thread_id(sort_by_hw_thread_id(cpu_topology)); // Disable HT, same socket.
 
     std::printf("---- Running throughput benchmarks (higher is better) ----\n");
 
@@ -390,12 +381,7 @@ void run_ping_pong_benchmark(char const* name, HugePages& hp, std::vector<unsign
     int constexpr N = 100000;
     int constexpr RUNS = 10;
 
-    // With HT enabled this selects 2 threads on the same core.
-    // With multiple CPU sockets this select 2 threads in the same socket.
     unsigned const cpus[2] = {hw_thread_ids[0], hw_thread_ids[1]};
-    // The last CPUs are least likely to be busy.
-    // unsigned const cpu_count = hw_thread_ids.size();
-    // unsigned const cpus[2] = {hw_thread_ids[cpu_count - 2], hw_thread_ids[cpu_count - 1]};
 
     // select the best of RUNS runs.
     std::array<uint64_t, 2> best_times = {std::numeric_limits<int64_t>::max(), std::numeric_limits<int64_t>::max()};
@@ -415,8 +401,7 @@ void run_ping_pong_benchmark(char const* name, HugePages& hp, std::vector<unsign
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void run_ping_pong_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const& cpu_topology) {
-    auto hw_thread_ids = hw_thread_id(sort_by_core_id(cpu_topology)); // Cores 0 and 1 are HT if HT is enabled. Otherwise, same socket.
-    // auto hw_thread_ids2 = hw_thread_id(sort_by_hw_thread_id(cpu_topology)); // Disable HT, same socket.
+    auto hw_thread_ids = hw_thread_id(sort_by_hw_thread_id(cpu_topology)); // Disable HT, same socket.
 
     std::printf("---- Running ping-pong benchmarks (lower is better) ----\n");
 
