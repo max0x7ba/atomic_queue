@@ -75,12 +75,19 @@ std::vector<atomic_queue::CpuTopologyInfo> atomic_queue::sort_by_core_id(std::ve
     return u;
 }
 
-std::vector<unsigned> atomic_queue::sort_hw_threads_by_core_id(std::vector<atomic_queue::CpuTopologyInfo> const& v) {
-    auto u = sort_by_core_id(v);
-    std::vector<unsigned> w(u.size());
+std::vector<atomic_queue::CpuTopologyInfo> atomic_queue::sort_by_hw_thread_id(std::vector<atomic_queue::CpuTopologyInfo> const& v) {
+    auto u = v;
+    std::sort(u.begin(), u.end(), [](auto& a, auto& b) {
+        return a.hw_thread_id < b.hw_thread_id;
+    });
+    return u;
+}
+
+std::vector<unsigned> atomic_queue::hw_thread_id(std::vector<atomic_queue::CpuTopologyInfo> const& v) {
+    std::vector<unsigned> u(v.size());
     for(unsigned i = 0, j = u.size(); i < j; ++i)
-        w[i] = u[i].hw_thread_id;
-    return w;
+        u[i] = v[i].hw_thread_id;
+    return u;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

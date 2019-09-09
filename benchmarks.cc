@@ -166,7 +166,7 @@ void throughput_consumer_impl(unsigned N, Queue* queue, sum_t* consumer_sum, std
 
 template<class Queue>
 void throughput_consumer(unsigned N, Queue* queue, sum_t* consumer_sum, std::atomic<unsigned>* last_consumer, uint64_t* t1, Barrier* barrier, unsigned cpu) {
-    // set_thread_affinity(cpu);
+    set_thread_affinity(cpu);
     static_cast<void>(cpu);
     barrier->wait();
     throughput_consumer_impl(N, queue, consumer_sum, last_consumer, t1);
@@ -174,7 +174,7 @@ void throughput_consumer(unsigned N, Queue* queue, sum_t* consumer_sum, std::ato
 
 template<class Queue>
 uint64_t benchmark_throughput(HugePages& hp, std::vector<unsigned> const& hw_thread_ids, unsigned N, unsigned thread_count, bool alternative_placement, sum_t* consumer_sums) {
-    // set_thread_affinity(hw_thread_ids.back()); // Use this thread for the last consumer.
+    set_thread_affinity(hw_thread_ids.back()); // Use this thread for the last consumer.
     unsigned cpu_idx = 0;
 
     auto queue = hp.create_unique_ptr<Queue>();
@@ -268,7 +268,9 @@ void run_throughput_spsc_benchmark(char const* name, HugePages& hp, std::vector<
     run_throughput_benchmark<Queue>(name, hp, hw_thread_ids, 1000000, 1, 1); // Special case for 1 producer and 1 consumer.
 }
 
-void run_throughput_benchmarks(HugePages& hp, std::vector<unsigned> const& hw_thread_ids) {
+void run_throughput_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const& cpu_topology) {
+    auto hw_thread_ids = hw_thread_id(sort_by_hw_thread_id(cpu_topology));
+
     std::printf("---- Running throughput benchmarks (higher is better) ----\n");
 
     int constexpr SIZE = 65536;
@@ -398,7 +400,9 @@ void run_ping_pong_benchmark(char const* name, HugePages& hp, std::vector<unsign
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void run_ping_pong_benchmarks(HugePages& hp, std::vector<unsigned> const& hw_thread_ids) {
+void run_ping_pong_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const& cpu_topology) {
+    auto hw_thread_ids = hw_thread_id(sort_by_core_id(cpu_topology));
+
     std::printf("---- Running ping-pong benchmarks (lower is better) ----\n");
 
     // This benchmarks doesn't require queue capacity greater than 1, however, capacity of 1 elides
@@ -446,16 +450,16 @@ void run_ping_pong_benchmarks(HugePages& hp, std::vector<unsigned> const& hw_thr
 int main() {
     std::setlocale(LC_NUMERIC, "");
 
+    auto cpu_topology = get_cpu_topology_info();
+    if(cpu_topology.size() < 2)
+        throw std::runtime_error("A CPU with at least 2 hardware threads is required.");
+
     size_t constexpr MB = 1024 * 1024;
     HugePages hp(HugePages::PAGE_1GB, 32 * MB); // Try allocating 1GB huge page to minimize TLB misses.
     HugePageAllocatorBase::hp = &hp;
 
-    auto hw_thread_ids = sort_hw_threads_by_core_id(get_cpu_topology_info());
-    if(hw_thread_ids.size() < 2)
-        throw std::runtime_error("A CPU with at least 2 hardware threads is required.");
-
-    run_throughput_benchmarks(hp, hw_thread_ids);
-    run_ping_pong_benchmarks(hp, hw_thread_ids);
+    run_throughput_benchmarks(hp, cpu_topology);
+    run_ping_pong_benchmarks(hp, cpu_topology);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

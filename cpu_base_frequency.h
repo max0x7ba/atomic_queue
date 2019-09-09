@@ -22,9 +22,11 @@ struct CpuTopologyInfo {
     unsigned hw_thread_id;
 };
 std::vector<CpuTopologyInfo> get_cpu_topology_info();
-std::vector<CpuTopologyInfo> sort_by_core_id(std::vector<CpuTopologyInfo> const&);
 
-std::vector<unsigned> sort_hw_threads_by_core_id(std::vector<CpuTopologyInfo> const&);
+std::vector<CpuTopologyInfo> sort_by_core_id(std::vector<CpuTopologyInfo> const&);
+std::vector<CpuTopologyInfo> sort_by_hw_thread_id(std::vector<CpuTopologyInfo> const&);
+
+std::vector<unsigned> hw_thread_id(std::vector<CpuTopologyInfo> const&);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
