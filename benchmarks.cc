@@ -363,7 +363,12 @@ void run_ping_pong_benchmark(char const* name, HugePages& hp, std::vector<unsign
     int constexpr N = 100000;
     int constexpr RUNS = 10;
 
-    unsigned const cpus[2] = {hw_thread_ids[0], hw_thread_ids[1]}; // With HT enabled this selects 2 threads on the same core.
+    // With HT enabled this selects 2 threads on the same core.
+    // With multiple CPU sockets this select 2 threads in the same socket.
+    // The last CPUs are least likely to be busy.
+    unsigned const cpu_count = hw_thread_ids.size();
+    unsigned const cpus[2] = {hw_thread_ids[cpu_count - 2], hw_thread_ids[cpu_count - 1]};
+    // unsigned const cpus[2] = {hw_thread_ids[0], hw_thread_ids[1]};
 
     // Select the best of RUNS runs.
     std::array<uint64_t, 2> best_times = {std::numeric_limits<int64_t>::max(), std::numeric_limits<int64_t>::max()};
@@ -430,8 +435,8 @@ void run_ping_pong_benchmarks(HugePages& hp, std::vector<unsigned> const& hw_thr
 int main() {
     std::setlocale(LC_NUMERIC, "");
 
-    size_t constexpr GB = 1024u * 1024 * 1024;
-    HugePages hp(HugePages::PAGE_1GB, 1 * GB); // Allocate one 1GB huge page to minimize TLB misses.
+    size_t constexpr MB = 1024 * 1024;
+    HugePages hp(HugePages::PAGE_1GB, 32 * MB); // Try allocating 1GB huge page to minimize TLB misses.
     HugePageAllocatorBase::hp = &hp;
 
     auto hw_thread_ids = sort_hw_threads_by_core_id(get_cpu_topology_info());

@@ -5,25 +5,23 @@
 #include "cpu_base_frequency.h"
 
 #include <fstream>
-#include <stdexcept>
 #include <tuple>
 #include <regex>
 #include <string>
 #include <thread>
+#include <system_error>
 
 #include <pthread.h>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 double atomic_queue::cpu_base_frequency() {
-    std::regex re("model name\\s*:[^@]+@\\s*([0-9.]+)\\s*GHz");
+    std::regex const re("model name\\s*:[^@]+@\\s*([0-9.]+)\\s*GHz");
     std::ifstream cpuinfo("/proc/cpuinfo");
     std::smatch m;
-    for(std::string line; getline(cpuinfo, line);) {
-        regex_match(line, m, re);
-        if(m.size() == 2)
+    for(std::string line; getline(cpuinfo, line);)
+        if(regex_match(line, m, re))
             return std::stod(m[1]);
-    }
     return 1; // Fallback to cycles, should it fail to parse.
 }
 
@@ -32,22 +30,35 @@ double atomic_queue::cpu_base_frequency() {
 std::vector<atomic_queue::CpuTopologyInfo> atomic_queue::get_cpu_topology_info() {
     std::vector<CpuTopologyInfo> r;
 
-    std::regex res[2] = {
-        std::regex("processor\\s+:\\s+([0-9]+)"),
-        std::regex("core id\\s+:\\s+([0-9]+)")
+    unsigned constexpr M = 3;
+    using MemberPtr = unsigned CpuTopologyInfo::*;
+    MemberPtr const member_ptrs[M] = {
+        &CpuTopologyInfo::socket_id,
+        &CpuTopologyInfo::core_id,
+        &CpuTopologyInfo::hw_thread_id
     };
+    std::regex const res[M] = {
+        std::regex("physical id\\s+:\\s+([0-9]+)"),
+        std::regex("core id\\s+:\\s+([0-9]+)"),
+        std::regex("processor\\s+:\\s+([0-9]+)")
+    };
+
     std::ifstream cpuinfo("/proc/cpuinfo");
     std::smatch m;
-    unsigned re_idx = 0;
-    unsigned values[2];
+    CpuTopologyInfo element;
+    unsigned valid_members = 0;
     for(std::string line; getline(cpuinfo, line);) {
-        regex_match(line, m, res[re_idx]);
-        if(m.size() != 2)
-            continue;
-        values[re_idx] = std::stoul(m[1]);
-        re_idx ^= 1;
-        if(!re_idx)
-            r.push_back(CpuTopologyInfo{values[0], values[1]});
+        for(unsigned i = 0, mask = 1; i < M; ++i, mask <<= 1) {
+            if(valid_members & mask || !regex_match(line, m, res[i]))
+                continue;
+            (element.*member_ptrs[i]) = std::stoul(m[1]);
+            valid_members |= mask;
+            if(valid_members == ((1u << M) - 1)) {
+                r.push_back(element);
+                valid_members = 0;
+            }
+            break;
+        }
     }
 
     if(std::thread::hardware_concurrency() != r.size())
@@ -58,7 +69,9 @@ std::vector<atomic_queue::CpuTopologyInfo> atomic_queue::get_cpu_topology_info()
 
 std::vector<atomic_queue::CpuTopologyInfo> atomic_queue::sort_by_core_id(std::vector<atomic_queue::CpuTopologyInfo> const& v) {
     auto u = v;
-    std::sort(u.begin(), u.end(), [](auto& a, auto& b) { return std::tie(a.core_id, a.hw_thread_id) < std::tie(b.core_id, b.hw_thread_id); });
+    std::sort(u.begin(), u.end(), [](auto& a, auto& b) {
+        return std::tie(a.socket_id, a.core_id, a.hw_thread_id) < std::tie(b.socket_id, b.core_id, b.hw_thread_id);
+    });
     return u;
 }
 

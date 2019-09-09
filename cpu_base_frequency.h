@@ -17,8 +17,9 @@ double cpu_base_frequency();
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct CpuTopologyInfo {
-    unsigned hw_thread_id;
+    unsigned socket_id;
     unsigned core_id;
+    unsigned hw_thread_id;
 };
 std::vector<CpuTopologyInfo> get_cpu_topology_info();
 std::vector<CpuTopologyInfo> sort_by_core_id(std::vector<CpuTopologyInfo> const&);

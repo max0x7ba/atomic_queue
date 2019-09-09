@@ -27,7 +27,7 @@ public:
         }
     };
 
-    enum Type { PAGE_2MB = 21, PAGE_1GB = 30 };
+    enum Type { PAGE_DEFAULT = 0, PAGE_2MB = 21, PAGE_1GB = 30 };
 
     HugePages(Type t, size_t total_size);
     ~HugePages() noexcept;
