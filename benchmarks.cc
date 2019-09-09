@@ -130,8 +130,6 @@ void throughput_producer(unsigned N, Queue* queue, std::atomic<uint64_t>* t0, Ba
     set_thread_affinity(cpu);
     barrier->wait();
 
-    atomic_thread_fence(std::memory_order_seq_cst);
-
     // The first producer saves the start time.
     uint64_t expected = 0;
     t0->compare_exchange_strong(expected, __builtin_ia32_rdtsc(), std::memory_order_acq_rel, std::memory_order_relaxed);
@@ -142,8 +140,6 @@ void throughput_producer(unsigned N, Queue* queue, std::atomic<uint64_t>* t0, Ba
 
 template<class Queue>
 void throughput_consumer_impl(unsigned N, Queue* queue, sum_t* consumer_sum, std::atomic<unsigned>* last_consumer, uint64_t* t1) {
-    atomic_thread_fence(std::memory_order_seq_cst);
-
     unsigned const stop = N + 1;
     sum_t sum = 0;
 
@@ -153,8 +149,6 @@ void throughput_consumer_impl(unsigned N, Queue* queue, sum_t* consumer_sum, std
             break;
         sum += n;
     }
-
-    atomic_thread_fence(std::memory_order_seq_cst);
 
     // The last consumer saves the end time.
     auto t = __builtin_ia32_rdtsc();
@@ -331,9 +325,7 @@ void run_throughput_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const
 
 template<class Queue, bool Sender>
 void ping_pong_thread_impl(Queue* q1, Queue* q2, unsigned N, uint64_t* time) {
-    atomic_thread_fence(std::memory_order_seq_cst);
     uint64_t t0 = __builtin_ia32_rdtsc();
-
     for(unsigned i = 1, j = 0; j < N; ++i) {
         if(Sender) {
             q1->push(i);
@@ -343,10 +335,7 @@ void ping_pong_thread_impl(Queue* q1, Queue* q2, unsigned N, uint64_t* time) {
             q2->push(i);
         }
     }
-
-    atomic_thread_fence(std::memory_order_seq_cst);
     uint64_t t1 = __builtin_ia32_rdtsc();
-
     *time = t1 - t0;
 }
 
