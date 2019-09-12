@@ -97,7 +97,7 @@ $(function() {
             },
             title: { text: 'Latency on ' + title_suffix },
             xAxis: { categories: categories },
-            yAxis: { title: { text: 'latency, nanoseconds/round-trip' }, max: 700 },
+            yAxis: { title: { text: 'latency, nanoseconds/round-trip' }, max: 1000 },
             tooltip: { valueSuffix: ' nanoseconds' },
             series: series
         });
