@@ -53,6 +53,8 @@ Highcharts.theme = {
     },
     tooltip: {
         backgroundColor: 'rgba(0, 0, 0, 0.85)',
+        borderWidth: 1,
+        borderColor: 'white',
         style: {
             color: '#F0F0F0'
         }
