@@ -81,6 +81,9 @@ The containers use `unsigned` type for size and internal indexes. On x86-64 plat
 
 I only have access to a few x86-64 machines. If you have access to different hardware feel free to submit the output file of `scripts/run-benchmarks.sh` and I will include your results into the benchmarks page.
 
+### Hyper-Threading
+When hyper-threading is enabled, single-producer-single-consumer benchmarks produce unrealistically great results if both the producer and consumer threads happen to get scheduled on the hyper-threads of the same core, due to L1d cache being shared between the cores. Such a thread placement, however, is undesirable in production scenarios because in CPU-bound workloads the two hyper-threads speedup is around 1.3x, whereas two non-hyper-threads speedup is 2x. For this reason the benchmarks pin threads to specific cores to avoid placing producers and consumers on the hyper-threads of the same core. Hyper-threads are still used in the benchmarks, but only when the number of producer and consumer threads is greater than the number of available non-hyper-threads.
+
 ## Throughput and scalability benchmark
 N producer threads push a 4-byte integer into one queue, N consumer threads pop the integers from the queue. All producers posts 1,000,000 messages in total. Total time to send and receive all the messages is measured. The benchmark is run for from 1 producer and 1 consumer up to `(total-number-of-cpus / 2)` producers/consumers to measure the scalabilty of different queues. Different thread placements are tried to make sure the benchmark doesn't run into unexpected adverse scheduler or NUMA effects.
 

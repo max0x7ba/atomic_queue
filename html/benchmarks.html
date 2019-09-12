@@ -15,6 +15,7 @@
     <link rel="stylesheet" href="benchmarks.css">
     <script src="https://code.jquery.com/jquery-3.4.1.slim.min.js" integrity="sha256-pasqAKBDmFT4eHoN2ndd6lN370kFiGUFyTiUHWhU7k8=" crossorigin="anonymous"></script>
     <script src="https://code.highcharts.com/highcharts.js"></script>
+    <script src="https://code.highcharts.com/modules/pattern-fill.js"></script>
     <script src="theme.js"></script>
     <script src="benchmarks.js"></script>
     <meta charset="utf-8">
@@ -35,7 +36,7 @@
     <ul>
       <li>OS: Ubuntu-18.04.02 LTS
       <li>Compiler: gcc-8.3.0
-      <li>atomic_queue version: commit 73c04046bfb576221fe6f48a9fd071f8c7f65155
+      <li>atomic_queue version: commit e2c53cc932a8f426b2e4f0015c7fb90104ffb929
       <li>Boost version: 1.65.1
       <li>TBB version: 2019_U7, commit 4233fef583b4f8cbf9f781311717600feaaa0694
       <li>moodycamel concurrentqueue version: commit dea078cf5b6e742cd67a0d725e36f872feca4de4
@@ -45,12 +46,14 @@
     <ul>
       <li>OS: Red Hat Enterprise Linux Server release 6.10 (Santiago)
       <li>Compiler: gcc-5.4.0
-      <li>atomic_queue version: commit 73c04046bfb576221fe6f48a9fd071f8c7f65155
+      <li>atomic_queue version: commit e2c53cc932a8f426b2e4f0015c7fb90104ffb929
       <li>Boost version: 1.61.0
       <li>TBB version: 2019_U7, commit 4233fef583b4f8cbf9f781311717600feaaa0694
       <li>moodycamel concurrentqueue version: commit dea078cf5b6e742cd67a0d725e36f872feca4de4
       <li>moodycamel readerwriterqueue version: commit 2ae710de996a1d02bbc7696b2cdff2c6078e76f8
     </ul>
+    <h3>Hyper-Threading</h3>
+<p>When hyper-threading is enabled, single-producer-single-consumer benchmarks produce unrealistically great results if both the producer and consumer threads happen to get scheduled on the hyper-threads of the same core, due to L1d cache being shared between the cores. Such a thread placement, however, is undesirable in production scenarios because in CPU-bound workloads the two hyper-threads speedup is around 1.3x, whereas two non-hyper-threads speedup is 2x. For this reason the benchmarks pin threads to specific cores to avoid placing producers and consumers on the hyper-threads of the same core. Hyper-threads are still used in the benchmarks, but only when the number of producer and consumer threads is greater than the number of available non-hyper-threads.</p>
     <h3>Source Code</h3>
     <p><a href="https://github.com/max0x7ba/atomic_queue">github.com/max0x7ba/atomic_queue</a></p>
     <p class="copyright">Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file LICENSE.</p>
