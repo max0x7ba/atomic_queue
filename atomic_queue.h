@@ -248,7 +248,7 @@ public:
     using value_type = T;
 
     AtomicQueue() noexcept {
-        assert(std::atomic<T>{NIL}.is_lock_free());
+        assert(std::atomic<T>{NIL}.is_lock_free()); // This queue is for atomic elements only. AtomicQueue2 is for non-atomic ones.
         if(T{} != NIL)
             for(auto& element : elements_)
                 element.store(NIL, X);
@@ -370,7 +370,7 @@ public:
     AtomicQueueB(unsigned size)
         : size_(std::max(details::round_up_to_power_of_2(size), 1u << (SHUFFLE_BITS * 2)))
         , elements_(AllocatorElements::allocate(size_)) {
-        assert(std::atomic<T>{NIL}.is_lock_free());
+        assert(std::atomic<T>{NIL}.is_lock_free()); // This queue is for atomic elements only. AtomicQueueB2 is for non-atomic ones.
         for(auto p = elements_, q = elements_ + size_; p < q; ++p)
             p->store(NIL, X);
     }

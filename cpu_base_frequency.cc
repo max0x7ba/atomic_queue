@@ -28,7 +28,7 @@ double atomic_queue::cpu_base_frequency() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 std::vector<atomic_queue::CpuTopologyInfo> atomic_queue::get_cpu_topology_info() {
-    std::vector<CpuTopologyInfo> r;
+    std::vector<CpuTopologyInfo> cpus;
 
     unsigned constexpr M = 3;
     using MemberPtr = unsigned CpuTopologyInfo::*;
@@ -54,17 +54,17 @@ std::vector<atomic_queue::CpuTopologyInfo> atomic_queue::get_cpu_topology_info()
             (element.*member_ptrs[i]) = std::stoul(m[1]);
             valid_members |= mask;
             if(valid_members == ((1u << M) - 1)) {
-                r.push_back(element);
+                cpus.push_back(element);
                 valid_members = 0;
             }
             break;
         }
     }
 
-    if(std::thread::hardware_concurrency() != r.size())
+    if(std::thread::hardware_concurrency() != cpus.size())
         throw std::runtime_error("get_cpu_topology_info() invariant broken.");
 
-    return r;
+    return sort_by_hw_thread_id(cpus);
 }
 
 std::vector<atomic_queue::CpuTopologyInfo> atomic_queue::sort_by_core_id(std::vector<atomic_queue::CpuTopologyInfo> const& v) {

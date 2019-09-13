@@ -18,6 +18,10 @@ class HugePages {
     unsigned char* beg_;
 
 public:
+    using WarnFn = void();
+    static WarnFn* warn_no_1GB_pages;
+    static WarnFn* warn_no_2MB_pages;
+
     struct Deleter {
         HugePages* hp_;
 
@@ -123,10 +127,10 @@ struct HugePageAllocatorBase {
 template<class T>
 struct HugePageAllocator : HugePageAllocatorBase
 {
-    static bool constexpr is_always_equal = false;
-    static bool constexpr propagate_on_container_copy_assignment = true;
-    static bool constexpr propagate_on_container_move_assignment = true;
-    static bool constexpr propagate_on_container_swap = true;
+    // static bool constexpr is_always_equal = false;
+    // static bool constexpr propagate_on_container_copy_assignment = true;
+    // static bool constexpr propagate_on_container_move_assignment = true;
+    // static bool constexpr propagate_on_container_swap = true;
 
     template<class U> struct rebind { using other = HugePageAllocator<U>; };
 

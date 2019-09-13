@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <clocale>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <limits>
 #include <stdexcept>
@@ -112,11 +113,13 @@ template<unsigned SIZE, bool MINIMIZE_CONTENTION, bool MAXIMIZE_THROUGHPUT>
 struct QueueTypes {
     using T = unsigned;
 
+    // For atomic elements only.
     using AtomicQueue =                                Type<RetryDecorator<atomic_queue::AtomicQueue<T, SIZE,  T{}, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT>>>;
     using OptimistAtomicQueue =                                       Type<atomic_queue::AtomicQueue<T, SIZE,  T{}, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT>>;
     using AtomicQueueB =        Type<RetryDecorator<CapacityToConstructor<atomic_queue::AtomicQueueB<T, Allocator, T{}, MAXIMIZE_THROUGHPUT>, SIZE>>>;
     using OptimistAtomicQueueB =               Type<CapacityToConstructor<atomic_queue::AtomicQueueB<T, Allocator, T{}, MAXIMIZE_THROUGHPUT>, SIZE>>;
 
+    // For non-atomic elements.
     using AtomicQueue2 =                         Type<RetryDecorator<atomic_queue::AtomicQueue2<T, SIZE, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT>>>;
     using OptimistAtomicQueue2 =                                Type<atomic_queue::AtomicQueue2<T, SIZE, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT>>;
     using AtomicQueueB2 = Type<RetryDecorator<CapacityToConstructor<atomic_queue::AtomicQueueB2<T, Allocator, MAXIMIZE_THROUGHPUT>, SIZE>>>;
@@ -266,7 +269,7 @@ void run_throughput_spsc_benchmark(char const* name, HugePages& hp, std::vector<
 }
 
 void run_throughput_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const& cpu_topology) {
-    auto hw_thread_ids = hw_thread_id(sort_by_hw_thread_id(cpu_topology)); // Disable HT, same socket.
+    auto hw_thread_ids = hw_thread_id(cpu_topology); // Sorted by hw_thread_id: avoid HT, same socket.
 
     std::printf("---- Running throughput benchmarks (higher is better) ----\n");
 
@@ -390,7 +393,7 @@ void run_ping_pong_benchmark(char const* name, HugePages& hp, std::vector<unsign
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void run_ping_pong_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const& cpu_topology) {
-    auto hw_thread_ids = hw_thread_id(sort_by_hw_thread_id(cpu_topology)); // Disable HT, same socket.
+    auto hw_thread_ids = hw_thread_id(cpu_topology); // Sorted by hw_thread_id: avoid HT, same socket.
 
     std::printf("---- Running ping-pong benchmarks (lower is better) ----\n");
 
@@ -434,6 +437,16 @@ void run_ping_pong_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const&
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+void advise_hugeadm_1GB() {
+    std::fprintf(stderr, "Warning: Failed to allocate 1GB huge pages. Run \"sudo hugeadm --pool-pages-min 1GB:1 --pool-pages-max 1GB:1\".\n");
+}
+
+void advise_hugeadm_2MB() {
+    std::fprintf(stderr, "Warning: Failed to allocate 2MB huge pages. Run \"sudo hugeadm --pool-pages-min 2MB:16 --pool-pages-max 2MB:16\".\n");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 } // namespace
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -445,8 +458,10 @@ int main() {
     if(cpu_topology.size() < 2)
         throw std::runtime_error("A CPU with at least 2 hardware threads is required.");
 
+    HugePages::warn_no_1GB_pages = advise_hugeadm_1GB;
+    HugePages::warn_no_2MB_pages = advise_hugeadm_2MB;
     size_t constexpr MB = 1024 * 1024;
-    HugePages hp(HugePages::PAGE_1GB, 32 * MB); // Try allocating 1GB huge page to minimize TLB misses.
+    HugePages hp(HugePages::PAGE_1GB, 32 * MB); // Try allocating a 1GB huge page to minimize TLB misses.
     HugePageAllocatorBase::hp = &hp;
 
     run_throughput_benchmarks(hp, cpu_topology);
