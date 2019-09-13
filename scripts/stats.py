@@ -38,4 +38,4 @@ for benchmark in ['msg/sec', 'sec/round-trip']:
             continue
         d = stats.describe(runs)
         desc = fmt[benchmark](d, benchmark)
-        print("{:>32s}: {}".format(queue, desc))
+        print("{:>40s}: {}".format(queue, desc))
