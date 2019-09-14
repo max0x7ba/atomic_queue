@@ -32,7 +32,9 @@ fmt = {
     }
 
 for benchmark in ['msg/sec', 'sec/round-trip']:
-    for queue, qr in results.items():
+    queues = sorted(results.keys())
+    for queue in queues:
+        qr = results[queue]
         runs = qr.get(benchmark, None)
         if not runs:
             continue
