@@ -170,7 +170,7 @@ void throughput_consumer(unsigned N, Queue* queue, sum_t* consumer_sum, std::ato
 
 template<class Queue>
 uint64_t benchmark_throughput(HugePages& hp, std::vector<unsigned> const& hw_thread_ids, unsigned N, unsigned thread_count, bool alternative_placement, sum_t* consumer_sums) {
-    set_thread_affinity(hw_thread_ids.back()); // Use this thread for the last consumer.
+    set_thread_affinity(hw_thread_ids[thread_count * 2 - 1]); // Use this thread for the last consumer.
     unsigned cpu_idx = 0;
 
     auto queue = hp.create_unique_ptr<Queue>();
