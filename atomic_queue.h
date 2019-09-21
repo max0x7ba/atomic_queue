@@ -163,7 +163,7 @@ public:
         do {
             if(static_cast<int>(head - tail_.load(X)) >= static_cast<int>(static_cast<Derived&>(*this).size_))
                 return false;
-        } while(!head_.compare_exchange_strong(head, head + 1, A, X)); // This loop is not FIFO.
+        } while(ATOMIC_QUEUE_UNLIKELY(!head_.compare_exchange_strong(head, head + 1, A, X))); // This loop is not FIFO.
 
         static_cast<Derived&>(*this).do_push(std::forward<T>(element), head);
         return true;
@@ -175,7 +175,7 @@ public:
         do {
             if(static_cast<int>(head_.load(X) - tail) <= 0)
                 return false;
-        } while(!tail_.compare_exchange_strong(tail, tail + 1, A, X)); // This loop is not FIFO.
+        } while(ATOMIC_QUEUE_UNLIKELY(!tail_.compare_exchange_strong(tail, tail + 1, A, X))); // This loop is not FIFO.
 
         element = static_cast<Derived&>(*this).do_pop(tail);
         return true;
@@ -224,7 +224,7 @@ class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL, MINIMIZE_
         std::atomic<T>& q_element = details::map<SHUFFLE_BITS>(elements_, tail % size_);
         for(;;) {
             T element = q_element.exchange(NIL, R); // (2) The store to wait for.
-            if(element != NIL)
+            if(ATOMIC_QUEUE_LIKELY(element != NIL))
                 return element;
             // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
             do
@@ -236,8 +236,7 @@ class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL, MINIMIZE_
     void do_push(T element, unsigned head) noexcept {
         assert(element != NIL);
         std::atomic<T>& q_element = details::map<SHUFFLE_BITS>(elements_, head % size_);
-        for(T expected = NIL; !q_element.compare_exchange_strong(expected, element, R, X); expected = NIL) {
-            // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
+        for(T expected = NIL; ATOMIC_QUEUE_UNLIKELY(!q_element.compare_exchange_strong(expected, element, R, X)); expected = NIL) {
             do
                 spin_loop_pause(); // (1) Wait for store (2) to complete.
             while(MAXIMIZE_THROUGHPUT && q_element.load(X) != NIL);

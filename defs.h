@@ -30,6 +30,9 @@ static inline void spin_loop_pause() noexcept {
 
 namespace atomic_queue {
 
+#define ATOMIC_QUEUE_LIKELY(expr) __builtin_expect(static_cast<bool>(expr), 1)
+#define ATOMIC_QUEUE_UNLIKELY(expr) __builtin_expect(static_cast<bool>(expr), 0)
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 auto constexpr A = std::memory_order_acquire;
