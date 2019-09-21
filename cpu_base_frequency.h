@@ -33,6 +33,8 @@ std::vector<unsigned> hw_thread_id(std::vector<CpuTopologyInfo> const&);
 void set_thread_affinity(unsigned hw_thread_id);
 void reset_thread_affinity();
 
+void set_default_thread_affinity(unsigned hw_thread_id);
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 } // namespace atomic_queue

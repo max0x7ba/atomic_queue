@@ -12,6 +12,7 @@
 #include <system_error>
 
 #include <pthread.h>
+#include <dlfcn.h>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -102,6 +103,9 @@ void set_thread_affinity_(cpu_set_t const& cpuset) {
         throw std::system_error(err, std::system_category(), "pthread_setaffinity_np");
 }
 
+int default_thread_affinity = -1;
+auto const real_pthread_create = reinterpret_cast<decltype(&pthread_create)>(::dlsym(RTLD_NEXT, "pthread_create"));
+
 } // namespace
 
 void atomic_queue::set_thread_affinity(unsigned hw_thread_id) {
@@ -119,6 +123,43 @@ void atomic_queue::reset_thread_affinity() {
     for(unsigned i = 0, j = std::thread::hardware_concurrency(); i < j; ++i)
         CPU_SET(i, &cpuset);
     set_thread_affinity_(cpuset);
+}
+
+void atomic_queue::set_default_thread_affinity(unsigned hw_thread_id) {
+    default_thread_affinity = hw_thread_id;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+int pthread_create(pthread_t* newthread,
+                   pthread_attr_t const* attr,
+                   void*(*start_routine)(void*),
+                   void* arg)
+{
+    if(!real_pthread_create)
+        std::abort();
+
+    pthread_attr_t attr2;
+    pthread_attr_t *pattr = const_cast<pthread_attr_t*>(attr);
+    if(default_thread_affinity >= 0) {
+        cpu_set_t cpuset;
+        CPU_ZERO(&cpuset);
+        CPU_SET(default_thread_affinity, &cpuset);
+        if(!pattr) {
+            if(::pthread_attr_init(&attr2))
+                std::abort();
+            pattr = &attr2;
+        }
+        if(::pthread_attr_setaffinity_np(pattr, sizeof cpuset, &cpuset))
+            std::abort();
+    }
+
+    int r = real_pthread_create(newthread, pattr, start_routine, arg);
+
+    if(pattr == &attr2)
+        ::pthread_attr_destroy(&attr2);
+
+    return r;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

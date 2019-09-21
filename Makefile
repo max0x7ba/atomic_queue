@@ -33,7 +33,7 @@ cflags.gcc := -pthread -march=native -W{all,extra} -g -fmessage-length=0 ${cxxfl
 
 cxxflags.clang.debug := -O0 -fstack-protector-all
 cxxflags.clang.release := -O3 -mtune=native -ffast-math -falign-functions=32 -DNDEBUG
-cxxflags.clang := -stdlib=libc++ -pthread -march=native -std=gnu++14 -W{all,extra,error} -g -fmessage-length=0 ${cxxflags.clang.${BUILD}}
+cxxflags.clang := -stdlib=libc++ -pthread -march=native -std=gnu++14 -W{all,extra,error,no-unused-function} -g -fmessage-length=0 ${cxxflags.clang.${BUILD}}
 ldflags.clang := -stdlib=libc++ ${ldflags.clang.${BUILD}}
 
 # Additional CPPFLAGS, CXXFLAGS, CFLAGS, LDLIBS, LDFLAGS can come from the command line, e.g. make CXXFLAGS='-march=skylake -mtune=skylake'.
@@ -70,7 +70,7 @@ ${build_dir}/libatomic_queue.a : $(addprefix ${build_dir}/,cpu_base_frequency.o 
 -include ${build_dir}/huge_pages.d
 
 ${build_dir}/benchmarks : cppflags += ${cppflags.tbb} ${cppflags.moodycamel}
-${build_dir}/benchmarks : ldlibs += ${ldlibs.tbb} ${ldlibs.moodycamel}
+${build_dir}/benchmarks : ldlibs += ${ldlibs.tbb} ${ldlibs.moodycamel} -ldl
 ${build_dir}/benchmarks : ${build_dir}/benchmarks.o ${build_dir}/libatomic_queue.a Makefile | ${build_dir}
 	$(strip ${LINK.EXE})
 -include ${build_dir}/benchmarks.d
@@ -90,9 +90,10 @@ ${build_dir}/%.a : Makefile | ${build_dir}
 
 run_benchmarks : ${build_dir}/benchmarks
 	@echo "---- running $< ----"
-	nice -20 $<
+#	nice -20 $<
+	sudo chrt -f 50 $<
 #	nice -20 perf stat -ddd $<
-#	sudo chrt -f 50 perf stat -d $<
+#	sudo chrt -f 50 perf stat -ddd $<
 
 run_tests : ${build_dir}/tests
 	@echo "---- running $< ----"

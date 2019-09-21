@@ -129,8 +129,7 @@ struct QueueTypes {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<class Queue>
-void throughput_producer(unsigned N, Queue* queue, std::atomic<uint64_t>* t0, Barrier* barrier, unsigned cpu) {
-    set_thread_affinity(cpu);
+void throughput_producer(unsigned N, Queue* queue, std::atomic<uint64_t>* t0, Barrier* barrier) {
     barrier->wait();
 
     // The first producer saves the start time.
@@ -162,8 +161,7 @@ void throughput_consumer_impl(unsigned N, Queue* queue, sum_t* consumer_sum, std
 }
 
 template<class Queue>
-void throughput_consumer(unsigned N, Queue* queue, sum_t* consumer_sum, std::atomic<unsigned>* last_consumer, uint64_t* t1, Barrier* barrier, unsigned cpu) {
-    set_thread_affinity(cpu);
+void throughput_consumer(unsigned N, Queue* queue, sum_t* consumer_sum, std::atomic<unsigned>* last_consumer, uint64_t* t1, Barrier* barrier) {
     barrier->wait();
     throughput_consumer_impl(N, queue, consumer_sum, last_consumer, t1);
 }
@@ -182,15 +180,22 @@ uint64_t benchmark_throughput(HugePages& hp, std::vector<unsigned> const& hw_thr
     std::vector<std::thread> threads(thread_count * 2 - 1);
     if(alternative_placement) {
         for(unsigned i = 0; i < thread_count; ++i) {
-            threads[i] = std::thread(throughput_producer<Queue>, N, queue.get(), &t0, &barrier, hw_thread_ids[cpu_idx++]);
-            if(i != thread_count - 1) // This thread is the last consumer.
-                threads[thread_count + i] = std::thread(throughput_consumer<Queue>, N, queue.get(), consumer_sums + i, &last_consumer, &t1, &barrier, hw_thread_ids[cpu_idx++]);
+            set_default_thread_affinity(hw_thread_ids[cpu_idx++]);
+            threads[i] = std::thread(throughput_producer<Queue>, N, queue.get(), &t0, &barrier);
+            if(i != thread_count - 1) { // This thread is the last consumer.
+                set_default_thread_affinity(hw_thread_ids[cpu_idx++]);
+                threads[thread_count + i] = std::thread(throughput_consumer<Queue>, N, queue.get(), consumer_sums + i, &last_consumer, &t1, &barrier);
+            }
         }
     } else {
-        for(unsigned i = 0; i < thread_count; ++i)
-            threads[i] = std::thread(throughput_producer<Queue>, N, queue.get(), &t0, &barrier, hw_thread_ids[cpu_idx++]);
-        for(unsigned i = 0; i < thread_count - 1; ++i) // This thread is the last consumer.
-            threads[thread_count + i] = std::thread(throughput_consumer<Queue>, N, queue.get(), consumer_sums + i, &last_consumer, &t1, &barrier, hw_thread_ids[cpu_idx++]);
+        for(unsigned i = 0; i < thread_count; ++i) {
+            set_default_thread_affinity(hw_thread_ids[cpu_idx++]);
+            threads[i] = std::thread(throughput_producer<Queue>, N, queue.get(), &t0, &barrier);
+        }
+        for(unsigned i = 0; i < thread_count - 1; ++i) { // This thread is the last consumer.
+            set_default_thread_affinity(hw_thread_ids[cpu_idx++]);
+            threads[thread_count + i] = std::thread(throughput_consumer<Queue>, N, queue.get(), consumer_sums + i, &last_consumer, &t1, &barrier);
+        }
     }
 
     barrier.release(thread_count * 2 - 1);
@@ -292,7 +297,7 @@ void run_throughput_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const
                                   Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, tbb::speculative_spin_mutex>>>{});
     run_throughput_mpmc_benchmark("tbb::concurrent_bounded_queue", hp, hw_thread_ids, Type<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, SIZE>>{});
 
-    using SPSC = QueueTypes<SIZE, true, false>;
+    using SPSC = QueueTypes<SIZE, false, false>;
     using MPMC = QueueTypes<SIZE, true, true>; // Enable MAXIMIZE_THROUGHPUT for 2 or more producers/consumers.
 
     run_throughput_spsc_benchmark("AtomicQueue", hp, hw_thread_ids, SPSC::AtomicQueue{});
@@ -343,8 +348,7 @@ void ping_pong_thread_impl(Queue* q1, Queue* q2, unsigned N, uint64_t* time) {
 }
 
 template<class Queue>
-inline void ping_pong_thread_receiver(Barrier* barrier, Queue* q1, Queue* q2, unsigned N, uint64_t* time, unsigned cpu) {
-    set_thread_affinity(cpu);
+inline void ping_pong_thread_receiver(Barrier* barrier, Queue* q1, Queue* q2, unsigned N, uint64_t* time) {
     barrier->wait();
     ping_pong_thread_impl<Queue, false>(q1, q2, N, time);
 }
@@ -362,7 +366,8 @@ inline std::array<uint64_t, 2> ping_pong_benchmark(unsigned N, HugePages& hp, un
     auto q2 = hp.create_unique_ptr<Queue>();
     Barrier barrier;
     std::array<uint64_t, 2> times;
-    std::thread receiver(ping_pong_thread_receiver<Queue>, &barrier, q1.get(), q2.get(), N, &times[0], cpus[1]);
+    set_default_thread_affinity(cpus[1]);
+    std::thread receiver(ping_pong_thread_receiver<Queue>, &barrier, q1.get(), q2.get(), N, &times[0]);
     ping_pong_thread_sender<Queue>(&barrier, q1.get(), q2.get(), N, &times[1]);
     receiver.join();
     return times;
