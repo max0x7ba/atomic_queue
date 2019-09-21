@@ -60,7 +60,7 @@ atomic_queue::HugePages::HugePages(Type t, size_t size) {
     end_ = beg_ + total_size;
 }
 
-atomic_queue::HugePages::~HugePages() {
+atomic_queue::HugePages::~HugePages() noexcept {
     if(beg_)
         ::munmap(beg_, end_ - beg_);
 }
