@@ -109,21 +109,21 @@ void check_huge_pages_leaks(char const* name, HugePages& hp) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<unsigned SIZE, bool MINIMIZE_CONTENTION, bool MAXIMIZE_THROUGHPUT>
+template<unsigned SIZE, bool SPSC, bool MINIMIZE_CONTENTION, bool MAXIMIZE_THROUGHPUT>
 struct QueueTypes {
     using T = unsigned;
 
     // For atomic elements only.
-    using AtomicQueue =                                Type<RetryDecorator<atomic_queue::AtomicQueue<T, SIZE,  T{}, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT>>>;
-    using OptimistAtomicQueue =                                       Type<atomic_queue::AtomicQueue<T, SIZE,  T{}, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT>>;
-    using AtomicQueueB =        Type<RetryDecorator<CapacityToConstructor<atomic_queue::AtomicQueueB<T, Allocator, T{}, MAXIMIZE_THROUGHPUT>, SIZE>>>;
-    using OptimistAtomicQueueB =               Type<CapacityToConstructor<atomic_queue::AtomicQueueB<T, Allocator, T{}, MAXIMIZE_THROUGHPUT>, SIZE>>;
+    using AtomicQueue =                                Type<RetryDecorator<atomic_queue::AtomicQueue<T, SIZE, T{}, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, false, SPSC>>>;
+    using OptimistAtomicQueue =                                       Type<atomic_queue::AtomicQueue<T, SIZE, T{}, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, false, SPSC>>;
+    using AtomicQueueB =        Type<RetryDecorator<CapacityToConstructor<atomic_queue::AtomicQueueB<T, Allocator, T{}, MAXIMIZE_THROUGHPUT, false, SPSC>, SIZE>>>;
+    using OptimistAtomicQueueB =               Type<CapacityToConstructor<atomic_queue::AtomicQueueB<T, Allocator, T{}, MAXIMIZE_THROUGHPUT, false, SPSC>, SIZE>>;
 
     // For non-atomic elements.
-    using AtomicQueue2 =                         Type<RetryDecorator<atomic_queue::AtomicQueue2<T, SIZE, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT>>>;
-    using OptimistAtomicQueue2 =                                Type<atomic_queue::AtomicQueue2<T, SIZE, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT>>;
-    using AtomicQueueB2 = Type<RetryDecorator<CapacityToConstructor<atomic_queue::AtomicQueueB2<T, Allocator, MAXIMIZE_THROUGHPUT>, SIZE>>>;
-    using OptimistAtomicQueueB2 =        Type<CapacityToConstructor<atomic_queue::AtomicQueueB2<T, Allocator, MAXIMIZE_THROUGHPUT>, SIZE>>;
+    using AtomicQueue2 =                         Type<RetryDecorator<atomic_queue::AtomicQueue2<T, SIZE, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, false, SPSC>>>;
+    using OptimistAtomicQueue2 =                                Type<atomic_queue::AtomicQueue2<T, SIZE, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, false, SPSC>>;
+    using AtomicQueueB2 = Type<RetryDecorator<CapacityToConstructor<atomic_queue::AtomicQueueB2<T, Allocator, MAXIMIZE_THROUGHPUT, false, SPSC>, SIZE>>>;
+    using OptimistAtomicQueueB2 =        Type<CapacityToConstructor<atomic_queue::AtomicQueueB2<T, Allocator, MAXIMIZE_THROUGHPUT, false, SPSC>, SIZE>>;
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -297,8 +297,8 @@ void run_throughput_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const
                                   Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, tbb::speculative_spin_mutex>>>{});
     run_throughput_mpmc_benchmark("tbb::concurrent_bounded_queue", hp, hw_thread_ids, Type<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, SIZE>>{});
 
-    using SPSC = QueueTypes<SIZE, false, false>;
-    using MPMC = QueueTypes<SIZE, true, true>; // Enable MAXIMIZE_THROUGHPUT for 2 or more producers/consumers.
+    using SPSC = QueueTypes<SIZE, true, false, false>;
+    using MPMC = QueueTypes<SIZE, false, true, true>; // Enable MAXIMIZE_THROUGHPUT for 2 or more producers/consumers.
 
     run_throughput_spsc_benchmark("AtomicQueue", hp, hw_thread_ids, SPSC::AtomicQueue{});
     run_throughput_mpmc_benchmark("AtomicQueue", hp, hw_thread_ids, MPMC::AtomicQueue{}, 2);
@@ -424,7 +424,7 @@ void run_ping_pong_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const&
     run_ping_pong_benchmark<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, SIZE>>("tbb::concurrent_bounded_queue", hp, hw_thread_ids);
 
     // Use MAXIMIZE_THROUGHPUT=false for better latency.
-    using SPSC = QueueTypes<SIZE, true, false>;
+    using SPSC = QueueTypes<SIZE, true, false, false>;
 
     run_ping_pong_benchmark<SPSC::AtomicQueue::type>("AtomicQueue", hp, hw_thread_ids);
     run_ping_pong_benchmark<SPSC::AtomicQueueB::type>("AtomicQueueB", hp, hw_thread_ids);
