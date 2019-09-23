@@ -74,7 +74,10 @@ $(function() {
                 title: { text: 'number of producers, number of consumers' },
                 tickInterval: 1
             },
-            yAxis: { title: { text: 'throughput, msg/sec' } },
+            yAxis: {
+                title: { text: 'throughput, msg/sec' },
+                max: 200e6 // TODO: Extract SPSC into a separate chart.
+            },
             tooltip: {
                 followPointer: true,
                 useHTML: true,
@@ -97,7 +100,7 @@ $(function() {
             },
             title: { text: 'Latency on ' + title_suffix },
             xAxis: { categories: categories },
-            yAxis: { title: { text: 'latency, nanoseconds/round-trip' }, max: 1000 },
+            yAxis: { title: { text: 'latency, nanoseconds/round-trip' }, max: 900 },
             tooltip: { valueSuffix: ' nanoseconds' },
             series: series
         });
