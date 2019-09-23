@@ -11,7 +11,7 @@ function benchmark() {
     ((N=33))
     for((i=1;i<=N;++i)); do
         $lb echo -n "[$i/$N] "
-        nice -20 "$exe"
+        sudo chrt -f 50 "$exe"
     done
 }
 
