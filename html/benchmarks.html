@@ -24,6 +24,7 @@
   <body>
     <h1>Scalability Benchmark</h1>
     <p>N producer threads push a 4-byte integer into one queue, N consumer threads pop the integers from the queue. All producers posts 1,000,000 messages in total. Total time to send and receive all the messages is measured. The benchmark is run for from 1 producer and 1 consumer up to (total-number-of-cpus / 2) producers/consumers to measure the scalabilty of different queues.</p>
+    <p>Drag over the chart to zoom in.</p>
     <div class="chart" id="scalability-7700k-5GHz"></div>
     <div class="chart" id="scalability-xeon-gold-6132"></div>
     <h1>Latency Benchmark</h1>

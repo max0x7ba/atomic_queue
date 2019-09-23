@@ -67,16 +67,18 @@ $(function() {
     }
 
     function plot_scalability(div_id, series, title_suffix) {
-        Highcharts.chart(div_id, {
-            chart: { type: 'column' },
+        let chart = Highcharts.chart(div_id, {
+            chart: {
+                type: 'column',
+                zoomType: 'y'
+            },
             title: { text: 'Scalability on ' + title_suffix },
             xAxis: {
                 title: { text: 'number of producers, number of consumers' },
                 tickInterval: 1
             },
             yAxis: {
-                title: { text: 'throughput, msg/sec' },
-                max: 200e6 // TODO: Extract SPSC into a separate chart.
+                title: { text: 'throughput, msg/sec' }
             },
             tooltip: {
                 followPointer: true,
@@ -88,6 +90,8 @@ $(function() {
             },
             series: series
         });
+        chart.yAxis[0].setExtremes(0, 50e6);
+        chart.showResetZoom();
     }
 
     function plot_latency(div_id, series_categories, title_suffix) {
