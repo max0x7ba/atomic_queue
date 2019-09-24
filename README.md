@@ -18,7 +18,9 @@ Available containers are:
 
 These containers have corresponding `AtomicQueueB`, `OptimistAtomicQueueB`, `AtomicQueueB2`, `OptimistAtomicQueueB2` versions where the buffer size is specified as an argument to the constructor. The `B` versions are slower.
 
-The queues also support the totally ordered mode. In this mode consumers receive messages in the same FIFO order the messages were posted. This mode is supported for `push` and `pop` functions, but for not the `try_` versions. On Intel x86 the totally ordered mode has 0 cost, as of 2019.
+Totally ordered mode is supported. In this mode consumers receive messages in the same FIFO order the messages were posted. This mode is supported for `push` and `pop` functions, but for not the `try_` versions. On Intel x86 the totally ordered mode has 0 cost, as of 2019.
+
+Single-producer-single-consumer mode is supported. In this mode, no read-modify-write instructions are necessary, only the atomic loads and stores. That improves queue throughput an significantly.
 
 A few well-known containers are used for reference in the benchmarks:
 * `boost::lockfree::spsc_queue` - a wait-free single-producer-single-consumer queue from Boost library.

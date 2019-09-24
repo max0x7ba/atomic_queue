@@ -66,13 +66,21 @@ $(function() {
         return [series, categories];
     }
 
-    function plot_scalability(div_id, series, title_suffix) {
+    function plot_scalability(div_id, series, title_suffix, zoom_max_y) {
         let chart = Highcharts.chart(div_id, {
             chart: {
                 type: 'column',
-                zoomType: 'y'
+                zoomType: 'y',
+                events: {
+                    click: function() {
+                        let max_y = chart.yAxis[0].getExtremes().max;
+                        chart.yAxis[0].setExtremes(0, zoom_max_y);
+                        zoom_max_y = max_y;
+                    }
+                }
             },
             title: { text: 'Scalability on ' + title_suffix },
+            subtitle: { text: "click on the chart background to zoom in and out" },
             xAxis: {
                 title: { text: 'number of producers, number of consumers' },
                 tickInterval: 1
@@ -90,8 +98,6 @@ $(function() {
             },
             series: series
         });
-        chart.yAxis[0].setExtremes(0, 50e6);
-        chart.showResetZoom();
     }
 
     function plot_latency(div_id, series_categories, title_suffix) {
@@ -116,8 +122,8 @@ $(function() {
     const latency_7700k = {"sec/round-trip":{"AtomicQueue":0.000000137,"AtomicQueue2":0.000000136,"AtomicQueueB":0.000000139,"AtomicQueueB2":0.00000017,"OptimistAtomicQueue":0.000000121,"OptimistAtomicQueue2":0.000000147,"OptimistAtomicQueueB":0.000000137,"OptimistAtomicQueueB2":0.000000167,"boost::lockfree::queue":0.000000265,"boost::lockfree::spsc_queue":0.000000125,"moodycamel::ConcurrentQueue":0.000000214,"moodycamel::ReaderWriterQueue":0.000000116,"pthread_spinlock":0.000004444,"tbb::concurrent_bounded_queue":0.000000249,"tbb::speculative_spin_mutex":0.000000766,"tbb::spin_mutex":0.000000201}};
     const latency_xeon_gold_6132 = {"sec/round-trip":{"AtomicQueue":0.000000252,"AtomicQueue2":0.000000316,"AtomicQueueB":0.00000033,"AtomicQueueB2":0.000000418,"OptimistAtomicQueue":0.000000292,"OptimistAtomicQueue2":0.000000325,"OptimistAtomicQueueB":0.000000367,"OptimistAtomicQueueB2":0.000000428,"boost::lockfree::queue":0.000000749,"boost::lockfree::spsc_queue":0.00000025,"moodycamel::ConcurrentQueue":0.000000462,"moodycamel::ReaderWriterQueue":0.000000246,"pthread_spinlock":0.000000306,"tbb::concurrent_bounded_queue":0.000000616,"tbb::speculative_spin_mutex":0.000000788,"tbb::spin_mutex":0.000000249}};
 
-    plot_scalability('scalability-7700k-5GHz', scalability_to_series(scalability_7700k), "Intel i7-7700k (core 5GHz / uncore 4.7GHz)");
-    plot_scalability('scalability-xeon-gold-6132', scalability_to_series(scalability_xeon_gold_6132), "Intel Xeon Gold 6132 (stock)");
+    plot_scalability('scalability-7700k-5GHz', scalability_to_series(scalability_7700k), "Intel i7-7700k (core 5GHz / uncore 4.7GHz)", 55e6);
+    plot_scalability('scalability-xeon-gold-6132', scalability_to_series(scalability_xeon_gold_6132), "Intel Xeon Gold 6132 (stock)", 20e6);
     plot_latency('latency-7700k-5GHz', latency_to_series(latency_7700k), "Intel i7-7700k (core 5GHz / uncore 4.7GHz)");
     plot_latency('latency-xeon-gold-6132', latency_to_series(latency_xeon_gold_6132), "Intel Xeon Gold 6132 (stock)");
 });
