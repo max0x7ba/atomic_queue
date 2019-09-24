@@ -20,8 +20,8 @@ class AtomicQueueMutexT {
     static constexpr unsigned size_ = MINIMIZE_CONTENTION ? details::round_up_to_power_of_2(SIZE) : SIZE;
 
     Mutex mutex_;
-    unsigned head_ = 0;
-    unsigned tail_ = 0;
+    alignas(CACHE_LINE_SIZE) unsigned head_ = 0;
+    alignas(CACHE_LINE_SIZE) unsigned tail_ = 0;
     alignas(CACHE_LINE_SIZE) T q_[size_] = {};
 
     static constexpr int SHUFFLE_BITS =
