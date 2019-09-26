@@ -109,6 +109,10 @@ void check_huge_pages_leaks(char const* name, HugePages& hp) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// According to my benchmarking, it looks like the best performance is achieved with the following parameters:
+// * For SPSC: SPSC=true,  MINIMIZE_CONTENTION=false, MAXIMIZE_THROUGHPUT=false.
+// * For MPMC: SPSC=false, MINIMIZE_CONTENTION=true,  MAXIMIZE_THROUGHPUT=true.
+// However, I am not sure that conflating these 3 parameters into 1 would be the right thing for every scenario.
 template<unsigned SIZE, bool SPSC, bool MINIMIZE_CONTENTION, bool MAXIMIZE_THROUGHPUT>
 struct QueueTypes {
     using T = unsigned;
@@ -215,9 +219,9 @@ void run_throughput_benchmark(char const* name, HugePages& hp, std::vector<unsig
     int constexpr RUNS = 3;
     std::vector<sum_t> consumer_sums(thread_count_max);
 
-    for(bool alternative_placement : {false, true}) {
-        for(unsigned threads = thread_count_min; threads <= thread_count_max; ++threads) {
-            unsigned const N = M / threads;
+    for(unsigned threads = thread_count_min; threads <= thread_count_max; ++threads) {
+        unsigned const N = M / threads;
+        for(bool alternative_placement : {false, true}) {
 
             sum_t const expected_sum = (N + 1) / 2. * N;
             double const expected_sum_inv = 1. / expected_sum;
