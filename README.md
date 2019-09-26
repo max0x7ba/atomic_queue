@@ -35,7 +35,7 @@ A few well-known containers are used for reference in the benchmarks:
 # Build and run instructions
 The containers provided are header-only class templates that require only `#include <atomic_queue/atomic_queue.h>`, no building/installing is necessary.
 
-Building is neccessary to run the tests and benchmarks.
+Building is necessary to run the tests and benchmarks.
 
 ```
 git clone https://github.com/cameron314/concurrentqueue.git
@@ -53,8 +53,8 @@ The benchmark also requires Intel TBB library to be available. It assumes that i
 The containers support the following APIs:
 * `try_push` - Appends an element to the end of the queue. Returns `false` when the queue is full.
 * `try_pop` - Removes an element from the front of the queue. Returns `false` when the queue is empty.
-* `push` - Appends an element to the end of the queue. Busy waits when the queue is full. Faster than `try_push` when the queue is not full. Optional FIFO producer queueing and total order.
-* `pop` - Removes an element from the front of the queue. Busy waits when the queue is empty. Faster than `try_pop` when the queue is not empty. Optional FIFO consumer queueing and total order.
+* `push` - Appends an element to the end of the queue. Busy waits when the queue is full. Faster than `try_push` when the queue is not full. Optional FIFO producer queuing and total order.
+* `pop` - Removes an element from the front of the queue. Busy waits when the queue is empty. Faster than `try_pop` when the queue is not empty. Optional FIFO consumer queuing and total order.
 * `was_empty` - Returns `true` if the container was empty during the call. The state may have changed by the time the return value is examined.
 * `was_full` - Returns `true` if the container was full during the call. The state may have changed by the time the return value is examined.
 
@@ -72,15 +72,18 @@ In a production multiple-producer-multiple-consumer scenario the ring-buffer siz
 Using a power-of-2 ring-buffer array size allows a couple of important optimizations:
 
 * The writer and reader indexes get mapped into the ring-buffer array index using modulo `% SIZE` binary operator and using a power-of-2 size turns that modulo operator into one plain `and` instruction and that is as fast as it gets.
-* The *element index within the cache line* gets swapped with the *cache line index* within the *ring-buffer array element index*, so that subsequent queue elements actually reside in different cache lines. This eliminates contention between producers and consumers on the ring-buffer cache lines. Instead of `N` producers together with `M` consumers competing on the same ring-buffer array cache line in the worst case, it is only one producer competing with one consumer. This optimization scales better with the number of producers and consumers, and element size. With low number of producers and consumers (up to about 2 of each in these benchmarks) disabling this optimization may yield better throughput (but higher variance across runs).
+* The *element index within the cache line* gets swapped with the *cache line index* within the *ring-buffer array element index*, so that subsequent queue elements actually reside in different cache lines. This eliminates contention between producers and consumers on the ring-buffer cache lines. Instead of `N` producers together with `M` consumers competing on the same ring-buffer array cache line in the worst case, it is only one producer competing with one consumer. This optimisation scales better with the number of producers and consumers, and element size. With low number of producers and consumers (up to about 2 of each in these benchmarks) disabling this optimisation may yield better throughput (but higher variance across runs).
 
-The containers use `unsigned` type for size and internal indexes. On x86-64 platform `unsigned` is 32-bit wide, whereas `size_t` is 64-bit wide. 64-bit instructions utilize an extra byte instruction prefix resulting in slightly more pressure on the CPU instruction cache and the front-end. Hence, 32-bit `unsigned` indexes are used to maximize performance. That limits the queue size to 4,294,967,295 elements, which seems to be a reasonable hard limit for many applications.
+The containers use `unsigned` type for size and internal indexes. On x86-64 platform `unsigned` is 32-bit wide, whereas `size_t` is 64-bit wide. 64-bit instructions utilise an extra byte instruction prefix resulting in slightly more pressure on the CPU instruction cache and the front-end. Hence, 32-bit `unsigned` indexes are used to maximise performance. That limits the queue size to 4,294,967,295 elements, which seems to be a reasonable hard limit for many applications.
 
 # Benchmarks
 [View throughput and latency benchmarks charts][1].
 
 ## Methodology
-`benchmarks` executable is run 33 times and then the results with the highest throughput / lowest latency are selected. This is done to mimimize adverse thread scheduling effects and noise, and to give each queue multiple opportunities to demonstrate its best performance.
+There are a few OS behaviours that complicate benchmarking:
+* CPU scheduler can place threads on different CPU cores each run. To avoid that the threads are pinned to specific CPU cores.
+* CPU scheduler can preempt threads. To avoid that FIFO real-time priority 50 is used to disable scheduler time slicing and make the threads non-preemptable by lower priority processes/threads.
+* Adverse address space randomisation may cause extra CPU cache conflicts. To minimise effects of that `benchmarks` executable is run at least 33 times and then the results with the highest throughput / lowest latency are selected.
 
 I only have access to a few x86-64 machines. If you have access to different hardware feel free to submit the output file of `scripts/run-benchmarks.sh` and I will include your results into the benchmarks page.
 
@@ -89,17 +92,17 @@ When hyper-threading is enabled, single-producer-single-consumer benchmarks prod
 
 For this reason the benchmarks pin threads to CPU cores to avoid placing producers and consumers on the hyper-threads of the same core. Hyper-threads are still used in the benchmarks, but only when the number of producer and consumer threads is greater than the number of available non-hyper-threads.
 
-Thread pinning also greately reduces the variance of the timings across multiple benchmarks runs.
+Thread pinning also greatly reduces the variance of the timings across multiple benchmarks runs.
 
 ### Huge pages
-When huge pages are available the benchmarks use 1x1GB or 16x2MB huge pages for the queues to minimize TLB misses. To enable huge pages do one of:
+When huge pages are available the benchmarks use 1x1GB or 16x2MB huge pages for the queues to minimise TLB misses. To enable huge pages do one of:
 ```
 sudo hugeadm --pool-pages-min 1GB:1 --pool-pages-max 1GB:1
 sudo hugeadm --pool-pages-min 2MB:16 --pool-pages-max 2MB:16
 ```
 
 ## Throughput and scalability benchmark
-N producer threads push a 4-byte integer into one queue, N consumer threads pop the integers from the queue. All producers posts 1,000,000 messages in total. Total time to send and receive all the messages is measured. The benchmark is run for from 1 producer and 1 consumer up to `(total-number-of-cpus / 2)` producers/consumers to measure the scalabilty of different queues.
+N producer threads push a 4-byte integer into one queue, N consumer threads pop the integers from the queue. All producers posts 1,000,000 messages in total. Total time to send and receive all the messages is measured. The benchmark is run for from 1 producer and 1 consumer up to `(total-number-of-cpus / 2)` producers/consumers to measure the scalability of different queues.
 
 ## Ping-pong benchmark
 One thread posts an integer to another thread and waits for the reply using two queues. The benchmarks measures the total time of 100,000 ping-pongs, best of 10 runs. Contention is minimal here to be able to achieve and measure the lowest latency. Reports the average round-trip time.
