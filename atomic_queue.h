@@ -78,10 +78,8 @@ struct GetIndexShuffleBits<false, array_size, elements_per_cache_line> {
 template<int BITS>
 constexpr unsigned remap_index(unsigned index) noexcept {
     constexpr unsigned MASK = (1u << BITS) - 1;
-    unsigned part0 = (index >> BITS) & MASK;
-    unsigned part1 = (index & MASK) << BITS;
-    unsigned part2 = index & ~(MASK | MASK << BITS);
-    return part0 | part1 | part2;
+    unsigned mix = (index ^ (index >> BITS)) & MASK;
+    return index ^ mix ^ (mix << BITS);
 }
 
 template<>
