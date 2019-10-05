@@ -87,13 +87,6 @@ There are a few OS behaviours that complicate benchmarking:
 
 I only have access to a few x86-64 machines. If you have access to different hardware feel free to submit the output file of `scripts/run-benchmarks.sh` and I will include your results into the benchmarks page.
 
-### Hyper-Threading
-When hyper-threading is enabled, single-producer-single-consumer benchmarks produce unrealistically great results if both the producer and consumer threads happen to get scheduled on the hyper-threads of the same core, due to L1d cache being shared between the cores. Such a thread placement, however, is undesirable in production scenarios because in CPU-bound workloads the two hyper-threads speedup is around 1.3x, whereas two non-hyper-threads speedup is 2x.
-
-For this reason the benchmarks pin threads to CPU cores to avoid placing producers and consumers on the hyper-threads of the same core. Hyper-threads are still used in the benchmarks, but only when the number of producer and consumer threads is greater than the number of available non-hyper-threads.
-
-Thread pinning also greatly reduces the variance of the timings across multiple benchmarks runs.
-
 ### Huge pages
 When huge pages are available the benchmarks use 1x1GB or 16x2MB huge pages for the queues to minimise TLB misses. To enable huge pages do one of:
 ```
