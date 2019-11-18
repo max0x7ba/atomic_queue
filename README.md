@@ -29,7 +29,7 @@ A few well-known containers are used for reference in the benchmarks:
 * `moodycamel::ConcurrentQueue` - a lock-free multiple-producer-multiple-consumer queue used in non-blocking mode.
 * `moodycamel::ReaderWriterQueue` - a lock-free single-producer-single-consumer queue used in non-blocking mode.
 * `tbb::spin_mutex` - a locked fixed size ring-buffer with `tbb::spin_mutex` from Intel Threading Building Blocks.
-* `tbb::speculative_spin_mutex` - a locked fixed size ring-buffer with `tbb::speculative_spin_mutex` from Intel Threading Building Blocks.
+* `tbb::speculative_spin_mutex` - a locked fixed size ring-buffer with `tbb::speculative_spin_mutex` from Intel Threading Building Blocks. This type of mutex uses hardware lock elision using Intel TSX extension, which is now known to be a good side-channel that bypasses memory protection, so that Intel recommends disabling TSX extension to mitigate. The benchmark for this queue type is going to be removed in the future.
 * `tbb::concurrent_bounded_queue` - eponymous queue used in non-blocking mode from Intel Threading Building Blocks.
 
 # Build and run instructions
