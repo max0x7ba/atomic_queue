@@ -322,7 +322,7 @@ public:
     }
 
     bool was_full() const noexcept {
-        return static_cast<int>(head_.load(X) - tail_.load(X)) >= static_cast<int>(static_cast<Derived&>(*this).size_);
+        return static_cast<int>(head_.load(X) - tail_.load(X)) >= static_cast<int>(static_cast<Derived const&>(*this).size_);
     }
 
     unsigned size() const noexcept {
