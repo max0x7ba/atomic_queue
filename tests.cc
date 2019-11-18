@@ -106,8 +106,20 @@ BOOST_AUTO_TEST_CASE(stress_MoodyCamelQueue) {
     stress<MoodyCamelQueue<unsigned, CAPACITY>>();
 }
 
-BOOST_AUTO_TEST_CASE(move_only) {
+BOOST_AUTO_TEST_CASE(move_only_2) {
     AtomicQueue2<std::unique_ptr<int>, 1> q;
+
+    std::unique_ptr<int> p{new int{1}};
+    BOOST_REQUIRE(q.try_push(move(p)));
+    BOOST_CHECK(!p);
+
+    BOOST_REQUIRE(q.try_pop(p));
+    BOOST_REQUIRE(p.get());
+    BOOST_CHECK_EQUAL(*p, 1);
+}
+
+BOOST_AUTO_TEST_CASE(move_only_b2) {
+    AtomicQueueB2<std::unique_ptr<int>> q(1);
 
     std::unique_ptr<int> p{new int{1}};
     BOOST_REQUIRE(q.try_push(move(p)));
