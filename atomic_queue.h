@@ -252,6 +252,30 @@ protected:
     }
 
 public:
+    /*
+     * When using try_push with objects that are moved, we can't recover the
+     * moved object if the push failed. This method fixes this by returning
+     * the moved object if the push failed.
+     */
+    template<class T>
+    std::optional<T> try_push_else_recover(T&& element) noexcept {
+        auto head = head_.load(X);
+        if(Derived::spsc_) {
+            if(static_cast<int>(head - tail_.load(X)) >= static_cast<int>(static_cast<Derived&>(*this).size_))
+                return {std::forward<T>(element)};
+            head_.store(head + 1, X);
+        }
+        else {
+            do {
+                if(static_cast<int>(head - tail_.load(X)) >= static_cast<int>(static_cast<Derived&>(*this).size_))
+                    return {std::forward<T>(element)};
+            } while(ATOMIC_QUEUE_UNLIKELY(!head_.compare_exchange_strong(head, head + 1, A, X))); // This loop is not FIFO.
+        }
+
+        static_cast<Derived&>(*this).do_push(std::forward<T>(element), head);
+        return {};
+    }
+
     template<class T>
     bool try_push(T&& element) noexcept {
         auto head = head_.load(X);
@@ -322,11 +346,11 @@ public:
     }
 
     bool was_full() const noexcept {
-        return static_cast<int>(head_.load(X) - tail_.load(X)) >= static_cast<int>(static_cast<Derived&>(*this).size_);
+        return static_cast<int>(head_.load(X) - tail_.load(X)) >= static_cast<int>(static_cast<Derived const&>(*this).size_);
     }
 
     unsigned size() const noexcept {
-        return static_cast<Derived&>(*this).size_;
+        return static_cast<Derived const&>(*this).size_;
     }
 };
 
