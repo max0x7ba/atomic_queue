@@ -326,7 +326,7 @@ public:
     }
 
     unsigned size() const noexcept {
-        return static_cast<Derived&>(*this).size_;
+        return static_cast<Derived const&>(*this).size_;
     }
 };
 
