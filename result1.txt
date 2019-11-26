@@ -1,0 +1,159 @@
+
+$ make run_benchmarks
+g++ -o /home/erez/projects/code/github/x/atomic_queue/release/gcc/benchmarks.o -c -I/home/erez/projects/code/github/x -pthread -march=native -std=gnu++17 -W{all,extra,error,no-{maybe-uninitialized,unused-function}} -g -fmessage-length=0 -O3 -mtune=native -ffast-math -falign-{functions,loops}=64 -DNDEBUG -MD -MP /home/erez/projects/code/github/x/atomic_queue/benchmarks.cc
+g++ -o /home/erez/projects/code/github/x/atomic_queue/release/gcc/cpu_base_frequency.o -c -I/home/erez/projects/code/github/x -pthread -march=native -std=gnu++17 -W{all,extra,error,no-{maybe-uninitialized,unused-function}} -g -fmessage-length=0 -O3 -mtune=native -ffast-math -falign-{functions,loops}=64 -DNDEBUG -MD -MP /home/erez/projects/code/github/x/atomic_queue/cpu_base_frequency.cc
+g++ -o /home/erez/projects/code/github/x/atomic_queue/release/gcc/huge_pages.o -c -I/home/erez/projects/code/github/x -pthread -march=native -std=gnu++17 -W{all,extra,error,no-{maybe-uninitialized,unused-function}} -g -fmessage-length=0 -O3 -mtune=native -ffast-math -falign-{functions,loops}=64 -DNDEBUG -MD -MP /home/erez/projects/code/github/x/atomic_queue/huge_pages.cc
+gcc-ar rscT /home/erez/projects/code/github/x/atomic_queue/release/gcc/libatomic_queue.a /home/erez/projects/code/github/x/atomic_queue/release/gcc/cpu_base_frequency.o /home/erez/projects/code/github/x/atomic_queue/release/gcc/huge_pages.o
+g++ -o /home/erez/projects/code/github/x/atomic_queue/release/gcc/benchmarks -fuse-ld=gold -pthread -g /home/erez/projects/code/github/x/atomic_queue/release/gcc/benchmarks.o /home/erez/projects/code/github/x/atomic_queue/release/gcc/libatomic_queue.a -lrt {-L,'-Wl,-rpath='}/usr/local/lib -ltbb -ldl
+---- running /home/erez/projects/code/github/x/atomic_queue/release/gcc/benchmarks ----
+sudo chrt -f 50 /home/erez/projects/code/github/x/atomic_queue/release/gcc/benchmarks
+[sudo] password for erez: 
+Sorry, try again.
+[sudo] password for erez: 
+Warning: Failed to allocate 1GB huge pages. Run "sudo hugeadm --pool-pages-min 1GB:1 --pool-pages-max 1GB:1".
+---- Running throughput benchmarks (higher is better) ----
+     boost::lockfree::spsc_queue, 1,s:  94,879,418 msg/sec
+     boost::lockfree::spsc_queue, 1,i:  97,811,250 msg/sec
+          boost::lockfree::queue, 1,s:   7,075,138 msg/sec
+          boost::lockfree::queue, 1,i:   7,109,413 msg/sec
+          boost::lockfree::queue, 2,s:   6,048,648 msg/sec
+          boost::lockfree::queue, 2,i:   6,107,601 msg/sec
+          boost::lockfree::queue, 3,s:   5,788,840 msg/sec
+          boost::lockfree::queue, 3,i:   5,870,491 msg/sec
+   es::lockfree::mpmc_queue<f,f>, 1,s:  41,906,117 msg/sec
+   es::lockfree::mpmc_queue<f,f>, 1,i:  49,227,116 msg/sec
+   es::lockfree::mpmc_queue<f,f>, 1,s:  50,219,724 msg/sec
+   es::lockfree::mpmc_queue<f,f>, 1,i:  50,338,088 msg/sec
+   es::lockfree::mpmc_queue<f,f>, 2,s:  21,006,724 msg/sec
+   es::lockfree::mpmc_queue<f,f>, 2,i:  21,652,522 msg/sec
+   es::lockfree::mpmc_queue<f,f>, 3,s:  13,689,788 msg/sec
+   es::lockfree::mpmc_queue<f,f>, 3,i:  14,222,712 msg/sec
+   es::lockfree::mpmc_queue<f,t>, 1,s:  42,043,597 msg/sec
+   es::lockfree::mpmc_queue<f,t>, 1,i:  43,247,748 msg/sec
+   es::lockfree::mpmc_queue<f,t>, 1,s:  43,408,077 msg/sec
+   es::lockfree::mpmc_queue<f,t>, 1,i:  43,371,852 msg/sec
+   es::lockfree::mpmc_queue<f,t>, 2,s:  10,491,380 msg/sec
+   es::lockfree::mpmc_queue<f,t>, 2,i:  10,452,377 msg/sec
+   es::lockfree::mpmc_queue<f,t>, 3,s:   8,374,590 msg/sec
+   es::lockfree::mpmc_queue<f,t>, 3,i:   8,636,852 msg/sec
+   es::lockfree::mpmc_queue<t,f>, 1,s:  43,342,007 msg/sec
+   es::lockfree::mpmc_queue<t,f>, 1,i:  40,730,969 msg/sec
+   es::lockfree::mpmc_queue<t,f>, 1,s:  42,999,163 msg/sec
+   es::lockfree::mpmc_queue<t,f>, 1,i:  42,331,340 msg/sec
+   es::lockfree::mpmc_queue<t,f>, 2,s:  13,216,232 msg/sec
+   es::lockfree::mpmc_queue<t,f>, 2,i:  12,940,071 msg/sec
+   es::lockfree::mpmc_queue<t,f>, 3,s:   8,918,911 msg/sec
+   es::lockfree::mpmc_queue<t,f>, 3,i:   9,063,264 msg/sec
+   es::lockfree::mpmc_queue<t,t>, 1,s:  41,980,251 msg/sec
+   es::lockfree::mpmc_queue<t,t>, 1,i:  42,459,030 msg/sec
+   es::lockfree::mpmc_queue<t,t>, 1,s:  42,229,862 msg/sec
+   es::lockfree::mpmc_queue<t,t>, 1,i:  33,724,725 msg/sec
+   es::lockfree::mpmc_queue<t,t>, 2,s:  11,530,558 msg/sec
+   es::lockfree::mpmc_queue<t,t>, 2,i:  12,865,424 msg/sec
+   es::lockfree::mpmc_queue<t,t>, 3,s:   9,680,444 msg/sec
+   es::lockfree::mpmc_queue<t,t>, 3,i:  10,088,071 msg/sec
+                pthread_spinlock, 1,s:  17,019,862 msg/sec
+                pthread_spinlock, 1,i:  16,972,283 msg/sec
+                pthread_spinlock, 2,s:  13,216,552 msg/sec
+                pthread_spinlock, 2,i:  15,108,251 msg/sec
+                pthread_spinlock, 3,s:   8,572,469 msg/sec
+                pthread_spinlock, 3,i:   8,111,074 msg/sec
+   moodycamel::ReaderWriterQueue, 1,s: 524,768,600 msg/sec
+   moodycamel::ReaderWriterQueue, 1,i: 525,209,331 msg/sec
+     moodycamel::ConcurrentQueue, 1,s:  19,944,087 msg/sec
+     moodycamel::ConcurrentQueue, 1,i:  17,440,607 msg/sec
+     moodycamel::ConcurrentQueue, 2,s:   9,402,469 msg/sec
+     moodycamel::ConcurrentQueue, 2,i:   9,313,832 msg/sec
+     moodycamel::ConcurrentQueue, 3,s:   9,907,164 msg/sec
+     moodycamel::ConcurrentQueue, 3,i:   9,885,286 msg/sec
+                 tbb::spin_mutex, 1,s:  43,699,952 msg/sec
+                 tbb::spin_mutex, 1,i:  45,849,644 msg/sec
+                 tbb::spin_mutex, 2,s:  31,424,220 msg/sec
+                 tbb::spin_mutex, 2,i:  31,655,436 msg/sec
+                 tbb::spin_mutex, 3,s:  20,302,226 msg/sec
+                 tbb::spin_mutex, 3,i:  20,300,173 msg/sec
+     tbb::speculative_spin_mutex, 1,s:   1,158,635 msg/sec
+     tbb::speculative_spin_mutex, 1,i:   1,640,915 msg/sec
+     tbb::speculative_spin_mutex, 2,s:  26,297,905 msg/sec
+     tbb::speculative_spin_mutex, 2,i:  26,999,266 msg/sec
+     tbb::speculative_spin_mutex, 3,s:  19,215,439 msg/sec
+     tbb::speculative_spin_mutex, 3,i:  17,928,715 msg/sec
+   tbb::concurrent_bounded_queue, 1,s:   9,623,481 msg/sec
+   tbb::concurrent_bounded_queue, 1,i:   9,829,076 msg/sec
+   tbb::concurrent_bounded_queue, 2,s:  12,395,821 msg/sec
+   tbb::concurrent_bounded_queue, 2,i:  12,357,749 msg/sec
+   tbb::concurrent_bounded_queue, 3,s:   9,992,534 msg/sec
+   tbb::concurrent_bounded_queue, 3,i:   9,729,767 msg/sec
+                     AtomicQueue, 1,s:  45,046,351 msg/sec
+                     AtomicQueue, 1,i:  45,631,194 msg/sec
+                     AtomicQueue, 2,s:   9,660,551 msg/sec
+                     AtomicQueue, 2,i:   9,411,904 msg/sec
+                     AtomicQueue, 3,s:   7,199,061 msg/sec
+                     AtomicQueue, 3,i:   7,217,304 msg/sec
+                    AtomicQueueB, 1,s:  38,497,614 msg/sec
+                    AtomicQueueB, 1,i:  38,168,571 msg/sec
+                    AtomicQueueB, 2,s:   9,038,393 msg/sec
+                    AtomicQueueB, 2,i:   8,800,752 msg/sec
+                    AtomicQueueB, 3,s:   7,142,461 msg/sec
+                    AtomicQueueB, 3,i:   6,970,981 msg/sec
+             OptimistAtomicQueue, 1,s: 528,869,800 msg/sec
+             OptimistAtomicQueue, 1,i: 551,472,984 msg/sec
+             OptimistAtomicQueue, 2,s:  28,805,222 msg/sec
+             OptimistAtomicQueue, 2,i:  29,170,093 msg/sec
+             OptimistAtomicQueue, 3,s:  30,603,599 msg/sec
+             OptimistAtomicQueue, 3,i:  30,253,940 msg/sec
+            OptimistAtomicQueueB, 1,s:  39,230,915 msg/sec
+            OptimistAtomicQueueB, 1,i:  41,735,853 msg/sec
+            OptimistAtomicQueueB, 2,s:  15,855,172 msg/sec
+            OptimistAtomicQueueB, 2,i:  16,442,681 msg/sec
+            OptimistAtomicQueueB, 3,s:  17,087,497 msg/sec
+            OptimistAtomicQueueB, 3,i:  17,179,175 msg/sec
+                    AtomicQueue2, 1,s:  46,846,907 msg/sec
+                    AtomicQueue2, 1,i:  44,904,326 msg/sec
+                    AtomicQueue2, 2,s:   9,330,049 msg/sec
+                    AtomicQueue2, 2,i:   9,253,054 msg/sec
+                    AtomicQueue2, 3,s:   7,381,856 msg/sec
+                    AtomicQueue2, 3,i:   7,301,297 msg/sec
+                   AtomicQueueB2, 1,s:  34,568,239 msg/sec
+                   AtomicQueueB2, 1,i:  34,640,445 msg/sec
+                   AtomicQueueB2, 2,s:   8,209,669 msg/sec
+                   AtomicQueueB2, 2,i:   8,092,231 msg/sec
+                   AtomicQueueB2, 3,s:   6,799,506 msg/sec
+                   AtomicQueueB2, 3,i:   6,415,026 msg/sec
+            OptimistAtomicQueue2, 1,s: 463,135,274 msg/sec
+            OptimistAtomicQueue2, 1,i: 379,537,674 msg/sec
+            OptimistAtomicQueue2, 2,s:  21,497,154 msg/sec
+            OptimistAtomicQueue2, 2,i:  19,282,535 msg/sec
+            OptimistAtomicQueue2, 3,s:  24,191,905 msg/sec
+            OptimistAtomicQueue2, 3,i:  23,956,296 msg/sec
+           OptimistAtomicQueueB2, 1,s:  28,988,530 msg/sec
+           OptimistAtomicQueueB2, 1,i:  28,985,125 msg/sec
+           OptimistAtomicQueueB2, 2,s:  11,995,527 msg/sec
+           OptimistAtomicQueueB2, 2,i:  11,812,101 msg/sec
+           OptimistAtomicQueueB2, 3,s:  15,137,048 msg/sec
+           OptimistAtomicQueueB2, 3,i:  14,708,241 msg/sec
+
+---- Running ping-pong benchmarks (lower is better) ----
+     boost::lockfree::spsc_queue: 0.000000178 sec/round-trip
+          boost::lockfree::queue: 0.000000404 sec/round-trip
+   es::lockfree::mpmc_queue<f,f>: 0.000000184 sec/round-trip
+   es::lockfree::mpmc_queue<f,t>: 0.000000185 sec/round-trip
+   es::lockfree::mpmc_queue<t,f>: 0.000000229 sec/round-trip
+   es::lockfree::mpmc_queue<t,t>: 0.000000223 sec/round-trip
+                pthread_spinlock: 0.000000402 sec/round-trip
+   moodycamel::ReaderWriterQueue: 0.000000170 sec/round-trip
+     moodycamel::ConcurrentQueue: 0.000000314 sec/round-trip
+                 tbb::spin_mutex: 0.000000374 sec/round-trip
+     tbb::speculative_spin_mutex: 0.000051170 sec/round-trip
+   tbb::concurrent_bounded_queue: 0.000000382 sec/round-trip
+                     AtomicQueue: 0.000000170 sec/round-trip
+                    AtomicQueueB: 0.000000184 sec/round-trip
+             OptimistAtomicQueue: 0.000000183 sec/round-trip
+            OptimistAtomicQueueB: 0.000000211 sec/round-trip
+                    AtomicQueue2: 0.000000187 sec/round-trip
+                   AtomicQueueB2: 0.000000208 sec/round-trip
+            OptimistAtomicQueue2: 0.000000225 sec/round-trip
+           OptimistAtomicQueueB2: 0.000000231 sec/round-trip
+
+[erez@dws1-erezstrauss-com  /home/erez/projects/code/github/x/atomic_queue (0) 23:48:49]
+

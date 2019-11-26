@@ -15,6 +15,8 @@
 #include <tbb/concurrent_queue.h>
 #include <tbb/spin_mutex.h>
 
+#include "mpmc_queue.h" // <es/lockfree/mpmc_queue.h>
+
 #include <algorithm>
 #include <clocale>
 #include <cstdint>
@@ -48,6 +50,25 @@ template<class T>
 inline double to_seconds(T tsc) {
     return tsc * TSC_TO_SECONDS;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+template<class Queue>
+struct ESLockfreeMPMCQueueAdapter : Queue {
+    using T = typename Queue::value_type;
+
+    void push(T element) {
+        while(!this->Queue::push(element))
+            spin_loop_pause();
+    }
+
+    T pop() {
+        T element;
+        while(!this->Queue::pop(element))
+            spin_loop_pause();
+        return element;
+    }
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -289,6 +310,26 @@ void run_throughput_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const
     run_throughput_mpmc_benchmark("boost::lockfree::queue", hp, hw_thread_ids,
                                   Type<BoostQueueAdapter<boost::lockfree::queue<unsigned, BoostAllocator, boost::lockfree::capacity<SIZE - 2>>>>{});
 
+    run_throughput_spsc_benchmark("es::lockfree::mpmc_queue<f,f>", hp, hw_thread_ids,
+                                  Type<ESLockfreeMPMCQueueAdapter<es::lockfree::mpmc_queue<unsigned, SIZE, uint32_t, false, false>>>{});
+    run_throughput_mpmc_benchmark("es::lockfree::mpmc_queue<f,f>", hp, hw_thread_ids,
+                                  Type<ESLockfreeMPMCQueueAdapter<es::lockfree::mpmc_queue<unsigned, SIZE, uint32_t, false, false>>>{});
+
+    run_throughput_spsc_benchmark("es::lockfree::mpmc_queue<f,t>", hp, hw_thread_ids,
+                                  Type<ESLockfreeMPMCQueueAdapter<es::lockfree::mpmc_queue<unsigned, SIZE, uint32_t, false, true>>>{});
+    run_throughput_mpmc_benchmark("es::lockfree::mpmc_queue<f,t>", hp, hw_thread_ids,
+                                  Type<ESLockfreeMPMCQueueAdapter<es::lockfree::mpmc_queue<unsigned, SIZE, uint32_t, false, true>>>{});
+
+    run_throughput_spsc_benchmark("es::lockfree::mpmc_queue<t,f>", hp, hw_thread_ids,
+                                  Type<ESLockfreeMPMCQueueAdapter<es::lockfree::mpmc_queue<unsigned, SIZE, uint32_t, true, false>>>{});
+    run_throughput_mpmc_benchmark("es::lockfree::mpmc_queue<t,f>", hp, hw_thread_ids,
+                                  Type<ESLockfreeMPMCQueueAdapter<es::lockfree::mpmc_queue<unsigned, SIZE, uint32_t, true, false>>>{});
+
+    run_throughput_spsc_benchmark("es::lockfree::mpmc_queue<t,t>", hp, hw_thread_ids,
+                                  Type<ESLockfreeMPMCQueueAdapter<es::lockfree::mpmc_queue<unsigned, SIZE, uint32_t, true, true>>>{});
+    run_throughput_mpmc_benchmark("es::lockfree::mpmc_queue<t,t>", hp, hw_thread_ids,
+                                  Type<ESLockfreeMPMCQueueAdapter<es::lockfree::mpmc_queue<unsigned, SIZE, uint32_t, true, true>>>{});
+
     run_throughput_mpmc_benchmark("pthread_spinlock", hp, hw_thread_ids, Type<RetryDecorator<AtomicQueueSpinlock<unsigned, SIZE>>>{});
     // run_throughput_mpmc_benchmark("FairSpinlock", hp, hw_thread_ids, Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, FairSpinlock>>>{});
     // run_throughput_mpmc_benchmark("UnfairSpinlock", hp, hw_thread_ids, Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, UnfairSpinlock>>>{});
@@ -415,6 +456,10 @@ void run_ping_pong_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const&
                                                                                                                       hw_thread_ids);
     run_ping_pong_benchmark<BoostQueueAdapter<boost::lockfree::queue<unsigned, BoostAllocator, boost::lockfree::capacity<SIZE>>>>("boost::lockfree::queue", hp,
                                                                                                                                   hw_thread_ids);
+    run_ping_pong_benchmark<ESLockfreeMPMCQueueAdapter<es::lockfree::mpmc_queue<unsigned, SIZE, uint32_t, false, false>>>("es::lockfree::mpmc_queue<f,f>", hp,   hw_thread_ids);
+    run_ping_pong_benchmark<ESLockfreeMPMCQueueAdapter<es::lockfree::mpmc_queue<unsigned, SIZE, uint32_t, false, true >>>("es::lockfree::mpmc_queue<f,t>", hp,   hw_thread_ids);
+    run_ping_pong_benchmark<ESLockfreeMPMCQueueAdapter<es::lockfree::mpmc_queue<unsigned, SIZE, uint32_t, true , false>>>("es::lockfree::mpmc_queue<t,f>", hp,   hw_thread_ids);
+    run_ping_pong_benchmark<ESLockfreeMPMCQueueAdapter<es::lockfree::mpmc_queue<unsigned, SIZE, uint32_t, true , true >>>("es::lockfree::mpmc_queue<t,t>", hp,   hw_thread_ids);
 
     run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinlock<unsigned, SIZE>>>("pthread_spinlock", hp, hw_thread_ids);
     // run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, FairSpinlock>>>("FairSpinlock", hp, hw_thread_ids);
