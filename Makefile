@@ -47,7 +47,7 @@ ldlibs := -lrt ${LDLIBS}
 cppflags.tbb :=
 ldlibs.tbb := {-L,'-Wl,-rpath='}/usr/local/lib -ltbb
 
-cppflags.moodycamel := -I$(abspath ..)
+cppflags.moodycamel := -I$(abspath ..) -I${abspath ../xenium}
 ldlibs.moodycamel :=
 
 COMPILE.CXX = ${CXX} -o $@ -c ${cppflags} ${cxxflags} -MD -MP $(abspath $<)
