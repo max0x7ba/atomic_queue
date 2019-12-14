@@ -24,18 +24,18 @@
   <body>
     <h1>Scalability Benchmark</h1>
     <p>N producer threads push a 4-byte integer into one queue, N consumer threads pop the integers from the queue. All producers posts 1,000,000 messages in total. Total time to send and receive all the messages is measured. The benchmark is run for from 1 producer and 1 consumer up to (total-number-of-cpus / 2) producers/consumers to measure the scalabilty of different queues.</p>
-    <div class="chart" id="scalability-7700k-5GHz"></div>
+    <div class="chart" id="scalability-9900KS-5GHz"></div>
     <div class="chart" id="scalability-xeon-gold-6132"></div>
     <h1>Latency Benchmark</h1>
     <p>One thread posts an integer to another thread and waits for the reply using two queues. The benchmarks measures the total time of 100,000 ping-pongs, best of 10 runs. Contention is minimal here to be able to achieve and measure the lowest latency. Reports the average round-trip time.</p>
-    <div class="chart" id="latency-7700k-5GHz"></div>
+    <div class="chart" id="latency-9900KS-5GHz"></div>
     <div class="chart" id="latency-xeon-gold-6132"></div>
     <h2>Systems details</h2>
-    <h3>Intel i7-7700K system</h3>
+    <h3>Intel i9-9900KS system</h3>
     <ul>
-      <li>OS: Ubuntu-18.04.02 LTS
+      <li>OS: Ubuntu-18.04.3 LTS
       <li>Compiler: gcc-8.3.0
-      <li>atomic_queue version: commit cac1ce14b420ef8ad26431014ecc44d10514b2a9
+      <li>atomic_queue version: commit 5113488e0146dc1ea82f4a0a3da85eba3e166d9f
       <li>Boost version: 1.65.1
       <li>TBB version: 2019_U7, commit 4233fef583b4f8cbf9f781311717600feaaa0694
       <li>moodycamel concurrentqueue version: commit dea078cf5b6e742cd67a0d725e36f872feca4de4
