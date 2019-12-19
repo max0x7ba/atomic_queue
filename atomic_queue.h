@@ -425,7 +425,9 @@ class AtomicQueueB : public AtomicQueueCommon<AtomicQueueB<T, A, NIL, MAXIMIZE_T
     static constexpr auto SHUFFLE_BITS = details::GetCacheLineIndexBits<ELEMENTS_PER_CACHE_LINE>::value;
     static_assert(SHUFFLE_BITS, "Unexpected SHUFFLE_BITS.");
 
-    unsigned size_;
+    // AtomicQueueCommon members are stored into by readers and writers.
+    // Allocate these immutable members on another cache line which never gets invalidated by stores.
+    alignas(CACHE_LINE_SIZE) unsigned size_;
     std::atomic<T>* elements_;
 
     T do_pop(unsigned tail) noexcept {
@@ -500,7 +502,9 @@ class AtomicQueueB2 : public AtomicQueueCommon<AtomicQueueB2<T, A, MAXIMIZE_THRO
     using AllocatorElements = A;
     using AllocatorStates = typename std::allocator_traits<A>::template rebind_alloc<std::atomic<uint8_t>>;
 
-    unsigned size_;
+    // AtomicQueueCommon members are stored into by readers and writers.
+    // Allocate these immutable members on another cache line which never gets invalidated by stores.
+    alignas(CACHE_LINE_SIZE) unsigned size_;
     std::atomic<unsigned char>* states_;
     T* elements_;
 
