@@ -27,13 +27,13 @@ AR := ${ar.${TOOLSET}}
 
 cxxflags.gcc.debug := -Og -fstack-protector-all -fno-omit-frame-pointer # -D_GLIBCXX_DEBUG
 cxxflags.gcc.release := -O3 -mtune=native -ffast-math -falign-{functions,loops}=64 -DNDEBUG
-cxxflags.gcc := -pthread -march=native -std=gnu++14 -W{all,extra,error,no-{maybe-uninitialized,unused-function}} -g -fmessage-length=0 ${cxxflags.gcc.${BUILD}}
+cxxflags.gcc := -pthread -march=native -std=gnu++14 -W{all,extra,error,no-{maybe-uninitialized,unused-function,unused-local-typedefs}} -g -fmessage-length=0 ${cxxflags.gcc.${BUILD}}
 
 cflags.gcc := -pthread -march=native -W{all,extra} -g -fmessage-length=0 ${cxxflags.gcc.${BUILD}}
 
 cxxflags.clang.debug := -O0 -fstack-protector-all
 cxxflags.clang.release := -O3 -mtune=native -ffast-math -falign-functions=64 -DNDEBUG
-cxxflags.clang := -stdlib=libc++ -pthread -march=native -std=gnu++14 -W{all,extra,error,no-unused-function} -g -fmessage-length=0 ${cxxflags.clang.${BUILD}}
+cxxflags.clang := -stdlib=libc++ -pthread -march=native -std=gnu++14 -W{all,extra,error,no-{unused-function,unused-local-typedefs}} -g -fmessage-length=0 ${cxxflags.clang.${BUILD}}
 ldflags.clang := -stdlib=libc++ ${ldflags.clang.${BUILD}}
 
 # Additional CPPFLAGS, CXXFLAGS, CFLAGS, LDLIBS, LDFLAGS can come from the command line, e.g. make CXXFLAGS='-march=skylake -mtune=skylake'.
