@@ -60,7 +60,7 @@ public:
     }
 
     void unlock() noexcept {
-        next_.fetch_add(1, std::memory_order_release);
+        next_.store(next_.load(std::memory_order_relaxed) + 1, std::memory_order_release);
     }
 };
 

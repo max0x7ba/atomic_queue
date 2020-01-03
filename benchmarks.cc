@@ -290,12 +290,13 @@ void run_throughput_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const
                                   Type<BoostQueueAdapter<boost::lockfree::queue<unsigned, BoostAllocator, boost::lockfree::capacity<SIZE - 2>>>>{});
 
     run_throughput_mpmc_benchmark("pthread_spinlock", hp, hw_thread_ids, Type<RetryDecorator<AtomicQueueSpinlock<unsigned, SIZE>>>{});
-    // run_throughput_mpmc_benchmark("FairSpinlock", hp, hw_thread_ids, Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, FairSpinlock>>>{});
+    run_throughput_mpmc_benchmark("FairSpinlock", hp, hw_thread_ids, Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, FairSpinlock>>>{});
     // run_throughput_mpmc_benchmark("UnfairSpinlock", hp, hw_thread_ids, Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, UnfairSpinlock>>>{});
 
     run_throughput_spsc_benchmark("moodycamel::ReaderWriterQueue", hp, hw_thread_ids, Type<MoodyCamelReaderWriterQueue<unsigned, SIZE>>{});
     run_throughput_mpmc_benchmark("moodycamel::ConcurrentQueue", hp, hw_thread_ids, Type<MoodyCamelQueue<unsigned, SIZE>>{});
 
+    run_throughput_mpmc_benchmark("std::mutex", hp, hw_thread_ids, Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, std::mutex>>>{});
     run_throughput_mpmc_benchmark("tbb::spin_mutex", hp, hw_thread_ids, Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, tbb::spin_mutex>>>{});
     // run_throughput_mpmc_benchmark("tbb::speculative_spin_mutex", hp, hw_thread_ids,
     //                               Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, tbb::speculative_spin_mutex>>>{});
@@ -417,12 +418,13 @@ void run_ping_pong_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const&
                                                                                                                                   hw_thread_ids);
 
     run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinlock<unsigned, SIZE>>>("pthread_spinlock", hp, hw_thread_ids);
-    // run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, FairSpinlock>>>("FairSpinlock", hp, hw_thread_ids);
+    run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, FairSpinlock>>>("FairSpinlock", hp, hw_thread_ids);
     // run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, UnfairSpinlock>>>("UnfairSpinlock", hp, hw_thread_ids);
 
     run_ping_pong_benchmark<MoodyCamelReaderWriterQueue<unsigned, SIZE>>("moodycamel::ReaderWriterQueue", hp, hw_thread_ids);
     run_ping_pong_benchmark<MoodyCamelQueue<unsigned, SIZE>>("moodycamel::ConcurrentQueue", hp, hw_thread_ids);
 
+    run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, std::mutex>>>("std::mutex", hp, hw_thread_ids);
     run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, tbb::spin_mutex>>>("tbb::spin_mutex", hp, hw_thread_ids);
     // run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, tbb::speculative_spin_mutex>>>("tbb::speculative_spin_mutex", hp, hw_thread_ids);
     run_ping_pong_benchmark<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, SIZE>>("tbb::concurrent_bounded_queue", hp, hw_thread_ids);
