@@ -22,14 +22,14 @@ Totally ordered mode is supported. In this mode consumers receive messages in th
 
 Single-producer-single-consumer mode is supported. In this mode, no read-modify-write instructions are necessary, only the atomic loads and stores. That improves queue throughput significantly.
 
-A few well-known containers are used for reference in the benchmarks:
+A few other thread-safe containers are used for reference in the benchmarks:
+* `std::mutex` - a fixed size ring-buffer with `std::mutex`.
+* `pthread_spinlock` - a fixed size ring-buffer with `pthread_spinlock_t`.
 * `boost::lockfree::spsc_queue` - a wait-free single-producer-single-consumer queue from Boost library.
 * `boost::lockfree::queue` - a lock-free multiple-producer-multiple-consumer queue from Boost library.
-* `pthread_spinlock` - a locked fixed size ring-buffer with `pthread_spinlock_t`.
 * `moodycamel::ConcurrentQueue` - a lock-free multiple-producer-multiple-consumer queue used in non-blocking mode.
 * `moodycamel::ReaderWriterQueue` - a lock-free single-producer-single-consumer queue used in non-blocking mode.
 * `tbb::spin_mutex` - a locked fixed size ring-buffer with `tbb::spin_mutex` from Intel Threading Building Blocks.
-* `tbb::speculative_spin_mutex` - a locked fixed size ring-buffer with `tbb::speculative_spin_mutex` from Intel Threading Building Blocks. This type of mutex uses hardware lock elision based on Intel TSX extension, which is now known to be a good side-channel that bypasses memory protection, so that Intel recommends disabling TSX extension to mitigate. AMD CPUs don't support this extension. The benchmark for this queue type is going to be removed in the future.
 * `tbb::concurrent_bounded_queue` - eponymous queue used in non-blocking mode from Intel Threading Building Blocks.
 
 # Build and run instructions
@@ -42,8 +42,6 @@ git clone https://github.com/cameron314/concurrentqueue.git
 git clone https://github.com/cameron314/readerwriterqueue.git
 git clone https://github.com/max0x7ba/atomic_queue.git
 cd atomic_queue
-sudo hugeadm --pool-pages-min 1GB:1 --pool-pages-max 1GB:1 # Optional.
-sudo cpupower frequency-set --related --governor performance # Optional.
 make -r -j4 run_benchmarks
 ```
 
@@ -75,6 +73,10 @@ Using a power-of-2 ring-buffer array size allows a couple of important optimizat
 * The *element index within the cache line* gets swapped with the *cache line index* within the *ring-buffer array element index*, so that subsequent queue elements actually reside in different cache lines. This eliminates contention between producers and consumers on the ring-buffer cache lines. Instead of `N` producers together with `M` consumers competing on the same ring-buffer array cache line in the worst case, it is only one producer competing with one consumer. This optimisation scales better with the number of producers and consumers, and element size. With low number of producers and consumers (up to about 2 of each in these benchmarks) disabling this optimisation may yield better throughput (but higher variance across runs).
 
 The containers use `unsigned` type for size and internal indexes. On x86-64 platform `unsigned` is 32-bit wide, whereas `size_t` is 64-bit wide. 64-bit instructions utilise an extra byte instruction prefix resulting in slightly more pressure on the CPU instruction cache and the front-end. Hence, 32-bit `unsigned` indexes are used to maximise performance. That limits the queue size to 4,294,967,295 elements, which seems to be a reasonable hard limit for many applications.
+
+While the atomic queues can be used with any moveable element types (including `std::unique_ptr`), for best througput and latency the queue elements should be cheap to copy and lock-free (e.g. `unsigned` or `T*`), so that `push` and `pop` operations complete fastest.
+
+Atomic queues that use anything else than an OS mutex (e.g. `std::mutex` or `boost::mutex`) should only be used with real-time `SCHED_FIFO` threads. Otherwise, the OS may preempt the thread in the middle of `push` or `pop` operation which may prevent other threads calling `push` and `pop` from making forward progress. A higher priority `SCHED_FIFO` thread can still preempt your `SCHED_FIFO` thread.
 
 # Benchmarks
 [View throughput and latency benchmarks charts][1].
