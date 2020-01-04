@@ -23,4 +23,6 @@ function benchmark() {
     done
 }
 
+$(dirname "$0")/benchmark-prologue.sh
 benchmark | tee results-${cpucount}.${now}.txt
+$(dirname "$0")/benchmark-epilogue.sh

@@ -90,10 +90,9 @@ ${build_dir}/%.a : Makefile | ${build_dir}
 
 run_benchmarks : ${build_dir}/benchmarks
 	@echo "---- running $< ----"
-#	nice -20 $<
+	scripts/benchmark-prologue.sh
 	sudo chrt -f 50 $<
-#	nice -20 perf stat -ddd $<
-#	sudo chrt -f 50 perf stat -ddd $<
+	scripts/benchmark-epilogue.sh
 
 run_tests : ${build_dir}/tests
 	@echo "---- running $< ----"
