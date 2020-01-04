@@ -78,13 +78,15 @@ While the atomic queues can be used with any moveable element types (including `
 
 Atomic queues that use anything else than an OS mutex (e.g. `std::mutex` or `boost::mutex`) should only be used with real-time `SCHED_FIFO` threads. Otherwise, the OS may preempt the thread in the middle of `push` or `pop` operation which may prevent other threads calling `push` and `pop` from making forward progress. A higher priority `SCHED_FIFO` thread can still preempt your `SCHED_FIFO` thread.
 
+Some people proposed busy-waiting with a call to `sched_yield`/`pthread_yield`. However, `sched_yield` is a wrong tool for locking because it doesn't communicate to the OS kernel what the thread is waiting for, so that the OS scheduler can never wake up the calling thread at the "right" time, unless there are no other threads that can run on this CPU. [More details about `sched_yield` and spinlocks from Linus Torvalds](https://www.realworldtech.com/forum/?threadid=189711&curpostid=189752).
+
 # Benchmarks
 [View throughput and latency benchmarks charts][1].
 
 ## Methodology
 There are a few OS behaviours that complicate benchmarking:
 * CPU scheduler can place threads on different CPU cores each run. To avoid that the threads are pinned to specific CPU cores.
-* CPU scheduler can preempt threads. To avoid that FIFO real-time priority 50 is used to disable scheduler time slicing and make the threads non-preemptable by lower priority processes/threads.
+* CPU scheduler can preempt threads. To avoid that real-time `SCHED_FIFO` priority 50 is used to disable scheduler time quantum expiry and make the threads non-preemptable by lower priority processes/threads.
 * Adverse address space randomisation may cause extra CPU cache conflicts. To minimise effects of that `benchmarks` executable is run at least 33 times and then the results with the highest throughput / lowest latency are selected.
 
 I only have access to a few x86-64 machines. If you have access to different hardware feel free to submit the output file of `scripts/run-benchmarks.sh` and I will include your results into the benchmarks page.
