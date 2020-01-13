@@ -7,11 +7,24 @@
 #include "atomic_queue.h"
 #include "spinlock.h"
 
+#include <mutex>
 #include <cassert>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 namespace atomic_queue {
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+template<class M>
+struct ScopedLockType {
+    using type = typename M::scoped_lock;
+};
+
+template<>
+struct ScopedLockType<std::mutex> {
+    using type = std::unique_lock<std::mutex>;
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -24,9 +37,9 @@ class AtomicQueueMutexT {
     alignas(CACHE_LINE_SIZE) unsigned tail_ = 0;
     alignas(CACHE_LINE_SIZE) T q_[size_] = {};
 
-    static constexpr int SHUFFLE_BITS =
-        details::GetIndexShuffleBits<MINIMIZE_CONTENTION, size_, CACHE_LINE_SIZE / sizeof(T)>::value;
-    using ScopedLock = typename Mutex::scoped_lock;
+    static constexpr int SHUFFLE_BITS = details::GetIndexShuffleBits<MINIMIZE_CONTENTION, size_, CACHE_LINE_SIZE / sizeof(T)>::value;
+
+    using ScopedLock = typename ScopedLockType<Mutex>::type;
 
 public:
     using value_type = T;

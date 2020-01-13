@@ -22,17 +22,17 @@ Totally ordered mode is supported. In this mode consumers receive messages in th
 
 Single-producer-single-consumer mode is supported. In this mode, no read-modify-write instructions are necessary, only the atomic loads and stores. That improves queue throughput significantly.
 
-A few well-known containers are used for reference in the benchmarks:
+A few other thread-safe containers are used for reference in the benchmarks:
+* `std::mutex` - a fixed size ring-buffer with `std::mutex`.
+* `pthread_spinlock` - a fixed size ring-buffer with `pthread_spinlock_t`.
 * `boost::lockfree::spsc_queue` - a wait-free single-producer-single-consumer queue from Boost library.
 * `boost::lockfree::queue` - a lock-free multiple-producer-multiple-consumer queue from Boost library.
-* `pthread_spinlock` - a locked fixed size ring-buffer with `pthread_spinlock_t`.
 * `moodycamel::ConcurrentQueue` - a lock-free multiple-producer-multiple-consumer queue used in non-blocking mode.
 * `moodycamel::ReaderWriterQueue` - a lock-free single-producer-single-consumer queue used in non-blocking mode.
 * `xenium::michael_scott_queue` - a lock-free multi-producer-multi-consumer queue proposed by [Michael and Scott](http://www.cs.rochester.edu/~scott/papers/1996_PODC_queues.pdf) (this queue is similar to `boost::lockfree::queue` which is also based on the same proposal).
 * `xenium::ramalhete_queue` - a lock-free multi-producer-multi-consumer queue proposed by [Ramalhete and Correia](http://concurrencyfreaks.blogspot.com/2016/11/faaarrayqueue-mpmc-lock-free-queue-part.html).
 * `xenium::vyukov_bounded_queue` - a bounded multi-producer-multi-consumer queue based on the version proposed by [Vyukov](https://groups.google.com/forum/#!topic/lock-free/-bqYlfbQmH0).
 * `tbb::spin_mutex` - a locked fixed size ring-buffer with `tbb::spin_mutex` from Intel Threading Building Blocks.
-* `tbb::speculative_spin_mutex` - a locked fixed size ring-buffer with `tbb::speculative_spin_mutex` from Intel Threading Building Blocks. This type of mutex uses hardware lock elision based on Intel TSX extension, which is now known to be a good side-channel that bypasses memory protection, so that Intel recommends disabling TSX extension to mitigate. AMD CPUs don't support this extension. The benchmark for this queue type is going to be removed in the future.
 * `tbb::concurrent_bounded_queue` - eponymous queue used in non-blocking mode from Intel Threading Building Blocks.
 
 # Build and run instructions
@@ -46,8 +46,6 @@ git clone https://github.com/cameron314/readerwriterqueue.git
 git clone https://github.com/mpoeter/xenium.git
 git clone https://github.com/max0x7ba/atomic_queue.git
 cd atomic_queue
-sudo hugeadm --pool-pages-min 1GB:1 --pool-pages-max 1GB:1 # Optional.
-sudo cpupower frequency-set --related --governor performance # Optional.
 make -r -j4 run_benchmarks
 ```
 
@@ -80,13 +78,19 @@ Using a power-of-2 ring-buffer array size allows a couple of important optimizat
 
 The containers use `unsigned` type for size and internal indexes. On x86-64 platform `unsigned` is 32-bit wide, whereas `size_t` is 64-bit wide. 64-bit instructions utilise an extra byte instruction prefix resulting in slightly more pressure on the CPU instruction cache and the front-end. Hence, 32-bit `unsigned` indexes are used to maximise performance. That limits the queue size to 4,294,967,295 elements, which seems to be a reasonable hard limit for many applications.
 
+While the atomic queues can be used with any moveable element types (including `std::unique_ptr`), for best througput and latency the queue elements should be cheap to copy and lock-free (e.g. `unsigned` or `T*`), so that `push` and `pop` operations complete fastest.
+
+Atomic queues that use anything else than an OS mutex (e.g. `std::mutex` or `boost::mutex`) should only be used with real-time `SCHED_FIFO` threads. Otherwise, the OS may preempt the thread in the middle of `push` or `pop` operation which may prevent other threads calling `push` and `pop` from making forward progress. A higher priority `SCHED_FIFO` thread can still preempt your `SCHED_FIFO` thread.
+
+Some people proposed busy-waiting with a call to `sched_yield`/`pthread_yield`. However, `sched_yield` is a wrong tool for locking because it doesn't communicate to the OS kernel what the thread is waiting for, so that the OS scheduler can never wake up the calling thread at the "right" time, unless there are no other threads that can run on this CPU. [More details about `sched_yield` and spinlocks from Linus Torvalds](https://www.realworldtech.com/forum/?threadid=189711&curpostid=189752).
+
 # Benchmarks
 [View throughput and latency benchmarks charts][1].
 
 ## Methodology
 There are a few OS behaviours that complicate benchmarking:
 * CPU scheduler can place threads on different CPU cores each run. To avoid that the threads are pinned to specific CPU cores.
-* CPU scheduler can preempt threads. To avoid that FIFO real-time priority 50 is used to disable scheduler time slicing and make the threads non-preemptable by lower priority processes/threads.
+* CPU scheduler can preempt threads. To avoid that real-time `SCHED_FIFO` priority 50 is used to disable scheduler time quantum expiry and make the threads non-preemptable by lower priority processes/threads.
 * Adverse address space randomisation may cause extra CPU cache conflicts. To minimise effects of that `benchmarks` executable is run at least 33 times and then the results with the highest throughput / lowest latency are selected.
 
 I only have access to a few x86-64 machines. If you have access to different hardware feel free to submit the output file of `scripts/run-benchmarks.sh` and I will include your results into the benchmarks page.

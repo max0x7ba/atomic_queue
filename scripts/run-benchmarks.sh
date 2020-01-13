@@ -15,4 +15,11 @@ function benchmark() {
     done
 }
 
+sudo hugeadm --pool-pages-min 1GB:1 --pool-pages-max 1GB:1
+sudo cpupower frequency-set --related --governor performance >/dev/null
+
 benchmark | tee results-${cpucount}.${now}.txt
+
+$(dirname "$0")/benchmark-prologue.sh
+sudo cpupower frequency-set --related --governor powersave >/dev/null
+$(dirname "$0")/benchmark-epilogue.sh
