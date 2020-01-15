@@ -47,8 +47,11 @@ ldlibs := -lrt ${LDLIBS}
 cppflags.tbb :=
 ldlibs.tbb := {-L,'-Wl,-rpath='}/usr/local/lib -ltbb
 
-cppflags.moodycamel := -I$(abspath ..) -I${abspath ../xenium}
+cppflags.moodycamel := -I$(abspath ..)
 ldlibs.moodycamel :=
+
+cppflags.xenium := -I${abspath ../xenium}
+ldlibs.xenium :=
 
 COMPILE.CXX = ${CXX} -o $@ -c ${cppflags} ${cxxflags} -MD -MP $(abspath $<)
 COMPILE.S = ${CXX} -o- -S -masm=intel ${cppflags} ${cxxflags} $(abspath $<) | c++filt > $@
@@ -69,8 +72,8 @@ ${build_dir}/libatomic_queue.a : $(addprefix ${build_dir}/,cpu_base_frequency.o 
 -include ${build_dir}/cpu_base_frequency.d
 -include ${build_dir}/huge_pages.d
 
-${build_dir}/benchmarks : cppflags += ${cppflags.tbb} ${cppflags.moodycamel}
-${build_dir}/benchmarks : ldlibs += ${ldlibs.tbb} ${ldlibs.moodycamel} -ldl
+${build_dir}/benchmarks : cppflags += ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium}
+${build_dir}/benchmarks : ldlibs += ${ldlibs.tbb} ${ldlibs.moodycamel} ${ldlibs.xenium} -ldl
 ${build_dir}/benchmarks : ${build_dir}/benchmarks.o ${build_dir}/libatomic_queue.a Makefile | ${build_dir}
 	$(strip ${LINK.EXE})
 -include ${build_dir}/benchmarks.d
