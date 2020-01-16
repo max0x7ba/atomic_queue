@@ -1,5 +1,7 @@
 # atomic_queue
-multiple-producer-multiple-consumer C++14 *lock-free* queues based on `std::atomic<>`. Based on ideas from ["A Wait-free Queue as Fast as Fetch-and-Add" whitepaper by Chaoran Yang and John Mellor-Crummey](http://chaoran.me/assets/pdf/wfq-ppopp16.pdf).
+multiple-producer-multiple-consumer C++14 *lock-free* queues based on `std::atomic<>`.
+
+Based on ideas from ["A Wait-free Queue as Fast as Fetch-and-Add" whitepaper by Chaoran Yang and John Mellor-Crummey](http://chaoran.me/assets/pdf/wfq-ppopp16.pdf).
 
 The main design principle these queues adhere to is _simplicity_: fixed size buffer, the bare minimum of atomic operations.
 
