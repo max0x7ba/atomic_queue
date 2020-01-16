@@ -7,8 +7,8 @@ The main design principle these queues adhere to is _simplicity_: fixed size buf
 
 These qualities are also limitations:
 
-* The maximum queue size must be set at compile time (fastest) or construction time (slower).
-* There are no blocking push/pop functions.
+* The maximum queue size must be set at compile time or construction time.
+* There are no OS-blocking push/pop functions.
 
 Nevertheless, ultra-low-latency applications need just that and nothing more. The simplicity pays off, see the [throughput and latency benchmarks][1].
 
@@ -18,7 +18,7 @@ Available containers are:
 * `AtomicQueue2` - a fixed size ring-buffer for non-atomic elements.
 * `OptimistAtomicQueue2` - a faster fixed size ring-buffer for non-atomic elements which busy-waits when empty or full.
 
-These containers have corresponding `AtomicQueueB`, `OptimistAtomicQueueB`, `AtomicQueueB2`, `OptimistAtomicQueueB2` versions where the buffer size is specified as an argument to the constructor. The `B` versions are slower.
+These containers have corresponding `AtomicQueueB`, `OptimistAtomicQueueB`, `AtomicQueueB2`, `OptimistAtomicQueueB2` versions where the buffer size is specified as an argument to the constructor.
 
 Totally ordered mode is supported. In this mode consumers receive messages in the same FIFO order the messages were posted. This mode is supported for `push` and `pop` functions, but for not the `try_` versions. On Intel x86 the totally ordered mode has 0 cost, as of 2019.
 
