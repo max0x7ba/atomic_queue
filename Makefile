@@ -120,6 +120,6 @@ rtags : clean
 	${MAKE} -nk | rc -c -; true
 
 clean :
-	rm -rf ${build_dir}
+	rm -rf ${build_dir} ${exes}
 
 .PHONY : rtags run_benchmarks clean all run_%
