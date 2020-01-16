@@ -9,6 +9,11 @@
 #include "huge_pages.h"
 #include "moodycamel.h"
 
+#include <xenium/michael_scott_queue.hpp>
+#include <xenium/ramalhete_queue.hpp>
+#include <xenium/vyukov_bounded_queue.hpp>
+#include <xenium/reclamation/generic_epoch_based.hpp>
+
 #include <boost/lockfree/queue.hpp>
 #include <boost/lockfree/spsc_queue.hpp>
 
@@ -23,6 +28,7 @@
 #include <limits>
 #include <stdexcept>
 #include <thread>
+#include <type_traits>
 #include <vector>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -77,6 +83,38 @@ struct BoostQueueAdapter : BoostSpScAdapter<Queue> {
             spin_loop_pause();
     }
 };
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+using Reclaimer = xenium::reclamation::new_epoch_based<>;
+
+template<class Queue>
+struct XeniumQueueAdapter : Queue {
+    using T = typename Queue::value_type;
+
+    T pop() {
+        T element;
+        while(!this->Queue::try_pop(element))
+            spin_loop_pause();
+        return element;
+    }
+};
+
+template <class T>
+struct region_guard_traits{
+    struct region_guard { region_guard() {} };
+};
+template <class T, class... Policies>
+struct region_guard_traits<xenium::michael_scott_queue<T, Policies...>> {
+    using region_guard = typename xenium::michael_scott_queue<T, Policies...>::region_guard;
+};
+template <class T, class... Policies>
+struct region_guard_traits<xenium::ramalhete_queue<T, Policies...>> {
+    using region_guard = typename xenium::ramalhete_queue<T, Policies...>::region_guard;
+};
+
+template <class T>
+using region_guard_t = typename region_guard_traits<T>::region_guard;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -140,6 +178,7 @@ void throughput_producer(unsigned N, Queue* queue, std::atomic<uint64_t>* t0, Ba
     uint64_t expected = 0;
     t0->compare_exchange_strong(expected, __builtin_ia32_rdtsc(), std::memory_order_acq_rel, std::memory_order_relaxed);
 
+    region_guard_t<Queue> guard{};
     for(unsigned n = 1, stop = N + 1; n <= stop; ++n)
         queue->push(n);
 }
@@ -149,6 +188,7 @@ void throughput_consumer_impl(unsigned N, Queue* queue, sum_t* consumer_sum, std
     unsigned const stop = N + 1;
     sum_t sum = 0;
 
+    region_guard_t<Queue> guard{};
     for(;;) {
         unsigned n = queue->pop();
         if(n == stop)
@@ -302,6 +342,13 @@ void run_throughput_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const
     //                               Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, tbb::speculative_spin_mutex>>>{});
     run_throughput_mpmc_benchmark("tbb::concurrent_bounded_queue", hp, hw_thread_ids, Type<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, SIZE>>{});
 
+    run_throughput_mpmc_benchmark("xenium::michael_scott_queue", hp, hw_thread_ids,
+        Type<XeniumQueueAdapter<xenium::michael_scott_queue<unsigned, xenium::policy::reclaimer<Reclaimer>>>>{});
+    run_throughput_mpmc_benchmark("xenium::ramalhete_queue", hp, hw_thread_ids,
+        Type<XeniumQueueAdapter<xenium::ramalhete_queue<unsigned, xenium::policy::reclaimer<Reclaimer>>>>{});
+    run_throughput_mpmc_benchmark("xenium::vyukov_bounded_queue", hp, hw_thread_ids,
+        Type<RetryDecorator<CapacityToConstructor<xenium::vyukov_bounded_queue<unsigned>, SIZE>>>{});
+    
     using SPSC = QueueTypes<SIZE, true, false, false>;
     using MPMC = QueueTypes<SIZE, false, true, true>; // Enable MAXIMIZE_THROUGHPUT for 2 or more producers/consumers.
 
@@ -339,6 +386,7 @@ void run_throughput_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const
 template<class Queue, bool Sender>
 void ping_pong_thread_impl(Queue* q1, Queue* q2, unsigned N, uint64_t* time) {
     uint64_t t0 = __builtin_ia32_rdtsc();
+    region_guard_t<Queue> guard{};
     for(unsigned i = 1, j = 0; j < N; ++i) {
         if(Sender) {
             q1->push(i);
@@ -428,6 +476,10 @@ void run_ping_pong_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const&
     run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, tbb::spin_mutex>>>("tbb::spin_mutex", hp, hw_thread_ids);
     // run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, tbb::speculative_spin_mutex>>>("tbb::speculative_spin_mutex", hp, hw_thread_ids);
     run_ping_pong_benchmark<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, SIZE>>("tbb::concurrent_bounded_queue", hp, hw_thread_ids);
+
+    run_ping_pong_benchmark<XeniumQueueAdapter<xenium::michael_scott_queue<unsigned, xenium::policy::reclaimer<Reclaimer>>>>("xenium::michael_scott_queue", hp, hw_thread_ids);
+    run_ping_pong_benchmark<XeniumQueueAdapter<xenium::ramalhete_queue<unsigned, xenium::policy::reclaimer<Reclaimer>>>>("xenium::ramalhete_queue", hp, hw_thread_ids);
+    run_ping_pong_benchmark<RetryDecorator<CapacityToConstructor<xenium::vyukov_bounded_queue<unsigned>, SIZE>>>("xenium::vyukov_bounded_queue", hp, hw_thread_ids);
 
     // Use MAXIMIZE_THROUGHPUT=false for better latency.
     using SPSC = QueueTypes<SIZE, true, false, false>;

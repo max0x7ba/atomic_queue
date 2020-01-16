@@ -29,6 +29,9 @@ A few other thread-safe containers are used for reference in the benchmarks:
 * `boost::lockfree::queue` - a lock-free multiple-producer-multiple-consumer queue from Boost library.
 * `moodycamel::ConcurrentQueue` - a lock-free multiple-producer-multiple-consumer queue used in non-blocking mode.
 * `moodycamel::ReaderWriterQueue` - a lock-free single-producer-single-consumer queue used in non-blocking mode.
+* `xenium::michael_scott_queue` - a lock-free multi-producer-multi-consumer queue proposed by [Michael and Scott](http://www.cs.rochester.edu/~scott/papers/1996_PODC_queues.pdf) (this queue is similar to `boost::lockfree::queue` which is also based on the same proposal).
+* `xenium::ramalhete_queue` - a lock-free multi-producer-multi-consumer queue proposed by [Ramalhete and Correia](http://concurrencyfreaks.blogspot.com/2016/11/faaarrayqueue-mpmc-lock-free-queue-part.html).
+* `xenium::vyukov_bounded_queue` - a bounded multi-producer-multi-consumer queue based on the version proposed by [Vyukov](https://groups.google.com/forum/#!topic/lock-free/-bqYlfbQmH0).
 * `tbb::spin_mutex` - a locked fixed size ring-buffer with `tbb::spin_mutex` from Intel Threading Building Blocks.
 * `tbb::concurrent_bounded_queue` - eponymous queue used in non-blocking mode from Intel Threading Building Blocks.
 
@@ -40,6 +43,7 @@ Building is necessary to run the tests and benchmarks.
 ```
 git clone https://github.com/cameron314/concurrentqueue.git
 git clone https://github.com/cameron314/readerwriterqueue.git
+git clone https://github.com/mpoeter/xenium.git
 git clone https://github.com/max0x7ba/atomic_queue.git
 cd atomic_queue
 make -r -j4 run_benchmarks
