@@ -178,7 +178,7 @@ void throughput_producer(unsigned N, Queue* queue, std::atomic<uint64_t>* t0, Ba
     uint64_t expected = 0;
     t0->compare_exchange_strong(expected, __builtin_ia32_rdtsc(), std::memory_order_acq_rel, std::memory_order_relaxed);
 
-    region_guard_t<Queue> guard{};
+    region_guard_t<Queue> guard;
     for(unsigned n = 1, stop = N + 1; n <= stop; ++n)
         queue->push(n);
 }
@@ -188,7 +188,7 @@ void throughput_consumer_impl(unsigned N, Queue* queue, sum_t* consumer_sum, std
     unsigned const stop = N + 1;
     sum_t sum = 0;
 
-    region_guard_t<Queue> guard{};
+    region_guard_t<Queue> guard;
     for(;;) {
         unsigned n = queue->pop();
         if(n == stop)
@@ -348,7 +348,7 @@ void run_throughput_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const
         Type<XeniumQueueAdapter<xenium::ramalhete_queue<unsigned, xenium::policy::reclaimer<Reclaimer>>>>{});
     run_throughput_mpmc_benchmark("xenium::vyukov_bounded_queue", hp, hw_thread_ids,
         Type<RetryDecorator<CapacityToConstructor<xenium::vyukov_bounded_queue<unsigned>, SIZE>>>{});
-    
+
     using SPSC = QueueTypes<SIZE, true, false, false>;
     using MPMC = QueueTypes<SIZE, false, true, true>; // Enable MAXIMIZE_THROUGHPUT for 2 or more producers/consumers.
 
@@ -386,7 +386,7 @@ void run_throughput_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const
 template<class Queue, bool Sender>
 void ping_pong_thread_impl(Queue* q1, Queue* q2, unsigned N, uint64_t* time) {
     uint64_t t0 = __builtin_ia32_rdtsc();
-    region_guard_t<Queue> guard{};
+    region_guard_t<Queue> guard;
     for(unsigned i = 1, j = 0; j < N; ++i) {
         if(Sender) {
             q1->push(i);

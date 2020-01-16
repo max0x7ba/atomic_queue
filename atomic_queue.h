@@ -325,7 +325,7 @@ public:
         return static_cast<int>(head_.load(X) - tail_.load(X)) >= static_cast<int>(static_cast<Derived const&>(*this).size_);
     }
 
-    unsigned size() const noexcept {
+    unsigned capacity() const noexcept {
         return static_cast<Derived const&>(*this).size_;
     }
 };
@@ -474,7 +474,7 @@ public:
 
     void swap(AtomicQueueB& b) noexcept {
         using std::swap;
-        swap(static_cast<Base&>(*this), static_cast<Base&>(b));
+        this->Base::swap(b);
         swap(static_cast<AllocatorElements&>(*this), static_cast<AllocatorElements&>(b));
         swap(size_, b.size_);
         swap(elements_, b.elements_);
@@ -571,7 +571,7 @@ public:
 
     void swap(AtomicQueueB2& b) noexcept {
         using std::swap;
-        swap(static_cast<Base&>(*this), static_cast<Base&>(b));
+        this->Base::swap(b);
         swap(static_cast<AllocatorElements&>(*this), static_cast<AllocatorElements&>(b));
         swap(static_cast<AllocatorStates&>(*this), static_cast<AllocatorStates&>(b));
         swap(size_, b.size_);

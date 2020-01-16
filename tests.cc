@@ -138,4 +138,14 @@ BOOST_AUTO_TEST_CASE(move_only_b2) {
     test_unique_ptr_int(q);
 }
 
+BOOST_AUTO_TEST_CASE(move_constuctor_assignment) {
+    AtomicQueueB2<std::unique_ptr<int>> q(2);
+    auto q2 = std::move(q);
+    q = std::move(q2);
+
+    AtomicQueueB<int> p(2);
+    auto p2 = std::move(p);
+    p = std::move(p2);
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
