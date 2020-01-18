@@ -1,5 +1,6 @@
 # Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file LICENSE.
 
+# Usage examples (assuming this directory is ~/src/atomic_queue):
 # time make -rC ~/src/atomic_queue -j8 run_benchmarks
 # time make -rC ~/src/atomic_queue -j8 TOOLSET=clang run_benchmarks
 # time make -rC ~/src/atomic_queue -j8 BUILD=debug run_tests
@@ -36,8 +37,8 @@ cxxflags.clang.release := -O3 -mtune=native -ffast-math -falign-functions=64 -DN
 cxxflags.clang := -stdlib=libc++ -pthread -march=native -std=gnu++14 -W{all,extra,error,no-{unused-function,unused-local-typedefs}} -g -fmessage-length=0 ${cxxflags.clang.${BUILD}}
 ldflags.clang := -stdlib=libc++ ${ldflags.clang.${BUILD}}
 
-# Additional CPPFLAGS, CXXFLAGS, CFLAGS, LDLIBS, LDFLAGS can come from the command line, e.g. make CXXFLAGS='-march=skylake -mtune=skylake'.
-# However, a clean build is required when changing the flags in the command line.
+# Additional CPPFLAGS, CXXFLAGS, CFLAGS, LDLIBS, LDFLAGS can come from the command line, e.g. make CPPFLAGS='-I<my-include-dir>', or from environment variables.
+# However, a clean build is required when changing the flags in the command line or in environment variables, this makefile doesn't detect such changes.
 cxxflags := ${cxxflags.${TOOLSET}} ${CXXFLAGS}
 cflags := ${cflags.${TOOLSET}} ${CFLAGS}
 cppflags := ${CPPFLAGS}
@@ -54,7 +55,7 @@ cppflags.xenium := -I${abspath ../xenium}
 ldlibs.xenium :=
 
 COMPILE.CXX = ${CXX} -o $@ -c ${cppflags} ${cxxflags} -MD -MP $(abspath $<)
-COMPILE.S = ${CXX} -o- -S -masm=intel ${cppflags} ${cxxflags} $(abspath $<) | c++filt > $@
+COMPILE.S = ${CXX} -o- -S -masm=intel ${cppflags} ${cxxflags} $(abspath $<) | c++filt | egrep -v '^[[:space:]]*\.(loc|cfi|L[A-Z])' > $@
 PREPROCESS.CXX = ${CXX} -o $@ -E ${cppflags} ${cxxflags} $(abspath $<)
 COMPILE.C = ${CC} -o $@ -c ${cppflags} ${cflags} -MD -MP $(abspath $<)
 LINK.EXE = ${LD} -o $@ $(ldflags) $(filter-out Makefile,$^) $(ldlibs)
@@ -94,6 +95,7 @@ ${build_dir}/%.a : Makefile | ${build_dir}
 run_benchmarks : ${build_dir}/benchmarks
 	@echo "---- running $< ----"
 	scripts/benchmark-prologue.sh
+#	-sudo chrt -f 50 perf stat -ddd $<
 	-sudo chrt -f 50 $<
 	scripts/benchmark-epilogue.sh
 
@@ -107,6 +109,7 @@ ${build_dir}/%.o : %.cc Makefile | ${build_dir}
 ${build_dir}/%.o : %.c Makefile | ${build_dir}
 	$(strip ${COMPILE.C})
 
+%.S : cppflags += ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium}
 %.S : %.cc Makefile | ${build_dir}
 	$(strip ${COMPILE.S})
 

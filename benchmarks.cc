@@ -156,10 +156,10 @@ struct QueueTypes {
     using T = unsigned;
 
     // For atomic elements only.
-    using AtomicQueue =                                Type<RetryDecorator<atomic_queue::AtomicQueue<T, SIZE, T{}, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, false, SPSC>>>;
-    using OptimistAtomicQueue =                                       Type<atomic_queue::AtomicQueue<T, SIZE, T{}, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, false, SPSC>>;
-    using AtomicQueueB =        Type<RetryDecorator<CapacityToConstructor<atomic_queue::AtomicQueueB<T, Allocator, T{}, MAXIMIZE_THROUGHPUT, false, SPSC>, SIZE>>>;
-    using OptimistAtomicQueueB =               Type<CapacityToConstructor<atomic_queue::AtomicQueueB<T, Allocator, T{}, MAXIMIZE_THROUGHPUT, false, SPSC>, SIZE>>;
+    using AtomicQueue =                                Type<RetryDecorator<atomic_queue::AtomicQueue<T, SIZE, T{}, T{} - 1, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, false, SPSC>>>;
+    using OptimistAtomicQueue =                                       Type<atomic_queue::AtomicQueue<T, SIZE, T{}, T{} - 1, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, false, SPSC>>;
+    using AtomicQueueB =        Type<RetryDecorator<CapacityToConstructor<atomic_queue::AtomicQueueB<T, Allocator, T{}, T{} - 1, MAXIMIZE_THROUGHPUT, false, SPSC>, SIZE>>>;
+    using OptimistAtomicQueueB =               Type<CapacityToConstructor<atomic_queue::AtomicQueueB<T, Allocator, T{}, T{} - 1, MAXIMIZE_THROUGHPUT, false, SPSC>, SIZE>>;
 
     // For non-atomic elements.
     using AtomicQueue2 =                         Type<RetryDecorator<atomic_queue::AtomicQueue2<T, SIZE, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, false, SPSC>>>;
@@ -262,7 +262,6 @@ void run_throughput_benchmark(char const* name, HugePages& hp, std::vector<unsig
     for(unsigned threads = thread_count_min; threads <= thread_count_max; ++threads) {
         unsigned const N = M / threads;
         for(bool alternative_placement : {false, true}) {
-
             sum_t const expected_sum = (N + 1) / 2. * N;
             double const expected_sum_inv = 1. / expected_sum;
 
