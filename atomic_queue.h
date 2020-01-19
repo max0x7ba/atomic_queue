@@ -134,7 +134,7 @@ protected:
     }
 
     template<class T>
-    static bool do_push_atomic2(T element, std::atomic<T>& q_element) noexcept {
+    static bool do_push_atomic(T element, std::atomic<T>& q_element) noexcept {
         assert(element != Derived::nil_ && element != Derived::nil2_);
         for(T expected = Derived::nil_; ATOMIC_QUEUE_UNLIKELY(!q_element.compare_exchange_strong(expected, element, R, X)); expected = Derived::nil_) {
             if(ATOMIC_QUEUE_UNLIKELY(expected == Derived::nil2_)) {
@@ -160,7 +160,7 @@ protected:
     }
 
     template<class T>
-    static bool do_pop_atomic2(std::atomic<T>& q_element, T& element, std::false_type /*can_fail*/) noexcept {
+    static bool do_pop_atomic(std::atomic<T>& q_element, T& element, std::false_type /*can_fail*/) noexcept {
         for(;;) {
             element = q_element.load(X);
             if(ATOMIC_QUEUE_LIKELY(element != Derived::nil_))
@@ -173,7 +173,7 @@ protected:
     }
 
     template<class T>
-    static bool do_pop_atomic2(std::atomic<T>& q_element, T& element, std::true_type /*can_fail*/) noexcept {
+    static bool do_pop_atomic(std::atomic<T>& q_element, T& element, std::true_type /*can_fail*/) noexcept {
         for(unsigned retries = 4; retries--;) {
             element = q_element.load(X);
             if(ATOMIC_QUEUE_UNLIKELY(element == Derived::nil2_))
@@ -196,58 +196,84 @@ protected:
         return true;
     }
 
-    enum State : unsigned char { EMPTY, STORING, STORED, LOADING };
+    enum State : unsigned char {
+        EMPTY = 0,
+        EXPIRED = 2,
+
+        STORING = 1,
+        STORED = 3,
+        LOADING = 5
+    };
 
     template<class U, class T>
     static bool do_push_any(U&& element, std::atomic<unsigned char>& state, T& q_element) noexcept {
-        if(Derived::spsc_) {
-            while(ATOMIC_QUEUE_UNLIKELY(state.load(A) != EMPTY))
-                if(Derived::maximize_throughput_)
-                    spin_loop_pause();
-            q_element = std::forward<U>(element);
-            state.store(STORED, R);
-        }
-        else {
-            for(;;) {
-                unsigned char expected = EMPTY;
-                if(ATOMIC_QUEUE_LIKELY(state.compare_exchange_strong(expected, STORING, X, X))) {
-                    q_element = std::forward<U>(element);
-                    state.store(STORED, R);
+        for(;;) {
+            unsigned char expected = EMPTY;
+            if(ATOMIC_QUEUE_LIKELY(state.compare_exchange_strong(expected, STORING, X, X))) {
+                q_element = std::forward<U>(element);
+                expected = STORING;
+                if(ATOMIC_QUEUE_LIKELY(state.compare_exchange_strong(expected, STORED, R, X)))
                     return true;
-                }
-                // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
-                do
-                    spin_loop_pause();
-                while(Derived::maximize_throughput_ && state.load(X) != EMPTY);
+                // This producer got pre-empted, expected == EXPIRED.
+                element = std::move(q_element); // Undo element move. This may fail if U is not T.
+                state.store(EMPTY, R);
+                return false;
             }
+            if(ATOMIC_QUEUE_UNLIKELY(expected == EXPIRED))
+                return false;
+            // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
+            do
+                spin_loop_pause();
+            while(Derived::maximize_throughput_ && (state.load(X) & 1));
         }
-        return true;
     }
 
     template<class T>
-    static bool do_pop_any(std::atomic<unsigned char>& state, T& q_element, T& element) noexcept {
-        if(Derived::spsc_) {
-            while(ATOMIC_QUEUE_UNLIKELY(state.load(A) != STORED))
-                if(Derived::maximize_throughput_)
-                    spin_loop_pause();
-            element = std::move(q_element);
-            state.store(EMPTY, R);
-            return true;
+    static bool do_pop_any(std::atomic<unsigned char>& state, T& q_element, T& element, std::false_type /*can_fail*/) noexcept {
+        for(;;) {
+            unsigned char expected = STORED;
+            if(ATOMIC_QUEUE_LIKELY(state.compare_exchange_strong(expected, LOADING, X, X))) {
+                element = std::move(q_element);
+                state.store(EMPTY, R);
+                return true;
+            }
+            // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
+            do
+                spin_loop_pause();
+            while(Derived::maximize_throughput_ && state.load(X) != STORED);
         }
-        else {
-            for(;;) {
-                unsigned char expected = STORED;
+    }
+
+    template<class T>
+    static bool do_pop_any(std::atomic<unsigned char>& state, T& q_element, T& element, std::true_type /*can_fail*/) noexcept {
+        for(unsigned char expected;;) {
+            for(unsigned retries = 4; retries;) {
+                expected = STORED;
                 if(ATOMIC_QUEUE_LIKELY(state.compare_exchange_strong(expected, LOADING, X, X))) {
                     element = std::move(q_element);
                     state.store(EMPTY, R);
                     return true;
                 }
                 // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
-                do
+                if(Derived::maximize_throughput_) {
+                    do {
+                        spin_loop_pause();
+                        expected = state.load(X);
+                    } while(expected != STORED && --retries);
+                }
+                else {
                     spin_loop_pause();
-                while(Derived::maximize_throughput_ && state.load(X) != STORED);
+                    --retries;
+                }
             }
+
+            // The producer seems to have been pre-empted.
+            if(ATOMIC_QUEUE_LIKELY(state.compare_exchange_strong(expected, EXPIRED, X, X)))
+                break;
+            // The producer made progress. Try loading the element again.
         }
+        // The producer got pre-empted half-way in push. Don't block this consumer. Tell the producer to retry.
+        return false;
     }
 
 public:
@@ -314,21 +340,18 @@ public:
 
     auto pop() noexcept {
         typename Derived::value_type element;
-        for(;;) {
-            unsigned tail;
-            if(Derived::spsc_) {
-                tail = tail_.load(X);
-                tail_.store(tail + 1, X);
-            }
-            else {
-                constexpr auto memory_order = Derived::total_order_ ? std::memory_order_seq_cst : std::memory_order_acquire;
-                tail = tail_.fetch_add(1, memory_order); // FIFO and total order on Intel regardless, as of 2019.
-            }
-            std::false_type can_fail;
-            if(ATOMIC_QUEUE_LIKELY(static_cast<Derived&>(*this).do_pop(tail, element, can_fail)))
-               return element;
-            // The producer got pre-empted before storing the element. Move on to the next element.
+        unsigned tail;
+        if(Derived::spsc_) {
+            tail = tail_.load(X);
+            tail_.store(tail + 1, X);
         }
+        else {
+            constexpr auto memory_order = Derived::total_order_ ? std::memory_order_seq_cst : std::memory_order_acquire;
+            tail = tail_.fetch_add(1, memory_order); // FIFO and total order on Intel regardless, as of 2019.
+        }
+        std::false_type can_fail;
+        static_cast<Derived&>(*this).do_pop(tail, element, can_fail);
+        return element;
     }
 
     bool was_empty() const noexcept {
@@ -367,12 +390,12 @@ class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, CAPACITY, NIL, NIL2,
     template<class CanFail>
     bool do_pop(unsigned tail, T& element, CanFail can_fail) noexcept {
         std::atomic<T>& q_element = details::map<SHUFFLE_BITS>(elements_, tail % capacity_);
-        return Base::do_pop_atomic2(q_element, element, can_fail);
+        return Base::do_pop_atomic(q_element, element, can_fail);
     }
 
     bool do_push(T element, unsigned head) noexcept {
         std::atomic<T>& q_element = details::map<SHUFFLE_BITS>(elements_, head % capacity_);
-        return Base::do_push_atomic2(element, q_element);
+        return Base::do_push_atomic(element, q_element);
     }
 
 public:
@@ -407,9 +430,9 @@ class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, CAPACITY, MINIMIZE
     alignas(CACHE_LINE_SIZE) T elements_[capacity_] = {};
 
     template<class CanFail>
-    bool do_pop(unsigned tail, T& element, CanFail /*can_fail*/) noexcept {
+    bool do_pop(unsigned tail, T& element, CanFail can_fail) noexcept {
         unsigned index = details::remap_index<SHUFFLE_BITS>(tail % capacity_);
-        return Base::template do_pop_any(states_[index], elements_[index], element);
+        return Base::template do_pop_any(states_[index], elements_[index], element, can_fail);
     }
 
     template<class U>
@@ -459,12 +482,12 @@ class AtomicQueueB : public AtomicQueueCommon<AtomicQueueB<T, A, NIL, NIL2, MAXI
     template<class CanFail>
     bool do_pop(unsigned tail, T& element, CanFail can_fail) noexcept {
         std::atomic<T>& q_element = details::map<SHUFFLE_BITS>(elements_, tail & (capacity_ - 1));
-        return Base::do_pop_atomic2(q_element, element, can_fail);
+        return Base::do_pop_atomic(q_element, element, can_fail);
     }
 
     bool do_push(T element, unsigned head) noexcept {
         std::atomic<T>& q_element = details::map<SHUFFLE_BITS>(elements_, head & (capacity_ - 1));
-        return Base::do_push_atomic2(element, q_element);
+        return Base::do_push_atomic(element, q_element);
     }
 
 public:
@@ -542,9 +565,9 @@ class AtomicQueueB2 : public AtomicQueueCommon<AtomicQueueB2<T, A, MAXIMIZE_THRO
     static_assert(SHUFFLE_BITS, "Unexpected SHUFFLE_BITS.");
 
     template<class CanFail>
-    bool do_pop(unsigned tail, T& element, CanFail /*can_fail*/) noexcept {
+    bool do_pop(unsigned tail, T& element, CanFail can_fail) noexcept {
         unsigned index = details::remap_index<SHUFFLE_BITS>(tail % (capacity_ - 1));
-        return Base::template do_pop_any(states_[index], elements_[index], element);
+        return Base::template do_pop_any(states_[index], elements_[index], element, can_fail);
     }
 
     template<class U>
