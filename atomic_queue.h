@@ -281,17 +281,10 @@ public:
     bool try_push(T&& element) noexcept {
         for(;;) {
             auto head = head_.load(X);
-            if(Derived::spsc_) {
+            do {
                 if(static_cast<int>(head - tail_.load(X)) >= static_cast<int>(static_cast<Derived&>(*this).capacity_))
                     return false;
-                head_.store(head + 1, X);
-            }
-            else {
-                do {
-                    if(static_cast<int>(head - tail_.load(X)) >= static_cast<int>(static_cast<Derived&>(*this).capacity_))
-                        return false;
-                } while(ATOMIC_QUEUE_UNLIKELY(!head_.compare_exchange_strong(head, head + 1, A, X)));
-            }
+            } while(ATOMIC_QUEUE_UNLIKELY(!head_.compare_exchange_strong(head, head + 1, A, X)));
             if(ATOMIC_QUEUE_LIKELY(static_cast<Derived&>(*this).do_push(std::forward<T>(element), head)))
                 return true;
             // This producer got pre-empted before storing the element. Retry.
@@ -302,17 +295,10 @@ public:
     bool try_pop(T& element) noexcept {
         for(;;) {
             auto tail = tail_.load(X);
-            if(Derived::spsc_) {
+            do {
                 if(static_cast<int>(head_.load(X) - tail) <= 0)
                     return false;
-                tail_.store(tail + 1, X);
-            }
-            else {
-                do {
-                    if(static_cast<int>(head_.load(X) - tail) <= 0)
-                        return false;
-                } while(ATOMIC_QUEUE_UNLIKELY(!tail_.compare_exchange_strong(tail, tail + 1, A, X)));
-            }
+            } while(ATOMIC_QUEUE_UNLIKELY(!tail_.compare_exchange_strong(tail, tail + 1, A, X)));
             std::true_type can_fail;
             if(ATOMIC_QUEUE_LIKELY(static_cast<Derived&>(*this).do_pop(tail, element, can_fail)))
                 return true;
@@ -324,14 +310,8 @@ public:
     void push(U&& element) noexcept {
         for(;;) {
             unsigned head;
-            if(Derived::spsc_) {
-                head = head_.load(X);
-                head_.store(head + 1, X);
-            }
-            else {
-                constexpr auto memory_order = Derived::total_order_ ? std::memory_order_seq_cst : std::memory_order_acquire;
-                head = head_.fetch_add(1, memory_order); // FIFO and total order on Intel regardless, as of 2019.
-            }
+            constexpr auto memory_order = Derived::total_order_ ? std::memory_order_seq_cst : std::memory_order_acquire;
+            head = head_.fetch_add(1, memory_order); // FIFO and total order on Intel regardless, as of 2019.
             if(ATOMIC_QUEUE_LIKELY(static_cast<Derived&>(*this).do_push(std::forward<U>(element), head)))
                 return;
             // This producer got pre-empted before storing the element. Retry.
@@ -341,14 +321,8 @@ public:
     auto pop() noexcept {
         typename Derived::value_type element;
         unsigned tail;
-        if(Derived::spsc_) {
-            tail = tail_.load(X);
-            tail_.store(tail + 1, X);
-        }
-        else {
-            constexpr auto memory_order = Derived::total_order_ ? std::memory_order_seq_cst : std::memory_order_acquire;
-            tail = tail_.fetch_add(1, memory_order); // FIFO and total order on Intel regardless, as of 2019.
-        }
+        constexpr auto memory_order = Derived::total_order_ ? std::memory_order_seq_cst : std::memory_order_acquire;
+        tail = tail_.fetch_add(1, memory_order); // FIFO and total order on Intel regardless, as of 2019.
         std::false_type can_fail;
         static_cast<Derived&>(*this).do_pop(tail, element, can_fail);
         return element;
@@ -371,9 +345,9 @@ public:
 
 template<class T, unsigned CAPACITY,
          T NIL = T{}, T NIL2 = T{} - 1,
-         bool MINIMIZE_CONTENTION = true, bool MAXIMIZE_THROUGHPUT = true, bool TOTAL_ORDER = false, bool SPSC = false>
-class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, CAPACITY, NIL, NIL2, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>> {
-    using Base = AtomicQueueCommon<AtomicQueue<T, CAPACITY, NIL, NIL2, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>>;
+         bool MINIMIZE_CONTENTION = true, bool MAXIMIZE_THROUGHPUT = true, bool TOTAL_ORDER = false>
+class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, CAPACITY, NIL, NIL2, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, TOTAL_ORDER>> {
+    using Base = AtomicQueueCommon<AtomicQueue<T, CAPACITY, NIL, NIL2, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, TOTAL_ORDER>>;
     friend Base;
 
     static constexpr T nil_ = NIL;
@@ -382,7 +356,6 @@ class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, CAPACITY, NIL, NIL2,
     static constexpr unsigned capacity_ = MINIMIZE_CONTENTION ? details::round_up_to_power_of_2(CAPACITY) : CAPACITY;
     static constexpr int SHUFFLE_BITS = details::GetIndexShuffleBits<MINIMIZE_CONTENTION, capacity_, CACHE_LINE_SIZE / sizeof(std::atomic<T>)>::value;
     static constexpr bool total_order_ = TOTAL_ORDER;
-    static constexpr bool spsc_ = SPSC;
     static constexpr bool maximize_throughput_ = MAXIMIZE_THROUGHPUT;
 
     alignas(CACHE_LINE_SIZE) std::atomic<T> elements_[capacity_] = {}; // Empty elements are NIL.
@@ -414,16 +387,15 @@ public:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<class T, unsigned CAPACITY, bool MINIMIZE_CONTENTION = true, bool MAXIMIZE_THROUGHPUT = true, bool TOTAL_ORDER = false, bool SPSC = false>
-class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, CAPACITY, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>> {
-    using Base = AtomicQueueCommon<AtomicQueue2<T, CAPACITY, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>>;
+template<class T, unsigned CAPACITY, bool MINIMIZE_CONTENTION = true, bool MAXIMIZE_THROUGHPUT = true, bool TOTAL_ORDER = false>
+class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, CAPACITY, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, TOTAL_ORDER>> {
+    using Base = AtomicQueueCommon<AtomicQueue2<T, CAPACITY, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, TOTAL_ORDER>>;
     using State = typename Base::State;
     friend Base;
 
     static constexpr unsigned capacity_ = MINIMIZE_CONTENTION ? details::round_up_to_power_of_2(CAPACITY) : CAPACITY;
     static constexpr int SHUFFLE_BITS = details::GetIndexShuffleBits<MINIMIZE_CONTENTION, capacity_, CACHE_LINE_SIZE / sizeof(State)>::value;
     static constexpr bool total_order_ = TOTAL_ORDER;
-    static constexpr bool spsc_ = SPSC;
     static constexpr bool maximize_throughput_ = MAXIMIZE_THROUGHPUT;
 
     alignas(CACHE_LINE_SIZE) std::atomic<unsigned char> states_[capacity_] = {};
@@ -453,17 +425,16 @@ public:
 
 template<class T, class A = std::allocator<T>,
          T NIL = T{}, T NIL2 = T{} - 1,
-         bool MAXIMIZE_THROUGHPUT = true, bool TOTAL_ORDER = false, bool SPSC = false>
-class AtomicQueueB : public AtomicQueueCommon<AtomicQueueB<T, A, NIL, NIL2, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>>,
+         bool MAXIMIZE_THROUGHPUT = true, bool TOTAL_ORDER = false>
+class AtomicQueueB : public AtomicQueueCommon<AtomicQueueB<T, A, NIL, NIL2, MAXIMIZE_THROUGHPUT, TOTAL_ORDER>>,
                      private std::allocator_traits<A>::template rebind_alloc<std::atomic<T>> {
-    using Base = AtomicQueueCommon<AtomicQueueB<T, A, NIL, NIL2, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>>;
+    using Base = AtomicQueueCommon<AtomicQueueB<T, A, NIL, NIL2, MAXIMIZE_THROUGHPUT, TOTAL_ORDER>>;
     friend Base;
 
     static constexpr T nil_ = NIL;
     static constexpr T nil2_ = NIL2;
 
     static constexpr bool total_order_ = TOTAL_ORDER;
-    static constexpr bool spsc_ = SPSC;
     static constexpr bool maximize_throughput_ = MAXIMIZE_THROUGHPUT;
 
     using AllocatorElements = typename std::allocator_traits<A>::template rebind_alloc<std::atomic<T>>;
@@ -537,16 +508,15 @@ public:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<class T, class A = std::allocator<T>, bool MAXIMIZE_THROUGHPUT = true, bool TOTAL_ORDER = false, bool SPSC = false>
-class AtomicQueueB2 : public AtomicQueueCommon<AtomicQueueB2<T, A, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>>,
+template<class T, class A = std::allocator<T>, bool MAXIMIZE_THROUGHPUT = true, bool TOTAL_ORDER = false>
+class AtomicQueueB2 : public AtomicQueueCommon<AtomicQueueB2<T, A, MAXIMIZE_THROUGHPUT, TOTAL_ORDER>>,
                       private A,
                       private std::allocator_traits<A>::template rebind_alloc<std::atomic<uint8_t>> {
-    using Base = AtomicQueueCommon<AtomicQueueB2<T, A, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>>;
+    using Base = AtomicQueueCommon<AtomicQueueB2<T, A, MAXIMIZE_THROUGHPUT, TOTAL_ORDER>>;
     using State = typename Base::State;
     friend Base;
 
     static constexpr bool total_order_ = TOTAL_ORDER;
-    static constexpr bool spsc_ = SPSC;
     static constexpr bool maximize_throughput_ = MAXIMIZE_THROUGHPUT;
 
     using AllocatorElements = A;
