@@ -82,8 +82,6 @@ The containers use `unsigned` type for size and internal indexes. On x86-64 plat
 
 While the atomic queues can be used with any moveable element types (including `std::unique_ptr`), for best througput and latency the queue elements should be cheap to copy and lock-free (e.g. `unsigned` or `T*`), so that `push` and `pop` operations complete fastest.
 
-For non-atomic elements variants of the queues (`2` suffix), if a thread calling `push` or `pop` is pre-empted between its atomic operations that causes another thread calling `pop` or `push` (corresondingly) on the same slot to spin on loading the element until the element is stored; other threads calling `push` and `pop` are not affected. Using real-time `SCHED_FIFO` threads reduces the risk of pre-emption, however, a higher priority `SCHED_FIFO` thread or kernel interrupt handler can still preempt your `SCHED_FIFO` thread. So, ideally, you may like to run your critical low-latency code on isolated cores that also no other processes can possibly use. The queue variants for atomic elements do not have this issue but they require the user to reserve two sentinel elements.
-
 Some people proposed busy-waiting with a call to `sched_yield`/`pthread_yield`. However, `sched_yield` is a wrong tool for locking because it doesn't communicate to the OS kernel what the thread is waiting for, so that the OS scheduler can never wake up the calling thread at the "right" time, unless there are no other threads that can run on this CPU. [More details about `sched_yield` and spinlocks from Linus Torvalds](https://www.realworldtech.com/forum/?threadid=189711&curpostid=189752).
 
 # Benchmarks
