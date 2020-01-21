@@ -95,7 +95,6 @@ ${build_dir}/%.a : Makefile | ${build_dir}
 run_benchmarks : ${build_dir}/benchmarks
 	@echo "---- running $< ----"
 	scripts/benchmark-prologue.sh
-#	-sudo chrt -f 50 perf stat -ddd $<
 	-sudo chrt -f 50 $<
 	scripts/benchmark-epilogue.sh
 
