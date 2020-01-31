@@ -494,13 +494,13 @@ class AtomicQueueB2 : public AtomicQueueCommon<AtomicQueueB2<T, A, MAXIMIZE_THRO
     static_assert(SHUFFLE_BITS, "Unexpected SHUFFLE_BITS.");
 
     T do_pop(unsigned tail) noexcept {
-        unsigned index = details::remap_index<SHUFFLE_BITS>(tail % (size_ - 1));
+        unsigned index = details::remap_index<SHUFFLE_BITS>(tail & (size_ - 1));
         return Base::template do_pop_any(states_[index], elements_[index]);
     }
 
     template<class U>
     void do_push(U&& element, unsigned head) noexcept {
-        unsigned index = details::remap_index<SHUFFLE_BITS>(head % (size_ - 1));
+        unsigned index = details::remap_index<SHUFFLE_BITS>(head & (size_ - 1));
         Base::template do_push_any(std::forward<U>(element), states_[index], elements_[index]);
     }
 
