@@ -74,27 +74,44 @@ constexpr T& map(T* elements, unsigned index) noexcept {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Implement a "bit-twiddling hack" for finding the next power of 2
+// in either 32 bits or 64 bits in C++11 compatible constexpr functions
+
+// "Runtime" version for 32 bits
+// --a;
+// a |= a >> 1;
+// a |= a >> 2;
+// a |= a >> 4;
+// a |= a >> 8;
+// a |= a >> 16;
+// ++a;
+
+template<class T>
+constexpr T decrement(T x) {
+    return x - 1;
+}
+
+template<class T>
+constexpr T increment(T x) {
+    return x + 1;
+}
+
+template<class T>
+constexpr T or_equal(T x, unsigned u) {
+    return (x | x >> u);
+}
+
+template<class T, class... Args>
+constexpr T or_equal(T x, unsigned u, Args... rest) {
+    return or_equal(or_equal(x, u), rest...);
+}
+
 constexpr uint32_t round_up_to_power_of_2(uint32_t a) noexcept {
-    --a;
-    a |= a >> 1;
-    a |= a >> 2;
-    a |= a >> 4;
-    a |= a >> 8;
-    a |= a >> 16;
-    ++a;
-    return a;
+    return increment(or_equal(decrement(a), 1, 2, 4, 8, 16));
 }
 
 constexpr uint64_t round_up_to_power_of_2(uint64_t a) noexcept {
-    --a;
-    a |= a >> 1;
-    a |= a >> 2;
-    a |= a >> 4;
-    a |= a >> 8;
-    a |= a >> 16;
-    a |= a >> 32;
-    ++a;
-    return a;
+    return increment(or_equal(decrement(a), 1, 2, 4, 8, 16, 32));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
