@@ -30,8 +30,13 @@ static inline void spin_loop_pause() noexcept {
 
 namespace atomic_queue {
 
+#if defined(__GNUC__)
 #define ATOMIC_QUEUE_LIKELY(expr) __builtin_expect(static_cast<bool>(expr), 1)
 #define ATOMIC_QUEUE_UNLIKELY(expr) __builtin_expect(static_cast<bool>(expr), 0)
+#else
+#define ATOMIC_QUEUE_LIKELY(expr) expr
+#define ATOMIC_QUEUE_UNLIKELY(expr) expr
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
