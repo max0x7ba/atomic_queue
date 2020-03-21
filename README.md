@@ -35,7 +35,18 @@ A few other thread-safe containers are used for reference in the benchmarks:
 * `tbb::spin_mutex` - a locked fixed size ring-buffer with `tbb::spin_mutex` from Intel Threading Building Blocks.
 * `tbb::concurrent_bounded_queue` - eponymous queue used in non-blocking mode from Intel Threading Building Blocks.
 
-# Build and run instructions
+# Using the library
+The containers provided are header-only class templates, no building/installing is necessary.
+
+1. Clone the project:
+```
+git clone https://github.com/max0x7ba/atomic_queue.git
+```
+2. Add the directory where `git clone` was invoked to the include paths of your build system.
+3. `#include <atomic_queue/atomic_queue.h>` in your C++ source.
+
+
+## Benchmark build and run instructions
 The containers provided are header-only class templates that require only `#include <atomic_queue/atomic_queue.h>`, no building/installing is necessary.
 
 Building is necessary to run the tests and benchmarks.
