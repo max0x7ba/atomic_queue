@@ -1,5 +1,5 @@
 # atomic_queue
-multiple-producer-multiple-consumer C++14 *lockless* queues based on `std::atomic<>`.
+multiple-producer-multiple-consumer C++11 *lockless* queues based on `std::atomic<>`.
 
 The main design principle these queues adhere to is _simplicity_: fixed size buffer, the bare minimum of atomic operations.
 
