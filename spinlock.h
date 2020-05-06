@@ -25,21 +25,24 @@ public:
     using scoped_lock = std::lock_guard<Spinlock>;
 
     Spinlock() noexcept {
-        if(::pthread_spin_init(&s_, 0))
+        if(ATOMIC_QUEUE_UNLIKELY(::pthread_spin_init(&s_, 0)))
             std::abort();
     }
+
+    Spinlock(Spinlock const&) = delete;
+    Spinlock& operator=(Spinlock const&) = delete;
 
     ~Spinlock() noexcept {
         ::pthread_spin_destroy(&s_);
     }
 
     void lock() noexcept {
-        if(::pthread_spin_lock(&s_))
+        if(ATOMIC_QUEUE_UNLIKELY(::pthread_spin_lock(&s_)))
             std::abort();
     }
 
     void unlock() noexcept {
-        if(::pthread_spin_unlock(&s_))
+        if(ATOMIC_QUEUE_UNLIKELY(::pthread_spin_unlock(&s_)))
             std::abort();
     }
 };
@@ -51,16 +54,38 @@ class FairSpinlock {
     alignas(CACHE_LINE_SIZE) std::atomic<unsigned> next_{0};
 
 public:
-    using scoped_lock = std::lock_guard<FairSpinlock>;
+    class LockGuard {
+        FairSpinlock* const m_;
+        unsigned const ticket_;
+    public:
+        LockGuard(FairSpinlock& m) noexcept
+            : m_(&m)
+            , ticket_(m.lock())
+        {}
 
-    void lock() noexcept {
+        ~LockGuard() noexcept {
+            m_->unlock(ticket_);
+        }
+    };
+
+    using scoped_lock = LockGuard;
+
+    FairSpinlock(FairSpinlock const&) = delete;
+    FairSpinlock& operator=(FairSpinlock const&) = delete;
+
+    unsigned lock() noexcept {
         auto ticket = ticket_.fetch_add(1, std::memory_order_relaxed);
         while(next_.load(std::memory_order_acquire) != ticket)
             spin_loop_pause();
+        return ticket;
     }
 
     void unlock() noexcept {
-        next_.store(next_.load(std::memory_order_relaxed) + 1, std::memory_order_release);
+        unlock(next_.load(std::memory_order_relaxed) + 1);
+    }
+
+    void unlock(unsigned ticket) noexcept {
+        next_.store(ticket + 1, std::memory_order_release);
     }
 };
 
@@ -71,6 +96,9 @@ class UnfairSpinlock {
 
 public:
     using scoped_lock = std::lock_guard<UnfairSpinlock>;
+
+    UnfairSpinlock(UnfairSpinlock const&) = delete;
+    UnfairSpinlock& operator=(UnfairSpinlock const&) = delete;
 
     void lock() noexcept {
         for(;;) {
@@ -87,31 +115,74 @@ public:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-class SpinlockHle {
-    int lock_ = 0;
+// class SpinlockHle {
+//     int lock_ = 0;
 
-#ifdef __gcc__
-    static constexpr int HLE_ACQUIRE = __ATOMIC_HLE_ACQUIRE;
-    static constexpr int HLE_RELEASE = __ATOMIC_HLE_RELEASE;
-#else
-    static constexpr int HLE_ACQUIRE = 0;
-    static constexpr int HLE_RELEASE = 0;
-#endif
+// #ifdef __gcc__
+//     static constexpr int HLE_ACQUIRE = __ATOMIC_HLE_ACQUIRE;
+//     static constexpr int HLE_RELEASE = __ATOMIC_HLE_RELEASE;
+// #else
+//     static constexpr int HLE_ACQUIRE = 0;
+//     static constexpr int HLE_RELEASE = 0;
+// #endif
 
-public:
-    using scoped_lock = std::lock_guard<Spinlock>;
+// public:
+//     using scoped_lock = std::lock_guard<Spinlock>;
 
-    void lock() noexcept {
-        for(int expected = 0;
-            !__atomic_compare_exchange_n(&lock_, &expected, 1, false, __ATOMIC_ACQUIRE | HLE_ACQUIRE, __ATOMIC_RELAXED);
-            expected = 0)
-            spin_loop_pause();
-    }
+//     SpinlockHle(SpinlockHle const&) = delete;
+//     SpinlockHle& operator=(SpinlockHle const&) = delete;
 
-    void unlock() noexcept {
-        __atomic_store_n(&lock_, 0, __ATOMIC_RELEASE | HLE_RELEASE);
-    }
-};
+//     void lock() noexcept {
+//         for(int expected = 0;
+//             !__atomic_compare_exchange_n(&lock_, &expected, 1, false, __ATOMIC_ACQUIRE | HLE_ACQUIRE, __ATOMIC_RELAXED);
+//             expected = 0)
+//             spin_loop_pause();
+//     }
+
+//     void unlock() noexcept {
+//         __atomic_store_n(&lock_, 0, __ATOMIC_RELEASE | HLE_RELEASE);
+//     }
+// };
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// class AdaptiveMutex {
+//     pthread_mutex_t m_;
+
+// public:
+//     using scoped_lock = std::lock_guard<AdaptiveMutex>;
+
+//     AdaptiveMutex() noexcept {
+//         pthread_mutexattr_t a;
+//         if(ATOMIC_QUEUE_UNLIKELY(::pthread_mutexattr_init(&a)))
+//             std::abort();
+//         if(ATOMIC_QUEUE_UNLIKELY(::pthread_mutexattr_settype(&a, PTHREAD_MUTEX_ADAPTIVE_NP)))
+//             std::abort();
+//         if(ATOMIC_QUEUE_UNLIKELY(::pthread_mutex_init(&m_, &a)))
+//             std::abort();
+//         if(ATOMIC_QUEUE_UNLIKELY(::pthread_mutexattr_destroy(&a)))
+//             std::abort();
+//         m_.__data.__spins = 32767;
+//     }
+
+//     AdaptiveMutex(AdaptiveMutex const&) = delete;
+//     AdaptiveMutex& operator=(AdaptiveMutex const&) = delete;
+
+//     ~AdaptiveMutex() noexcept {
+//         if(ATOMIC_QUEUE_UNLIKELY(::pthread_mutex_destroy(&m_)))
+//             std::abort();
+//     }
+
+//     void lock() noexcept {
+//         if(ATOMIC_QUEUE_UNLIKELY(::pthread_mutex_lock(&m_)))
+//             std::abort();
+//     }
+
+//     void unlock() noexcept {
+//         if(ATOMIC_QUEUE_UNLIKELY(::pthread_mutex_unlock(&m_)))
+//             std::abort();
+//     }
+// };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

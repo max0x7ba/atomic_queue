@@ -80,8 +80,8 @@ using AtomicQueueMutex = AtomicQueueMutexT<T, Mutex, SIZE, MINIMIZE_CONTENTION>;
 template<class T, unsigned SIZE, bool MINIMIZE_CONTENTION = true>
 using AtomicQueueSpinlock = AtomicQueueMutexT<T, Spinlock, SIZE, MINIMIZE_CONTENTION>;
 
-template<class T, unsigned SIZE, bool MINIMIZE_CONTENTION = true>
-using AtomicQueueSpinlockHle = AtomicQueueMutexT<T, SpinlockHle, SIZE, MINIMIZE_CONTENTION>;
+// template<class T, unsigned SIZE, bool MINIMIZE_CONTENTION = true>
+// using AtomicQueueSpinlockHle = AtomicQueueMutexT<T, SpinlockHle, SIZE, MINIMIZE_CONTENTION>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
