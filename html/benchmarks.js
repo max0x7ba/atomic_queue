@@ -105,7 +105,8 @@ $(function() {
                     pointPadding: 0.2,
                     groupPadding: 0.1,
                     borderWidth: 0,
-                    shadow: true
+                    shadow: true,
+                    animationLimit: Infinity
                 }
             },
             series: series
@@ -122,7 +123,8 @@ $(function() {
                     groupPadding: 0.1,
                     borderWidth: 0,
                     shadow: true,
-                    stacking: 'normal'
+                    stacking: 'normal',
+                    animationLimit: Infinity
                 },
                 bar: { dataLabels: { enabled: true, align: 'left', inside: false } }
             },
