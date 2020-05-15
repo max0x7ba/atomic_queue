@@ -16,7 +16,6 @@ static inline void spin_loop_pause() noexcept {
 }
 } // namespace atomic_queue
 #elif defined(__arm__) || defined(__aarch64__)
-// TODO: These need to be verified as I do not have access to ARM platform.
 namespace atomic_queue {
 constexpr int CACHE_LINE_SIZE = 64;
 static inline void spin_loop_pause() noexcept {
@@ -49,8 +48,8 @@ namespace atomic_queue {
 #define ATOMIC_QUEUE_LIKELY(expr) __builtin_expect(static_cast<bool>(expr), 1)
 #define ATOMIC_QUEUE_UNLIKELY(expr) __builtin_expect(static_cast<bool>(expr), 0)
 #else
-#define ATOMIC_QUEUE_LIKELY(expr) expr
-#define ATOMIC_QUEUE_UNLIKELY(expr) expr
+#define ATOMIC_QUEUE_LIKELY(expr) (expr)
+#define ATOMIC_QUEUE_UNLIKELY(expr) (expr)
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
