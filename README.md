@@ -1,5 +1,5 @@
 # atomic_queue
-multiple-producer-multiple-consumer C++11 *lockless* queues based on `std::atomic<>`.
+C++11 multiple-producer-multiple-consumer *lockless* queues based on `std::atomic<>`.
 
 The main design principle these queues adhere to is _simplicity_: fixed size buffer, the bare minimum of atomic operations.
 
@@ -104,6 +104,7 @@ Some people proposed busy-waiting with a call to `sched_yield`/`pthread_yield`. 
 There are a few OS behaviours that complicate benchmarking:
 * CPU scheduler can place threads on different CPU cores each run. To avoid that the threads are pinned to specific CPU cores.
 * CPU scheduler can preempt threads. To avoid that real-time `SCHED_FIFO` priority 50 is used to disable scheduler time quantum expiry and make the threads non-preemptable by lower priority processes/threads.
+* Real-time thread throttling disabled.
 * Adverse address space randomisation may cause extra CPU cache conflicts. To minimise effects of that `benchmarks` executable is run at least 33 times and then the results with the highest throughput / lowest latency are selected.
 
 I only have access to a few x86-64 machines. If you have access to different hardware feel free to submit the output file of `scripts/run-benchmarks.sh` and I will include your results into the benchmarks page.
