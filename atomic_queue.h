@@ -323,6 +323,10 @@ public:
         return static_cast<int>(head_.load(X) - tail_.load(X)) >= static_cast<int>(static_cast<Derived const&>(*this).size_);
     }
 
+    unsigned was_size() const noexcept {
+        return std::max(static_cast<int>(head_.load(X) - tail_.load(X)), 0);
+    }
+
     unsigned capacity() const noexcept {
         return static_cast<Derived const&>(*this).size_;
     }
