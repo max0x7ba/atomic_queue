@@ -125,10 +125,10 @@ echo -1 | sudo tee /proc/sys/kernel/sched_rt_runtime_us >/dev/null
 ```
 
 ## Throughput and scalability benchmark
-N producer threads push a 4-byte integer into one queue, N consumer threads pop the integers from the queue. All producers posts 1,000,000 messages in total. Total time to send and receive all the messages is measured. The benchmark is run for from 1 producer and 1 consumer up to `(total-number-of-cpus / 2)` producers/consumers to measure the scalability of different queues.
+N producer threads push a 4-byte integer into one same queue, N consumer threads pop the integers from the queue. All producers posts 1,000,000 messages in total. Total time to send and receive all the messages is measured. The benchmark is run for from 1 producer and 1 consumer up to `(total-number-of-cpus / 2)` producers/consumers to measure the scalability of different queues.
 
 ## Ping-pong benchmark
-One thread posts an integer to another thread and waits for the reply using two queues. The benchmarks measures the total time of 100,000 ping-pongs, best of 10 runs. Contention is minimal here to be able to achieve and measure the lowest latency. Reports the average round-trip time.
+One thread posts an integer to another thread through one queue and waits for a reply from another queue (2 queues in total). The benchmarks measures the total time of 100,000 ping-pongs, best of 10 runs. Contention is minimal here (1-producer-1-consumer, 1 element in the queue) to be able to achieve and measure the lowest latency. Reports the average round-trip time.
 
 # Contributing
 The project uses `.editorconfig` and `.clang-format` to automate formatting. Pull requests are expected to be formatted using these settings.
