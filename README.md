@@ -68,12 +68,14 @@ The containers support the following APIs:
 * `try_pop` - Removes an element from the front of the queue. Returns `false` when the queue is empty.
 * `push` - Appends an element to the end of the queue. Busy waits when the queue is full. Faster than `try_push` when the queue is not full. Optional FIFO producer queuing and total order.
 * `pop` - Removes an element from the front of the queue. Busy waits when the queue is empty. Faster than `try_pop` when the queue is not empty. Optional FIFO consumer queuing and total order.
+* `was_size` - Returns the number of unconsumed elements during the call. The state may have changed by the time the return value is examined.
 * `was_empty` - Returns `true` if the container was empty during the call. The state may have changed by the time the return value is examined.
 * `was_full` - Returns `true` if the container was full during the call. The state may have changed by the time the return value is examined.
+* `capacity` - Returns the maximum number of elements the queue can possibly hold.
 
 TODO: full API reference.
 
-# Notes
+# Implementation Notes
 The available queues here use a ring-buffer array for storing elements. The size of the queue is fixed at compile time or construction time.
 
 In a production multiple-producer-multiple-consumer scenario the ring-buffer size should be set to the maximum allowable queue size. When the buffer size is exhausted it means that the consumers cannot consume the elements fast enough, fixing which would require either of:
@@ -93,7 +95,7 @@ While the atomic queues can be used with any moveable element types (including `
 
 `push` and `pop` both perform two atomic operations: increment the counter to claim the element slot and store the element into the array. If a thread calling `push` or `pop` is pre-empted between the two atomic operations that causes another thread calling `pop` or `push` (corresondingly) on the same slot to spin on loading the element until the element is stored; other threads calling `push` and `pop` are not affected. Using real-time `SCHED_FIFO` threads reduces the risk of pre-emption, however, a higher priority `SCHED_FIFO` thread or kernel interrupt handler can still preempt your `SCHED_FIFO` thread. If the queues are used on isolated cores with real-time priority threads, in which case no pre-emption or interrupts occur, the queues operations become _lock-free_.
 
-So, ideally, you may like to run your critical low-latency code on isolated cores that also no other processes can possibly use.
+So, ideally, you may like to run your critical low-latency code on isolated cores that also no other processes can possibly use. And disable [real-time thread throttling](real-time-thread-throttling) to prevent `SCHED_FIFO` real-time threads from being throttled.
 
 Some people proposed busy-waiting with a call to `sched_yield`/`pthread_yield`. However, `sched_yield` is a wrong tool for locking because it doesn't communicate to the OS kernel what the thread is waiting for, so that the OS scheduler can never wake up the calling thread at the "right" time, unless there are no other threads that can run on this CPU. [More details about `sched_yield` and spinlocks from Linus Torvalds](https://www.realworldtech.com/forum/?threadid=189711&curpostid=189752).
 
@@ -116,6 +118,12 @@ sudo hugeadm --pool-pages-min 1GB:1 --pool-pages-max 1GB:1
 sudo hugeadm --pool-pages-min 2MB:16 --pool-pages-max 2MB:16
 ```
 
+### Real-time thread throttling
+Full details can be found in [Real-Time group scheduling][2]. To disable real-time thread throttling do:
+```
+echo -1 | sudo tee /proc/sys/kernel/sched_rt_runtime_us >/dev/null
+```
+
 ## Throughput and scalability benchmark
 N producer threads push a 4-byte integer into one queue, N consumer threads pop the integers from the queue. All producers posts 1,000,000 messages in total. Total time to send and receive all the messages is measured. The benchmark is run for from 1 producer and 1 consumer up to `(total-number-of-cpus / 2)` producers/consumers to measure the scalability of different queues.
 
@@ -130,3 +138,4 @@ The project uses `.editorconfig` and `.clang-format` to automate formatting. Pul
 Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file LICENSE.
 
 [1]: https://max0x7ba.github.io/atomic_queue/html/benchmarks.html
+[2]: https://www.kernel.org/doc/html/latest/scheduler/sched-rt-group.html
