@@ -316,14 +316,15 @@ public:
     }
 
     bool was_empty() const noexcept {
-        return static_cast<int>(head_.load(X) - tail_.load(X)) <= 0;
+        return !was_size();
     }
 
     bool was_full() const noexcept {
-        return static_cast<int>(head_.load(X) - tail_.load(X)) >= static_cast<int>(static_cast<Derived const&>(*this).size_);
+        return was_size() >= static_cast<int>(static_cast<Derived const&>(*this).size_);
     }
 
     unsigned was_size() const noexcept {
+        // tail_ can be greater than head_ because of consumers doing pop, rather that try_pop, when the queue is empty.
         return std::max(static_cast<int>(head_.load(X) - tail_.load(X)), 0);
     }
 
