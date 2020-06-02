@@ -9,7 +9,6 @@
 #include "atomic_queue.h"
 #include "atomic_queue_mutex.h"
 #include "barrier.h"
-#include "moodycamel.h"
 
 #include <cstdint>
 #include <thread>
@@ -78,21 +77,31 @@ void stress() {
 
 template<class Q>
 void test_unique_ptr_int(Q& q) {
+    BOOST_CHECK(q.was_empty());
+    BOOST_CHECK_EQUAL(q.was_size(), 0);
     std::unique_ptr<int> p{new int{1}};
     BOOST_REQUIRE(q.try_push(move(p)));
     BOOST_CHECK(!p);
+    BOOST_CHECK(!q.was_empty());
+    BOOST_CHECK_EQUAL(q.was_size(), 1);
 
     p.reset(new int{2});
     q.push(move(p));
     BOOST_REQUIRE(!p);
+    BOOST_CHECK(!q.was_empty());
+    BOOST_CHECK_EQUAL(q.was_size(), 2);
 
     BOOST_REQUIRE(q.try_pop(p));
     BOOST_REQUIRE(p.get());
     BOOST_CHECK_EQUAL(*p, 1);
+    BOOST_CHECK(!q.was_empty());
+    BOOST_CHECK_EQUAL(q.was_size(), 1);
 
     p = q.pop();
     BOOST_REQUIRE(p.get());
     BOOST_CHECK_EQUAL(*p, 2);
+    BOOST_CHECK(q.was_empty());
+    BOOST_CHECK_EQUAL(q.was_size(), 0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -118,14 +127,6 @@ BOOST_AUTO_TEST_CASE(stress_AtomicQueue2) {
 
 BOOST_AUTO_TEST_CASE(stress_BlockingAtomicQueue2) {
     stress<AtomicQueue2<unsigned, CAPACITY>>();
-}
-
-BOOST_AUTO_TEST_CASE(stress_pthread_spinlock) {
-    stress<RetryDecorator<AtomicQueueSpinlock<unsigned, CAPACITY>>>();
-}
-
-BOOST_AUTO_TEST_CASE(stress_MoodyCamelQueue) {
-    stress<MoodyCamelQueue<unsigned, CAPACITY>>();
 }
 
 BOOST_AUTO_TEST_CASE(move_only_2) {
