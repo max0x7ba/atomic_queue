@@ -119,7 +119,7 @@ sudo hugeadm --pool-pages-min 2MB:16 --pool-pages-max 2MB:16
 ```
 
 ### Real-time thread throttling
-Full details can be found in [Real-Time group scheduling][2]. To disable real-time thread throttling do:
+By default, Linux scheduler throttles real-time threads from consuming 100% of CPU and that is detrimental to benchmarking. Full details can be found in [Real-Time group scheduling][2]. To disable real-time thread throttling do:
 ```
 echo -1 | sudo tee /proc/sys/kernel/sched_rt_runtime_us >/dev/null
 ```
