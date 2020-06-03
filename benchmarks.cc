@@ -45,6 +45,7 @@ template<class T>
 using Type = std::common_type<T>; // Similar to boost::type<>.
 
 using sum_t = long long;
+using cycles_t = decltype(__builtin_ia32_rdtsc());
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -102,7 +103,7 @@ struct XeniumQueueAdapter : Queue {
 
 template <class T>
 struct region_guard_traits{
-    struct region_guard { region_guard() {} };
+    struct region_guard { constexpr region_guard() noexcept = default; };
 };
 template <class T, class... Policies>
 struct region_guard_traits<xenium::michael_scott_queue<T, Policies...>> {
@@ -171,11 +172,11 @@ struct QueueTypes {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<class Queue>
-void throughput_producer(unsigned N, Queue* queue, std::atomic<uint64_t>* t0, Barrier* barrier) {
+void throughput_producer(unsigned N, Queue* queue, std::atomic<cycles_t>* t0, Barrier* barrier) {
     barrier->wait();
 
     // The first producer saves the start time.
-    uint64_t expected = 0;
+    cycles_t expected = 0;
     t0->compare_exchange_strong(expected, __builtin_ia32_rdtsc(), std::memory_order_acq_rel, std::memory_order_relaxed);
 
     region_guard_t<Queue> guard;
@@ -184,7 +185,7 @@ void throughput_producer(unsigned N, Queue* queue, std::atomic<uint64_t>* t0, Ba
 }
 
 template<class Queue>
-void throughput_consumer_impl(unsigned N, Queue* queue, sum_t* consumer_sum, std::atomic<unsigned>* last_consumer, uint64_t* t1) {
+void throughput_consumer_impl(unsigned N, Queue* queue, sum_t* consumer_sum, std::atomic<unsigned>* last_consumer, cycles_t* t1) {
     unsigned const stop = N + 1;
     sum_t sum = 0;
 
@@ -205,19 +206,19 @@ void throughput_consumer_impl(unsigned N, Queue* queue, sum_t* consumer_sum, std
 }
 
 template<class Queue>
-void throughput_consumer(unsigned N, Queue* queue, sum_t* consumer_sum, std::atomic<unsigned>* last_consumer, uint64_t* t1, Barrier* barrier) {
+void throughput_consumer(unsigned N, Queue* queue, sum_t* consumer_sum, std::atomic<unsigned>* last_consumer, cycles_t* t1, Barrier* barrier) {
     barrier->wait();
     throughput_consumer_impl(N, queue, consumer_sum, last_consumer, t1);
 }
 
 template<class Queue>
-uint64_t benchmark_throughput(HugePages& hp, std::vector<unsigned> const& hw_thread_ids, unsigned N, unsigned thread_count, bool alternative_placement, sum_t* consumer_sums) {
+cycles_t benchmark_throughput(HugePages& hp, std::vector<unsigned> const& hw_thread_ids, unsigned N, unsigned thread_count, bool alternative_placement, sum_t* consumer_sums) {
     set_thread_affinity(hw_thread_ids[thread_count * 2 - 1]); // Use this thread for the last consumer.
     unsigned cpu_idx = 0;
 
     auto queue = hp.create_unique_ptr<Queue>();
-    std::atomic<uint64_t> t0{0};
-    uint64_t t1 = 0;
+    std::atomic<cycles_t> t0{0};
+    cycles_t t1 = 0;
     std::atomic<unsigned> last_consumer{thread_count};
 
     Barrier barrier;
@@ -261,14 +262,14 @@ void run_throughput_benchmark(char const* name, HugePages& hp, std::vector<unsig
 
     for(unsigned threads = thread_count_min; threads <= thread_count_max; ++threads) {
         unsigned const N = M / threads;
+        sum_t const expected_sum = (N + 1) / 2. * N;
+        double const expected_sum_inv = 1. / expected_sum;
+
         for(bool alternative_placement : {false, true}) {
+            cycles_t min_time = std::numeric_limits<cycles_t>::max();
 
-            sum_t const expected_sum = (N + 1) / 2. * N;
-            double const expected_sum_inv = 1. / expected_sum;
-
-            uint64_t min_time = std::numeric_limits<uint64_t>::max();
             for(unsigned run = RUNS; run--;) {
-                uint64_t time = benchmark_throughput<Queue>(hp, hw_thread_ids, N, threads, alternative_placement, consumer_sums.data());
+                cycles_t time = benchmark_throughput<Queue>(hp, hw_thread_ids, N, threads, alternative_placement, consumer_sums.data());
                 min_time = std::min(min_time, time);
 
                 check_huge_pages_leaks(name, hp);
@@ -385,8 +386,8 @@ void run_throughput_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<class Queue, bool Sender>
-void ping_pong_thread_impl(Queue* q1, Queue* q2, unsigned N, uint64_t* time) {
-    uint64_t t0 = __builtin_ia32_rdtsc();
+void ping_pong_thread_impl(Queue* q1, Queue* q2, unsigned N, cycles_t* time) {
+    cycles_t t0 = __builtin_ia32_rdtsc();
     region_guard_t<Queue> guard;
     for(unsigned i = 1, j = 0; j < N; ++i) {
         if(Sender) {
@@ -397,29 +398,29 @@ void ping_pong_thread_impl(Queue* q1, Queue* q2, unsigned N, uint64_t* time) {
             q2->push(i);
         }
     }
-    uint64_t t1 = __builtin_ia32_rdtsc();
+    cycles_t t1 = __builtin_ia32_rdtsc();
     *time = t1 - t0;
 }
 
 template<class Queue>
-inline void ping_pong_thread_receiver(Barrier* barrier, Queue* q1, Queue* q2, unsigned N, uint64_t* time) {
+inline void ping_pong_thread_receiver(Barrier* barrier, Queue* q1, Queue* q2, unsigned N, cycles_t* time) {
     barrier->wait();
     ping_pong_thread_impl<Queue, false>(q1, q2, N, time);
 }
 
 template<class Queue>
-inline void ping_pong_thread_sender(Barrier* barrier, Queue* q1, Queue* q2, unsigned N, uint64_t* time) {
+inline void ping_pong_thread_sender(Barrier* barrier, Queue* q1, Queue* q2, unsigned N, cycles_t* time) {
     barrier->release(1);
     ping_pong_thread_impl<Queue, true>(q1, q2, N, time);
 }
 
 template<class Queue>
-inline std::array<uint64_t, 2> ping_pong_benchmark(unsigned N, HugePages& hp, unsigned const (&cpus)[2]) {
+inline std::array<cycles_t, 2> ping_pong_benchmark(unsigned N, HugePages& hp, unsigned const (&cpus)[2]) {
     set_thread_affinity(cpus[0]); // This thread is the sender.
     auto q1 = hp.create_unique_ptr<Queue>();
     auto q2 = hp.create_unique_ptr<Queue>();
     Barrier barrier;
-    std::array<uint64_t, 2> times;
+    std::array<cycles_t, 2> times;
     set_default_thread_affinity(cpus[1]);
     std::thread receiver(ping_pong_thread_receiver<Queue>, &barrier, q1.get(), q2.get(), N, &times[0]);
     ping_pong_thread_sender<Queue>(&barrier, q1.get(), q2.get(), N, &times[1]);
@@ -435,7 +436,7 @@ void run_ping_pong_benchmark(char const* name, HugePages& hp, std::vector<unsign
     unsigned const cpus[2] = {hw_thread_ids[0], hw_thread_ids[1]};
 
     // select the best of RUNS runs.
-    std::array<uint64_t, 2> best_times = {std::numeric_limits<int64_t>::max(), std::numeric_limits<int64_t>::max()};
+    std::array<cycles_t, 2> best_times = {std::numeric_limits<int64_t>::max(), std::numeric_limits<int64_t>::max()};
     for(unsigned run = RUNS; run--;) {
         auto times = ping_pong_benchmark<Queue>(N, hp, cpus);
         if(best_times[0] + best_times[1] > times[0] + times[1])
@@ -456,7 +457,7 @@ void run_ping_pong_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const&
 
     std::printf("---- Running ping-pong benchmarks (lower is better) ----\n");
 
-    // This benchmarks doesn't require queue capacity greater than 1, however, capacity of 1 elides
+    // This benchmark doesn't require queue capacity greater than 1, however, capacity of 1 elides
     // some instructions completely because of (x % 1) is always 0. Use something greater than 1 to
     // preclude aggressive optimizations.
     constexpr unsigned SIZE = 8;
@@ -517,7 +518,7 @@ void advise_hugeadm_2MB() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int main() {
-    std::setlocale(LC_NUMERIC, "");
+    std::setlocale(LC_NUMERIC, ""); // Enable thousand separator, if set in user's locale.
 
     auto cpu_topology = get_cpu_topology_info();
     if(cpu_topology.size() < 2)
