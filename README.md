@@ -1,12 +1,13 @@
 # atomic_queue
-C++11 multiple-producer-multiple-consumer *lockless* queues based on `std::atomic<>`.
+C++11 multiple-producer-multiple-consumer *lockless* queues based on [`std::atomic`][3].
 
-The main design principle these queues adhere to is _simplicity_: fixed size buffer, the bare minimum of atomic operations.
+The main design principle these queues adhere to is _simplicity_: the bare minimum of atomic operations, fixed size buffer, value semantics.
 
 These qualities are also limitations:
 
 * The maximum queue size must be set at compile time or construction time.
 * There are no OS-blocking push/pop functions.
+* A reference/pointer to an element in the queue cannot be taken.
 
 Nevertheless, ultra-low-latency applications need just that and nothing more. The simplicity pays off, see the [throughput and latency benchmarks][1].
 
@@ -139,3 +140,4 @@ Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file L
 
 [1]: https://max0x7ba.github.io/atomic_queue/html/benchmarks.html
 [2]: https://www.kernel.org/doc/html/latest/scheduler/sched-rt-group.html
+[3]: https://en.cppreference.com/w/cpp/header/atomic
