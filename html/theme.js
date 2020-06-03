@@ -15,7 +15,7 @@ Highcharts.theme = {
     },
     subtitle: {
         style: {
-            color: 'white',
+            color: '#808080'
         }
     },
     xAxis: {
@@ -30,7 +30,7 @@ Highcharts.theme = {
         tickColor: '#707070',
         title: {
             style: {
-                color: '#808080'
+                color: 'white'
             }
         }
     },
@@ -47,7 +47,7 @@ Highcharts.theme = {
         tickWidth: 1,
         title: {
             style: {
-                color: '#808080'
+                color: 'white'
             }
         }
     },
@@ -61,6 +61,11 @@ Highcharts.theme = {
     },
     plotOptions: {
         series: {
+            pointPadding: 0.2,
+            groupPadding: 0.1,
+            borderWidth: 0,
+            animationLimit: Infinity,
+            shadow: true,
             dataLabels: {
                 color: '#B0B0B0'
             },

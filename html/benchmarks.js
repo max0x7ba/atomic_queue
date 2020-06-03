@@ -15,13 +15,13 @@ $(function() {
 
     const settings = {
      "boost::lockfree::spsc_queue": [$.extend(true, {pattern: {color: '#8E44AD'}}, spsc_pattern),  0],
-   "moodycamel::ReaderWriterQueue": [$.extend(true, {pattern: {color: '#E74C3C'}}, spsc_pattern),  1],
+   "moodycamel::ReaderWriterQueue": [$.extend(true, {pattern: {color: '#BA4A00'}}, spsc_pattern),  1],
                 "pthread_spinlock": ['#58D68D',  2],
                       "std::mutex": ['#239B56',  3],
                  "tbb::spin_mutex": ['#3498DB',  4],
    "tbb::concurrent_bounded_queue": ['#9ACCED',  5],
           "boost::lockfree::queue": ['#AA73C2',  6],
-     "moodycamel::ConcurrentQueue": ['#ED796D',  7],
+     "moodycamel::ConcurrentQueue": ['#BA4A00',  7],
      "xenium::michael_scott_queue": ['#73C6B6',  8],
          "xenium::ramalhete_queue": ['#45B39D',  9],
     "xenium::vyukov_bounded_queue": ['#16A085', 10],
@@ -100,15 +100,6 @@ $(function() {
                 pointFormat: '<tr><td style="color: {series.color}">{series.name}: </td>' +'<td style="text-align: right"><b>{point.y} msg/sec</b></td></tr>',
                 footerFormat: '</table>'
             },
-            plotOptions: {
-                series: {
-                    pointPadding: 0.2,
-                    groupPadding: 0.1,
-                    borderWidth: 0,
-                    shadow: true,
-                    animationLimit: Infinity
-                }
-            },
             series: series
         });
     }
@@ -118,14 +109,7 @@ $(function() {
         Highcharts.chart(div_id, {
             chart: { type: 'bar' },
             plotOptions: {
-                series: {
-                    pointPadding: 0.2,
-                    groupPadding: 0.1,
-                    borderWidth: 0,
-                    shadow: true,
-                    stacking: 'normal',
-                    animationLimit: Infinity
-                },
+                series: { stacking: 'normal'},
                 bar: { dataLabels: { enabled: true, align: 'left', inside: false } }
             },
             title: { text: 'Latency on ' + title_suffix },
