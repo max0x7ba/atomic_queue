@@ -2,12 +2,12 @@
 
 // Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file LICENSE.
 
-#include "atomic_queue.h"
-#include "atomic_queue_mutex.h"
-#include "barrier.h"
-#include "cpu_base_frequency.h"
-#include "huge_pages.h"
-#include "moodycamel.h"
+#include "atomic_queue/atomic_queue.h"
+#include "atomic_queue/atomic_queue_mutex.h"
+#include "atomic_queue/barrier.h"
+#include "atomic_queue/cpu_base_frequency.h"
+#include "atomic_queue/huge_pages.h"
+#include "atomic_queue/moodycamel.h"
 
 #include <xenium/michael_scott_queue.hpp>
 #include <xenium/ramalhete_queue.hpp>

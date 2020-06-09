@@ -2,7 +2,7 @@
 
 // Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file LICENSE.
 
-#include "cpu_base_frequency.h"
+#include "atomic_queue/cpu_base_frequency.h"
 
 #include <fstream>
 #include <tuple>

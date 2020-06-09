@@ -6,9 +6,9 @@
 #define BOOST_TEST_MODULE atomic_queue
 #include <boost/test/unit_test.hpp>
 
-#include "atomic_queue.h"
-#include "atomic_queue_mutex.h"
-#include "barrier.h"
+#include "atomic_queue/atomic_queue.h"
+#include "atomic_queue/atomic_queue_mutex.h"
+#include "atomic_queue/barrier.h"
 
 #include <cstdint>
 #include <thread>

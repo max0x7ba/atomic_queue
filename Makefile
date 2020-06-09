@@ -9,7 +9,7 @@ SHELL := /bin/bash
 BUILD := release
 
 TOOLSET := gcc
-build_dir := ${CURDIR}/${BUILD}/${TOOLSET}
+build_dir := ${CURDIR}/build/${BUILD}/${TOOLSET}
 
 cxx.gcc := g++
 cc.gcc := gcc
@@ -41,7 +41,7 @@ ldflags.clang := -stdlib=libc++ ${ldflags.clang.${BUILD}}
 # However, a clean build is required when changing the flags in the command line or in environment variables, this makefile doesn't detect such changes.
 cxxflags := ${cxxflags.${TOOLSET}} ${CXXFLAGS}
 cflags := ${cflags.${TOOLSET}} ${CFLAGS}
-cppflags := ${CPPFLAGS}
+cppflags := ${CPPFLAGS} -Iinclude
 ldflags := -fuse-ld=gold -pthread -g ${ldflags.${TOOLSET}} ${LDFLAGS}
 ldlibs := -lrt ${LDLIBS}
 
@@ -102,17 +102,17 @@ run_tests : ${build_dir}/tests
 	@echo "---- running $< ----"
 	$<
 
-${build_dir}/%.o : %.cc Makefile | ${build_dir}
+${build_dir}/%.o : src/%.cc Makefile | ${build_dir}
 	$(strip ${COMPILE.CXX})
 
-${build_dir}/%.o : %.c Makefile | ${build_dir}
+${build_dir}/%.o : src/%.c Makefile | ${build_dir}
 	$(strip ${COMPILE.C})
 
 %.S : cppflags += ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium}
-%.S : %.cc Makefile | ${build_dir}
+%.S : src/%.cc Makefile | ${build_dir}
 	$(strip ${COMPILE.S})
 
-%.I : %.cc
+%.I : src/%.cc
 	$(strip ${PREPROCESS.CXX})
 
 ${build_dir} :
