@@ -61,13 +61,17 @@ inline double to_seconds(T tsc) {
 template<class Queue>
 struct BoostSpScAdapter : Queue {
     using T = typename Queue::value_type;
+    using producer_token_t = dummy_tok_t<BoostSpScAdapter<Queue>>;
+    using consumer_token_t = dummy_tok_t<BoostSpScAdapter<Queue>>;
 
-    void push(T element) {
+    BoostSpScAdapter(unsigned) { }
+
+    void push(producer_token_t, T element) {
         while(!this->Queue::push(element))
             spin_loop_pause();
     }
 
-    T pop() {
+    T pop(consumer_token_t) {
         T element;
         while(!this->Queue::pop(element))
             spin_loop_pause();
@@ -78,8 +82,12 @@ struct BoostSpScAdapter : Queue {
 template<class Queue>
 struct BoostQueueAdapter : BoostSpScAdapter<Queue> {
     using T = typename Queue::value_type;
+    using producer_token_t = dummy_tok_t<BoostQueueAdapter<Queue>>;
+    using consumer_token_t = dummy_tok_t<BoostQueueAdapter<Queue>>;
 
-    void push(T element) {
+    BoostQueueAdapter(unsigned) { }
+
+    void push(producer_token_t, T element) {
         while(!this->Queue::bounded_push(element))
             spin_loop_pause();
     }
@@ -92,8 +100,14 @@ using Reclaimer = xenium::reclamation::new_epoch_based<>;
 template<class Queue>
 struct XeniumQueueAdapter : Queue {
     using T = typename Queue::value_type;
+    using producer_token_t = dummy_tok_t<XeniumQueueAdapter<Queue>>;
+    using consumer_token_t = dummy_tok_t<XeniumQueueAdapter<Queue>>;
 
-    T pop() {
+    void push(producer_token_t, T element) {
+        push(element);
+    }
+
+    T pop(consumer_token_t) {
         T element;
         while(!this->Queue::try_pop(element))
             spin_loop_pause();
@@ -180,8 +194,9 @@ void throughput_producer(unsigned N, Queue* queue, std::atomic<cycles_t>* t0, Ba
     t0->compare_exchange_strong(expected, __builtin_ia32_rdtsc(), std::memory_order_acq_rel, std::memory_order_relaxed);
 
     region_guard_t<Queue> guard;
+    typename Queue::producer_token_t tok(*queue);
     for(unsigned n = 1, stop = N + 1; n <= stop; ++n)
-        queue->push(n);
+        queue->push(tok, n);
 }
 
 template<class Queue>
@@ -190,8 +205,9 @@ void throughput_consumer_impl(unsigned N, Queue* queue, sum_t* consumer_sum, std
     sum_t sum = 0;
 
     region_guard_t<Queue> guard;
+    typename Queue::consumer_token_t tok(*queue);
     for(;;) {
-        unsigned n = queue->pop();
+        unsigned n = queue->pop(tok);
         if(n == stop)
             break;
         sum += n;
@@ -216,7 +232,7 @@ cycles_t benchmark_throughput(HugePages& hp, std::vector<unsigned> const& hw_thr
     set_thread_affinity(hw_thread_ids[thread_count * 2 - 1]); // Use this thread for the last consumer.
     unsigned cpu_idx = 0;
 
-    auto queue = hp.create_unique_ptr<Queue>();
+    auto queue = hp.create_unique_ptr<Queue>(thread_count);
     std::atomic<cycles_t> t0{0};
     cycles_t t1 = 0;
     std::atomic<unsigned> last_consumer{thread_count};
@@ -389,13 +405,15 @@ template<class Queue, bool Sender>
 void ping_pong_thread_impl(Queue* q1, Queue* q2, unsigned N, cycles_t* time) {
     cycles_t t0 = __builtin_ia32_rdtsc();
     region_guard_t<Queue> guard;
+    typename Queue::producer_token_t ptok(Sender ? *q1 : *q2);
+    typename Queue::consumer_token_t ctok(Sender ? *q2 : *q1);
     for(unsigned i = 1, j = 0; j < N; ++i) {
         if(Sender) {
-            q1->push(i);
-            j = q2->pop();
+            q1->push(ptok, i);
+            j = q2->pop(ctok);
         } else {
-            j = q1->pop();
-            q2->push(i);
+            j = q1->pop(ctok);
+            q2->push(ptok, i);
         }
     }
     cycles_t t1 = __builtin_ia32_rdtsc();
@@ -417,8 +435,8 @@ inline void ping_pong_thread_sender(Barrier* barrier, Queue* q1, Queue* q2, unsi
 template<class Queue>
 inline std::array<cycles_t, 2> ping_pong_benchmark(unsigned N, HugePages& hp, unsigned const (&cpus)[2]) {
     set_thread_affinity(cpus[0]); // This thread is the sender.
-    auto q1 = hp.create_unique_ptr<Queue>();
-    auto q2 = hp.create_unique_ptr<Queue>();
+    auto q1 = hp.create_unique_ptr<Queue>(1);
+    auto q2 = hp.create_unique_ptr<Queue>(1);
     Barrier barrier;
     std::array<cycles_t, 2> times;
     set_default_thread_affinity(cpus[1]);

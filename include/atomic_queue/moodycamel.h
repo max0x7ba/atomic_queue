@@ -15,47 +15,44 @@ namespace atomic_queue {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+template<class Queue>
+struct dummy_tok_t {
+    dummy_tok_t(Queue&) { }
+};
+
 template<class T, unsigned Capacity>
 struct MoodyCamelQueue : moodycamel::ConcurrentQueue<T> {
-    MoodyCamelQueue()
-        : moodycamel::ConcurrentQueue<T>(Capacity) {
-        ctok() = moodycamel::ConcurrentQueue<T>::consumer_token_t(*this);  // update instance
-    }
+    using producer_token_t = typename moodycamel::ConcurrentQueue<T>::producer_token_t;
+    using consumer_token_t = typename moodycamel::ConcurrentQueue<T>::consumer_token_t;
 
-    void push(T element) {
-        // TODO: To be able to use try_enqueue properly, particularly with tokens,
-        // requires the number of producer and consumer threads to be passed to the
-        // constructor
-        while (!this->try_enqueue(element))
+    MoodyCamelQueue(unsigned producerThreads) : moodycamel::ConcurrentQueue<T>(Capacity, producerThreads, 0) { }
+
+    void push(producer_token_t& tok, T element) {
+        while (!this->try_enqueue(tok, element))
             spin_loop_pause();
     }
 
-    T pop() {
+    T pop(consumer_token_t& tok) {
         T element;
-        while (!this->try_dequeue(ctok(), element))
+        while (!this->try_dequeue(tok, element))
             spin_loop_pause();
         return element;
-    }
-
-private:
-    moodycamel::ConcurrentQueue<T>::consumer_token_t& ctok() {
-        // Assume just one instance is present at a time
-        static thread_local moodycamel::ConcurrentQueue<T>::consumer_token_t ctok(*this);
-        return ctok;
     }
 };
 
 template<class T, unsigned Capacity>
 struct MoodyCamelReaderWriterQueue : moodycamel::ReaderWriterQueue<T> {
-    MoodyCamelReaderWriterQueue()
-        : moodycamel::ReaderWriterQueue<T>(Capacity) {}
+    using producer_token_t = dummy_tok_t<MoodyCamelReaderWriterQueue<T, Capacity>>;
+    using consumer_token_t = dummy_tok_t<MoodyCamelReaderWriterQueue<T, Capacity>>;
 
-    void push(T element) {
+    MoodyCamelReaderWriterQueue(unsigned producerThreads) : moodycamel::ReaderWriterQueue<T>(Capacity) { }
+
+    void push(producer_token_t, T element) {
         while (!this->try_enqueue(element))
             spin_loop_pause();
     }
 
-    T pop() {
+    T pop(consumer_token_t) {
         T element;
         while (!this->try_dequeue(element))
             spin_loop_pause();
