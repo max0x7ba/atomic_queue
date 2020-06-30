@@ -2,6 +2,8 @@
 #ifndef HUGE_PAGES_H_INCLUDED
 #define HUGE_PAGES_H_INCLUDED
 
+#include "benchmarks.h"
+
 #include <new>
 #include <memory>
 #include <utility>
@@ -100,6 +102,11 @@ public:
 
     template<class T, class... Args>
     std::unique_ptr<T, Deleter> create_unique_ptr(Args&&... args) {
+        return std::unique_ptr<T, Deleter>{new(this->allocate(sizeof(T))) T{std::forward<Args>(args)...}, Deleter{this}};
+    }
+
+    template<class T, class... Args>
+    std::unique_ptr<T, Deleter> create_unique_ptr(NoContext, Args&&... args) {
         return std::unique_ptr<T, Deleter>{new(this->allocate(sizeof(T))) T{std::forward<Args>(args)...}, Deleter{this}};
     }
 

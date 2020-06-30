@@ -198,8 +198,9 @@ void throughput_producer(unsigned N, Queue* queue, std::atomic<cycles_t>* t0, Ba
     t0->compare_exchange_strong(expected, __builtin_ia32_rdtsc(), std::memory_order_acq_rel, std::memory_order_relaxed);
 
     region_guard_t<Queue> guard;
+    ProducerOf<Queue> producer{*queue};
     for(unsigned n = 1, stop = N + 1; n <= stop; ++n)
-        queue->push(n);
+        producer.push(*queue, n);
 }
 
 template<class Queue>
@@ -208,8 +209,9 @@ void throughput_consumer_impl(unsigned N, Queue* queue, sum_t* consumer_sum, std
     sum_t sum = 0;
 
     region_guard_t<Queue> guard;
+    ConsumerOf<Queue> consumer{*queue};
     for(;;) {
-        unsigned n = queue->pop();
+        unsigned n = consumer.pop(*queue);
         if(n == stop)
             break;
         sum += n;
@@ -234,7 +236,7 @@ cycles_t benchmark_throughput(HugePages& hp, std::vector<unsigned> const& hw_thr
     set_thread_affinity(hw_thread_ids[thread_count * 2 - 1]); // Use this thread for the last consumer.
     unsigned cpu_idx = 0;
 
-    auto queue = hp.create_unique_ptr<Queue>();
+    auto queue = hp.create_unique_ptr<Queue>(ContextOf<Queue>{thread_count, thread_count});
     std::atomic<cycles_t> t0{0};
     cycles_t t1 = 0;
     std::atomic<unsigned> last_consumer{thread_count};
@@ -403,18 +405,29 @@ void run_throughput_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<class Queue, bool Sender>
-void ping_pong_thread_impl(Queue* q1, Queue* q2, unsigned N, cycles_t* time) {
+template<class Queue>
+void ping_pong_thread_impl(Queue* q1, Queue* q2, unsigned N, cycles_t* time, std::false_type /*sender*/) {
     cycles_t t0 = __builtin_ia32_rdtsc();
     region_guard_t<Queue> guard;
+    ConsumerOf<Queue> consumer_q1{*q1};
+    ProducerOf<Queue> producer_q2{*q2};
     for(unsigned i = 1, j = 0; j < N; ++i) {
-        if(Sender) {
-            q1->push(i);
-            j = q2->pop();
-        } else {
-            j = q1->pop();
-            q2->push(i);
-        }
+        j = consumer_q1.pop(*q1);
+        producer_q2.push(*q2, i);
+    }
+    cycles_t t1 = __builtin_ia32_rdtsc();
+    *time = t1 - t0;
+}
+
+template<class Queue>
+void ping_pong_thread_impl(Queue* q1, Queue* q2, unsigned N, cycles_t* time, std::true_type /*sender*/) {
+    cycles_t t0 = __builtin_ia32_rdtsc();
+    region_guard_t<Queue> guard;
+    ProducerOf<Queue> producer_q1{*q1};
+    ConsumerOf<Queue> consumer_q2{*q2};
+    for(unsigned i = 1, j = 0; j < N; ++i) {
+        producer_q1.push(*q1, i);
+        j = consumer_q2.pop(*q2);
     }
     cycles_t t1 = __builtin_ia32_rdtsc();
     *time = t1 - t0;
@@ -423,20 +436,23 @@ void ping_pong_thread_impl(Queue* q1, Queue* q2, unsigned N, cycles_t* time) {
 template<class Queue>
 inline void ping_pong_thread_receiver(Barrier* barrier, Queue* q1, Queue* q2, unsigned N, cycles_t* time) {
     barrier->wait();
-    ping_pong_thread_impl<Queue, false>(q1, q2, N, time);
+    std::false_type constexpr sender;
+    ping_pong_thread_impl<Queue>(q1, q2, N, time, sender);
 }
 
 template<class Queue>
 inline void ping_pong_thread_sender(Barrier* barrier, Queue* q1, Queue* q2, unsigned N, cycles_t* time) {
     barrier->release(1);
-    ping_pong_thread_impl<Queue, true>(q1, q2, N, time);
+    std::true_type constexpr sender;
+    ping_pong_thread_impl<Queue>(q1, q2, N, time, sender);
 }
 
 template<class Queue>
 inline std::array<cycles_t, 2> ping_pong_benchmark(unsigned N, HugePages& hp, unsigned const (&cpus)[2]) {
     set_thread_affinity(cpus[0]); // This thread is the sender.
-    auto q1 = hp.create_unique_ptr<Queue>();
-    auto q2 = hp.create_unique_ptr<Queue>();
+    ContextOf<Queue> const ctx{1, 1};
+    auto q1 = hp.create_unique_ptr<Queue>(ctx);
+    auto q2 = hp.create_unique_ptr<Queue>(ctx);
     Barrier barrier;
     std::array<cycles_t, 2> times;
     set_default_thread_affinity(cpus[1]);
