@@ -5,9 +5,6 @@
 #include "atomic_queue/atomic_queue.h"
 #include "atomic_queue/atomic_queue_mutex.h"
 #include "atomic_queue/barrier.h"
-#include "atomic_queue/cpu_base_frequency.h"
-#include "atomic_queue/huge_pages.h"
-#include "atomic_queue/moodycamel.h"
 
 #include <xenium/michael_scott_queue.hpp>
 #include <xenium/ramalhete_queue.hpp>
@@ -19,6 +16,10 @@
 
 #include <tbb/concurrent_queue.h>
 #include <tbb/spin_mutex.h>
+
+#include "cpu_base_frequency.h"
+#include "huge_pages.h"
+#include "moodycamel.h"
 
 #include <algorithm>
 #include <clocale>
@@ -145,6 +146,23 @@ void check_huge_pages_leaks(char const* name, HugePages& hp) {
         hp.reset();
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct ThreadCound {
+    unsigned producers;
+    unsigned comsumers;
+};
+
+template<class T>
+struct ConstructorAdapter : T{
+    using T::T;
+};
+
+// template<class T>
+// struct ConstructorAdapter : {
+//     using T::T;
+// };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
