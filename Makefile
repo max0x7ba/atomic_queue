@@ -34,8 +34,8 @@ cflags.gcc := -pthread -march=native -W{all,extra} -g -fmessage-length=0 ${cxxfl
 
 cxxflags.clang.debug := -O0 -fstack-protector-all
 cxxflags.clang.release := -O3 -mtune=native -ffast-math -falign-functions=64 -DNDEBUG
-cxxflags.clang := -stdlib=libc++ -pthread -march=native -std=gnu++14 -W{all,extra,error,no-{unused-function,unused-local-typedefs}} -g -fmessage-length=0 ${cxxflags.clang.${BUILD}}
-ldflags.clang := -stdlib=libc++ ${ldflags.clang.${BUILD}}
+cxxflags.clang := -stdlib=libstdc++ -pthread -march=native -std=gnu++14 -W{all,extra,error,no-{unused-variable,unused-function,unused-local-typedefs}} -g -fmessage-length=0 ${cxxflags.clang.${BUILD}}
+ldflags.clang := -stdlib=libstdc++ ${ldflags.clang.${BUILD}}
 
 # Additional CPPFLAGS, CXXFLAGS, CFLAGS, LDLIBS, LDFLAGS can come from the command line, e.g. make CPPFLAGS='-I<my-include-dir>', or from environment variables.
 # However, a clean build is required when changing the flags in the command line or in environment variables, this makefile doesn't detect such changes.
