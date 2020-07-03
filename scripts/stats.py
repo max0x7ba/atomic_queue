@@ -20,11 +20,11 @@ for line in sys.stdin:
 
 # pprint(results)
 
-def format_msg_sec(d, benchmark):
-    return "{:11,.0f} {} (mean: {:11,.0f} stdev: {:11,.0f})".format(d.minmax[1], benchmark, d.mean, math.sqrt(d.variance))
+def format_msg_sec(d, media, benchmark):
+    return "{:11,.0f} {} (median: {:11,.0f}, mean: {:11,.0f} stdev: {:11,.0f})".format(d.minmax[1], benchmark, median, d.mean, math.sqrt(d.variance))
 
-def format_round_trip(d, benchmark):
-    return "{:11.9f} {} (mean: {:11.9f} stdev: {:11.9f})".format(d.minmax[0], benchmark, d.mean, math.sqrt(d.variance))
+def format_round_trip(d, media, benchmark):
+    return "{:11.9f} {} (median: {:11,.0f}, mean: {:11.9f} stdev: {:11.9f})".format(d.minmax[0], benchmark, median, d.mean, math.sqrt(d.variance))
 
 fmt = {
     'msg/sec': format_msg_sec,
@@ -39,5 +39,6 @@ for benchmark in ['msg/sec', 'sec/round-trip']:
         if not runs:
             continue
         d = stats.describe(runs)
-        desc = fmt[benchmark](d, benchmark)
+        median = np.median(runs)
+        desc = fmt[benchmark](d, median, benchmark)
         print("{:>40s}: {}".format(queue, desc))
