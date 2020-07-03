@@ -4,12 +4,23 @@
 
 import sys
 import pandas as pd
+import json
+from collections import defaultdict
 from pprint import pprint
 
 from parse_output import *
 
 results = list(parse_output(sys.stdin))
 df = as_scalability_df(results)
-df = df.groupby(['queue', 'threads']).max().unstack(level=0).droplevel(0, axis=1)
-df.to_json(sys.stdout, orient='columns')
-print()
+
+columns = defaultdict(list) # name: [threads, mean].
+errorbars = defaultdict(list) # name: [threads, low, high].
+for (name, threads), data in df.groupby(['queue', 'threads']):
+    s = data["msg/sec"].describe(percentiles=None)
+    threads = int(threads)
+    columns[name].append([threads, int(s["mean"])])
+    errorbars[name].append([threads, int(s["min"]), int(s["max"])])
+
+output = [{"name" : n, "type": "column", "data": d} for n, d in columns.items()]
+output += [{"name" : n, "type": "errorbar", "data": d} for n, d in errorbars.items()]
+json.dump(output, sys.stdout)
