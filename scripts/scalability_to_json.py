@@ -21,7 +21,7 @@ for (name, threads), data in df.groupby(['queue', 'threads']):
     columns[name].append([threads, int(s["mean"])])
     errorbars[name].append([threads, int(s["min"]), int(s["max"])])
 
-output = [{"name" : n, "type": "column", "data": d} for n, d in columns.items()]
-output += [{"name" : n, "type": "errorbar", "data": d} for n, d in errorbars.items()]
-json.dump(output, sys.stdout)
+output1 = [{"name" : n, "type": "column", "data": d} for n, d in columns.items()]
+output2 = [{"name" : n, "type": "errorbar", "data": d} for n, d in errorbars.items()]
+json.dump([j for i in zip(output1, output2) for j in i], sys.stdout)
 print()
