@@ -24,3 +24,4 @@ for (name, threads), data in df.groupby(['queue', 'threads']):
 output = [{"name" : n, "type": "column", "data": d} for n, d in columns.items()]
 output += [{"name" : n, "type": "errorbar", "data": d} for n, d in errorbars.items()]
 json.dump(output, sys.stdout)
+print()
