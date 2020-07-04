@@ -95,11 +95,11 @@ $(function() {
                         a.high = Highcharts.numberFormat(point.point.options.high, 0);
                     }
                 });
-                let html = `<span style="font-weight: bold; font-size: 1.2em;">${threads} producers, ${threads} consumers</span>`;
-                html += '<table><tr><th>Name</th><th style="text-align: right">min</th><th style="text-align: right">average</th><th style="text-align: right">max</th></tr>';
+                let html = `<span class="tooltip_scalability_title">${threads} producers, ${threads} consumers</span>`;
+                html += '<table class="tooltip_scalability"><tr><th>Name</th><th>min</th><th>average</th><th>max</th></tr>';
                 data.forEach(s => {
-                    html += `<tr><td style="color: ${s.color}">${s.name}: </td><td style="text-align: right"><b>${s.min}</b></td><td style="text-align: right"><b>${s.mean}</b></td><td style="text-align: right"><b>${s.high}</b></td></tr>`; }
-                );
+                    html += `<tr><td style="color: ${s.color}">${s.name}: </td><td><b>${s.min}</b></td><td><b>${s.mean}</b></td><td><b>${s.high}</b></td></tr>`;
+                });
                 html += '</table>';
                 tooltip = html;
                 tooltips[threads] = tooltip;

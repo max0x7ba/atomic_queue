@@ -23,3 +23,12 @@ p, li {
     color: #A0A0A0;
     margin-left: 20px;
 }
+
+span.tooltip_scalability_title {
+    font-weight: bold;
+    font-size: 1.2em;
+}
+
+table.tooltip_scalability {
+    text-align: right;
+}
