@@ -95,18 +95,20 @@ $(function() {
                     data[p.series.options.index] = {
                         name: p.series.name,
                         color: p.series.color,
-                        mean: Highcharts.numberFormat(stats[3], 0),
-                        stdev: Highcharts.numberFormat(stats[4], 0),
                         min: Highcharts.numberFormat(stats[1], 0),
-                        max: Highcharts.numberFormat(stats[2], 0)
+                        max: Highcharts.numberFormat(stats[2], 0),
+                        mean: Highcharts.numberFormat(stats[3], 0),
+                        stdev: Highcharts.numberFormat(stats[4], 0)
                     };
                 }
+
                 let html = `<span class="tooltip_scalability_title">${threads} producers, ${threads} consumers</span>`;
-                html += '<table class="tooltip_scalability"><tr><th></th><th>average</th><th>stdev</th><th>min</th><th>max</th></tr>';
-                for(const s of data)
-                    if(s)
-                        html += `<tr><td style="color: ${s.color}">${s.name}: </td><td><b>${s.mean}</b></td><td><b>${s.stdev}</b></td><td>${s.min}</td><td>${s.max}</td></tr>`;
+                html += '<table class="tooltip_scalability"><tr><th></th><th>mean</th><th>stdev</th><th>min</th><th>max</th></tr>';
+                for(const d of data)
+                    if(d)
+                        html += `<tr><td style="color: ${d.color}">${d.name}: </td><td><strong>${d.mean}</strong></td><td><strong>${d.stdev}</strong></td><td>${d.min}</td><td>${d.max}</td></tr>`;
                 html += '</table>';
+
                 tooltip = html;
                 tooltips[threads] = tooltip;
             }
