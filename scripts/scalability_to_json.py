@@ -13,12 +13,10 @@ from parse_output import *
 results = list(parse_output(sys.stdin))
 df = as_scalability_df(results)
 
-# name
-## thread, min, max, mean, stdev
-output3 = defaultdict(list)
+output = defaultdict(list) # name: thread, min, max, mean, stdev
 for (name, threads), data in df.groupby(['queue', 'threads']):
     s = data["msg/sec"].describe(percentiles=None)
     threads = int(threads)
-    output3[name].append([threads, *[int(s[f]) for f in ['min', 'max', 'mean', 'std']]])
-json.dump(output3, sys.stdout)
+    output[name].append([threads, *[int(s[f]) for f in ['min', 'max', 'mean', 'std']]])
+json.dump(output, sys.stdout)
 print()
