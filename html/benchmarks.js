@@ -42,25 +42,18 @@ $(function() {
         ];
         let mode = 0;
 
-        const series = [];
-        for(const [name, stats] of Object.entries(results)) {
+        const series = Object.entries(results).map(entry => {
+            const [name, stats] = entry;
             const s = settings[name];
-            series.push({
+            return {
                 name: name,
                 color: s[0],
                 index: s[1],
                 type: "column",
                 data: stats.map(a => [a[0], a[3]]),
                 atomic_queue_stats: stats
-            });
-            series.push({
-                name: name,
-                color: s[0],
-                index: s[1],
-                type: "errorbar",
-                data: stats.map(a => [a[0], a[1], a[2]])
-            });
-        }
+            }
+        });
 
         const tooltips = []; // Build a tooltip once and then reuse it.
         const tooltip_formatter = function() {
@@ -68,8 +61,7 @@ $(function() {
             let tooltip = tooltips[threads];
             if(!tooltip) {
                 const data = [];
-                for(let i = 0; i < this.points.length; i += 2) {
-                    const p = this.points[i];
+                for(const p of this.points) {
                     const stats = p.series.options.atomic_queue_stats[p.point.index];
                     data[p.series.options.index] = {
                         name: p.series.name,
@@ -121,18 +113,18 @@ $(function() {
     }
 
     function plot_latency(div_id, results, title_suffix) {
-        const series = [];
-        for(const [name, stats] of Object.entries(results)) {
+        const series = Object.entries(results).map(entry => {
+            const [name, stats] = entry;
             const s = settings[name];
-            series.push({
+            return {
                 name: name,
                 color: s[0],
                 index: s[1],
                 type: 'bar',
                 data: [[s[1], stats[2]]],
                 atomic_queue_stats: stats
-            });
-        }
+            };
+        });
         series.sort((a, b) => { return a.index - b.index; });
         const categories = series.map(s => { return s.name; });
 
