@@ -13,5 +13,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - name: make run_tests
-      run: make run_tests
+    - name: make gcc run_tests
+      run: make -r TOOLSET=gcc env run_tests
+    - name: make clang run_tests
+      run: make -r TOOLSET=clang env run_tests

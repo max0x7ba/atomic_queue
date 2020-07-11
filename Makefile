@@ -132,7 +132,8 @@ clean :
 	rm -rf ${build_dir} ${exes}
 
 env :
-	env
-	ls -lR $${BOOST_ROOT_1_72_0}
+	env | sort
+	${MAKE} --version
+	${CXX} --version
 
 .PHONY : env rtags run_benchmarks clean all run_%
