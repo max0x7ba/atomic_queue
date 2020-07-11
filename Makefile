@@ -79,8 +79,7 @@ ${build_dir}/benchmarks : ${build_dir}/benchmarks.o ${build_dir}/libatomic_queue
 	$(strip ${LINK.EXE})
 -include ${build_dir}/benchmarks.d
 
-${build_dir}/tests : cppflags += ${cppflags.moodycamel}
-${build_dir}/tests : ldlibs += ${ldlibs.moodycamel} -lboost_unit_test_framework
+${build_dir}/tests : ldlibs += -lboost_unit_test_framework
 ${build_dir}/tests : ${build_dir}/tests.o Makefile | ${build_dir}
 	$(strip ${LINK.EXE})
 -include ${build_dir}/tests.d
@@ -124,4 +123,7 @@ rtags : clean
 clean :
 	rm -rf ${build_dir} ${exes}
 
-.PHONY : rtags run_benchmarks clean all run_%
+env :
+	env
+
+.PHONY : env rtags run_benchmarks clean all run_%
