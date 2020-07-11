@@ -78,30 +78,30 @@ void stress() {
 template<class Q>
 void test_unique_ptr_int(Q& q) {
     BOOST_CHECK(q.was_empty());
-    BOOST_CHECK_EQUAL(q.was_size(), 0);
+    BOOST_CHECK_EQUAL(q.was_size(), 0u);
     std::unique_ptr<int> p{new int{1}};
     BOOST_REQUIRE(q.try_push(move(p)));
     BOOST_CHECK(!p);
     BOOST_CHECK(!q.was_empty());
-    BOOST_CHECK_EQUAL(q.was_size(), 1);
+    BOOST_CHECK_EQUAL(q.was_size(), 1u);
 
     p.reset(new int{2});
     q.push(move(p));
     BOOST_REQUIRE(!p);
     BOOST_CHECK(!q.was_empty());
-    BOOST_CHECK_EQUAL(q.was_size(), 2);
+    BOOST_CHECK_EQUAL(q.was_size(), 2u);
 
     BOOST_REQUIRE(q.try_pop(p));
     BOOST_REQUIRE(p.get());
     BOOST_CHECK_EQUAL(*p, 1);
     BOOST_CHECK(!q.was_empty());
-    BOOST_CHECK_EQUAL(q.was_size(), 1);
+    BOOST_CHECK_EQUAL(q.was_size(), 1u);
 
     p = q.pop();
     BOOST_REQUIRE(p.get());
     BOOST_CHECK_EQUAL(*p, 2);
     BOOST_CHECK(q.was_empty());
-    BOOST_CHECK_EQUAL(q.was_size(), 0);
+    BOOST_CHECK_EQUAL(q.was_size(), 0u);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
