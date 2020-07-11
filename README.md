@@ -1,3 +1,5 @@
+![C/C++ CI](https://github.com/max0x7ba/atomic_queue/workflows/C/C++%20CI/badge.svg)
+
 # atomic_queue
 C++11 multiple-producer-multiple-consumer *lockless* queues based on circular buffer with [`std::atomic`][3].
 
