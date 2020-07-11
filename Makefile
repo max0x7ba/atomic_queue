@@ -125,5 +125,6 @@ clean :
 
 env :
 	env
+	ls -lR $${BOOST_ROOT_1_72_0}
 
 .PHONY : env rtags run_benchmarks clean all run_%
