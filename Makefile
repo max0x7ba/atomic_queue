@@ -47,7 +47,7 @@ ldlibs := -lrt ${LDLIBS}
 
 ifdef BOOST_ROOT_1_72_0 # E.g./opt/hostedtoolcache/boost/1.72.0/x64
 boost_unit_test_framework_inc := -I${BOOST_ROOT_1_72_0}
-boost_unit_test_framework_lib := -{L,'Wl,rpath='}${BOOST_ROOT_1_72_0}/lib -lboost_unit_test_framework-mt-x64
+boost_unit_test_framework_lib := -{L,'Wl,-rpath='}${BOOST_ROOT_1_72_0}/lib -lboost_unit_test_framework-mt-x64
 else
 boost_unit_test_framework_lib := -lboost_unit_test_framework
 endif
