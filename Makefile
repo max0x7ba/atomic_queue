@@ -45,6 +45,13 @@ cppflags := ${CPPFLAGS} -Iinclude
 ldflags := -fuse-ld=gold -pthread -g ${ldflags.${TOOLSET}} ${LDFLAGS}
 ldlibs := -lrt ${LDLIBS}
 
+ifdef BOOST_ROOT_1_72_0 # E.g./opt/hostedtoolcache/boost/1.72.0/x64
+boost_unit_test_framework_inc := -I${BOOST_ROOT_1_72_0}
+boost_unit_test_framework_lib := -{L,'Wl,rpath='}${BOOST_ROOT_1_72_0}/lib -lboost_unit_test_framework-mt-x64
+else
+boost_unit_test_framework_lib := -lboost_unit_test_framework
+endif
+
 cppflags.tbb :=
 ldlibs.tbb := {-L,'-Wl,-rpath='}/usr/local/lib -ltbb
 
@@ -79,7 +86,8 @@ ${build_dir}/benchmarks : ${build_dir}/benchmarks.o ${build_dir}/libatomic_queue
 	$(strip ${LINK.EXE})
 -include ${build_dir}/benchmarks.d
 
-${build_dir}/tests : ldlibs += -lboost_unit_test_framework
+${build_dir}/tests : cppflags += ${boost_unit_test_framework_inc}
+${build_dir}/tests : ldlibs += ${boost_unit_test_framework_lib}
 ${build_dir}/tests : ${build_dir}/tests.o Makefile | ${build_dir}
 	$(strip ${LINK.EXE})
 -include ${build_dir}/tests.d
