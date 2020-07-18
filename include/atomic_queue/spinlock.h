@@ -49,19 +49,22 @@ public:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-class FairSpinlock {
+class TicketSpinlock {
     alignas(CACHE_LINE_SIZE) std::atomic<unsigned> ticket_{0};
     alignas(CACHE_LINE_SIZE) std::atomic<unsigned> next_{0};
 
 public:
     class LockGuard {
-        FairSpinlock* const m_;
+        TicketSpinlock* const m_;
         unsigned const ticket_;
     public:
-        LockGuard(FairSpinlock& m) noexcept
+        LockGuard(TicketSpinlock& m) noexcept
             : m_(&m)
             , ticket_(m.lock())
         {}
+
+        LockGuard(LockGuard const&) = delete;
+        LockGuard& operator=(LockGuard const&) = delete;
 
         ~LockGuard() noexcept {
             m_->unlock(ticket_);
@@ -70,13 +73,20 @@ public:
 
     using scoped_lock = LockGuard;
 
-    FairSpinlock(FairSpinlock const&) = delete;
-    FairSpinlock& operator=(FairSpinlock const&) = delete;
+    TicketSpinlock() noexcept = default;
+    TicketSpinlock(TicketSpinlock const&) = delete;
+    TicketSpinlock& operator=(TicketSpinlock const&) = delete;
 
-    unsigned lock() noexcept {
+    ATOMIC_QUEUE_NOINLINE unsigned lock() noexcept {
         auto ticket = ticket_.fetch_add(1, std::memory_order_relaxed);
-        while(next_.load(std::memory_order_acquire) != ticket)
-            spin_loop_pause();
+        for(;;) {
+            auto position = ticket - next_.load(std::memory_order_acquire);
+            if(ATOMIC_QUEUE_LIKELY(!position))
+                break;
+            do
+                spin_loop_pause();
+            while(--position);
+        }
         return ticket;
     }
 

@@ -46,31 +46,31 @@ public:
 
     template<class U>
     bool try_push(U&& element) noexcept {
-        ScopedLock lock(this->mutex_);
-        if(this->head_ - this->tail_ < size_) {
-            q_[details::remap_index<SHUFFLE_BITS>(this->head_ % size_)] = std::forward<U>(element);
-            ++this->head_;
+        ScopedLock lock(mutex_);
+        if(ATOMIC_QUEUE_LIKELY(head_ - tail_ < size_)) {
+            q_[details::remap_index<SHUFFLE_BITS>(head_ % size_)] = std::forward<U>(element);
+            ++head_;
             return true;
         }
         return false;
     }
 
     bool try_pop(T& element) noexcept {
-        ScopedLock lock(this->mutex_);
-        if(this->head_ != this->tail_) {
-            element = std::move(q_[details::remap_index<SHUFFLE_BITS>(this->tail_ % size_)]);
-            ++this->tail_;
+        ScopedLock lock(mutex_);
+        if(ATOMIC_QUEUE_LIKELY(head_ != tail_)) {
+            element = std::move(q_[details::remap_index<SHUFFLE_BITS>(tail_ % size_)]);
+            ++tail_;
             return true;
         }
         return false;
     }
 
     bool was_empty() const noexcept {
-        return static_cast<int>(this->head_ - this->tail_) <= 0;
+        return static_cast<int>(head_ - tail_) <= 0;
     }
 
     bool was_full() const noexcept {
-        return static_cast<int>(this->head_ - this->tail_) >= static_cast<int>(size_);
+        return static_cast<int>(head_ - tail_) >= static_cast<int>(size_);
     }
 };
 
