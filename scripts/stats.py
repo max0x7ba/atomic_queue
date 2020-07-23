@@ -5,6 +5,7 @@
 import sys
 import re
 import math
+import csv
 import numpy as np
 from scipy import stats
 from pprint import pprint
@@ -18,8 +19,6 @@ for line in sys.stdin:
     if m:
         results[m.group(1)][m.group(3)].append(float(m.group(2).replace(',', '')))
 
-# pprint(results)
-
 def format_msg_sec(d, media, benchmark):
     return "{:11,.0f} {} (median: {:11,.0f}, mean: {:11,.0f} stdev: {:11,.0f})".format(d.minmax[1], benchmark, median, d.mean, math.sqrt(d.variance))
 
@@ -31,6 +30,8 @@ fmt = {
     'sec/round-trip': format_round_trip
     }
 
+csv_file = csv.writer(open("results.csv", "w"), csv.excel_tab)
+csv_file.writerow(["name", "min", "max", "mean", "stdev"])
 for benchmark in ['msg/sec', 'sec/round-trip']:
     queues = sorted(results.keys())
     for queue in queues:
@@ -42,3 +43,4 @@ for benchmark in ['msg/sec', 'sec/round-trip']:
         median = np.median(runs)
         desc = fmt[benchmark](d, median, benchmark)
         print("{:>40s}: {}".format(queue, desc))
+        csv_file.writerow([queue, d.minmax[0], d.minmax[1], d.mean, math.sqrt(d.variance)])
