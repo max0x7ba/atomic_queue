@@ -133,7 +133,7 @@ clean :
 
 env :
 	env | sort
-	${MAKE} --version
-	${CXX} --version
+	${MAKE} --version | head -n1
+	${CXX} --version | head -n1
 
 .PHONY : env rtags run_benchmarks clean all run_%
