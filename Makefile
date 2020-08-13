@@ -76,21 +76,19 @@ all : ${exes}
 ${exes} : % : ${build_dir}/%
 	ln -sf ${<:${CURDIR}/%=%}
 
-${build_dir}/libatomic_queue.a : $(addprefix ${build_dir}/,cpu_base_frequency.o huge_pages.o)
--include ${build_dir}/cpu_base_frequency.d
--include ${build_dir}/huge_pages.d
-
+benchmarks_src := benchmarks.cc cpu_base_frequency.cc huge_pages.cc
 ${build_dir}/benchmarks : cppflags += ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium}
 ${build_dir}/benchmarks : ldlibs += ${ldlibs.tbb} ${ldlibs.moodycamel} ${ldlibs.xenium} -ldl
-${build_dir}/benchmarks : ${build_dir}/benchmarks.o ${build_dir}/libatomic_queue.a Makefile | ${build_dir}
+${build_dir}/benchmarks : ${benchmarks_src:%.cc=${build_dir}/%.o} Makefile | ${build_dir}
 	$(strip ${LINK.EXE})
--include ${build_dir}/benchmarks.d
+-include ${benchmarks_src:%.cc=${build_dir}/%.d}
 
-${build_dir}/tests : cppflags += ${boost_unit_test_framework_inc}
+tests_src := tests.cc
+${build_dir}/tests : cppflags += ${boost_unit_test_framework_inc} -DBOOST_TEST_DYN_LINK=1
 ${build_dir}/tests : ldlibs += ${boost_unit_test_framework_lib}
-${build_dir}/tests : ${build_dir}/tests.o Makefile | ${build_dir}
+${build_dir}/tests : ${tests_src:%.cc=${build_dir}/%.o} Makefile | ${build_dir}
 	$(strip ${LINK.EXE})
--include ${build_dir}/tests.d
+-include ${tests_src:%.cc=${build_dir}/%.d}
 
 ${build_dir}/%.so : cxxflags += -fPIC
 ${build_dir}/%.so : Makefile | ${build_dir}
