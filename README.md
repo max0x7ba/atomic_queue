@@ -1,7 +1,7 @@
 [![C/C++ CI](https://github.com/max0x7ba/atomic_queue/workflows/C/C++%20CI/badge.svg)](https://github.com/max0x7ba/atomic_queue/actions?query=workflow%3A%22C%2FC%2B%2B+CI%22)
 
 # atomic_queue
-C++11 multiple-producer-multiple-consumer *lockless* queues based on circular buffer with [`std::atomic`][3].
+C++14 multiple-producer-multiple-consumer *lockless* queues based on circular buffer with [`std::atomic`][3].
 
 The main design principle these queues follow is _simplicity_: the bare minimum of atomic operations, fixed size buffer, value semantics.
 

@@ -5,6 +5,7 @@
 #include "atomic_queue/atomic_queue.h"
 
 #include <thread>
+#include <cstdint>
 #include <iostream>
 
 int main() {
