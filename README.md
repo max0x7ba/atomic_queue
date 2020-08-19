@@ -77,6 +77,8 @@ The containers support the following APIs:
 * `was_full` - Returns `true` if the container was full during the call. The state may have changed by the time the return value is examined.
 * `capacity` - Returns the maximum number of elements the queue can possibly hold.
 
+See [example.cc](src/example.cc) for a usage example.
+
 TODO: full API reference.
 
 # Implementation Notes

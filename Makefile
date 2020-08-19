@@ -90,6 +90,11 @@ ${build_dir}/tests : ${tests_src:%.cc=${build_dir}/%.o} Makefile | ${build_dir}
 	$(strip ${LINK.EXE})
 -include ${tests_src:%.cc=${build_dir}/%.d}
 
+example_src := example.cc
+${build_dir}/example : ${example_src:%.cc=${build_dir}/%.o} Makefile | ${build_dir}
+	$(strip ${LINK.EXE})
+-include ${example_src:%.cc=${build_dir}/%.d}
+
 ${build_dir}/%.so : cxxflags += -fPIC
 ${build_dir}/%.so : Makefile | ${build_dir}
 	$(strip ${LINK.SO})
@@ -104,6 +109,10 @@ run_benchmarks : ${build_dir}/benchmarks
 	scripts/benchmark-epilogue.sh
 
 run_tests : ${build_dir}/tests
+	@echo "---- running $< ----"
+	$<
+
+run_% : ${build_dir}/%
 	@echo "---- running $< ----"
 	$<
 

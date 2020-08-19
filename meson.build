@@ -25,6 +25,12 @@ tests_exe = executable(
 )
 test('tests', tests_exe)
 
+example_exe = executable(
+  'example',
+  'src/example.cc',
+  dependencies : [atomic_queue]
+)
+
 benchmarks_exe = executable(
   'benchmarks',
   ['src/benchmarks.cc', 'src/cpu_base_frequency.cc', 'src/huge_pages.cc'],
