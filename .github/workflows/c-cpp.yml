@@ -15,7 +15,7 @@ jobs:
     - uses: actions/checkout@v2
     - name: Environment variables
       run: make env; make TOOLSET=gcc versions; make TOOLSET=clang versions
-    - name: Tests with gcc
+    - name: Unit tests with gcc
       run: make -rj2 TOOLSET=gcc run_tests
-    - name: Tests with clang
+    - name: Unit tests with clang
       run: make -rj2 TOOLSET=clang run_tests
