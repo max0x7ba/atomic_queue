@@ -148,4 +148,32 @@ BOOST_AUTO_TEST_CASE(move_constructor_assignment) {
     p = std::move(p2);
 }
 
+BOOST_AUTO_TEST_CASE(try_push) {
+    using Queue = atomic_queue::AtomicQueueB2<
+      /* T = */ float,
+      /* A = */ std::allocator<float>,
+      /* MAXIMIZE_THROUGHPUT */ true,
+      /* TOTAL_ORDER = */ true,
+      /* SPSC = */ true
+      >;
+
+    constexpr unsigned CAPACITY = 4096;
+    Queue q(CAPACITY);
+    BOOST_CHECK_EQUAL(q.capacity(), CAPACITY);
+    BOOST_CHECK(q.was_empty());
+    BOOST_CHECK_EQUAL(q.was_size(), 0u);
+
+    for(unsigned i = 1; i <= CAPACITY; ++i)
+        BOOST_CHECK(q.try_push(i));
+
+    BOOST_CHECK(!q.was_empty());
+    BOOST_CHECK_EQUAL(q.was_size(), CAPACITY);
+
+    for(unsigned i = 1; i <= CAPACITY; ++i)
+        BOOST_CHECK(!q.try_push(i));
+
+    BOOST_CHECK(!q.was_empty());
+    BOOST_CHECK_EQUAL(q.was_size(), CAPACITY);
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
