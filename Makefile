@@ -69,7 +69,7 @@ LINK.EXE = ${LD} -o $@ $(ldflags) $(filter-out Makefile,$^) $(ldlibs)
 LINK.SO = ${LD} -o $@ -shared $(ldflags) $(filter-out Makefile,$^) $(ldlibs)
 LINK.A = ${AR} rscT $@ $(filter-out Makefile,$^)
 
-exes := benchmarks tests
+exes := benchmarks tests example
 
 all : ${exes}
 

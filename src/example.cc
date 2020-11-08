@@ -9,20 +9,19 @@
 #include <iostream>
 
 int main() {
-    int constexpr PRODUCERS = 1;
-    int constexpr CONSUMERS = 2;
-    unsigned constexpr CAPACITY = 1024;
-    unsigned constexpr N = 1000000;
+    int constexpr PRODUCERS = 1; // Number of producer threads.
+    int constexpr CONSUMERS = 2; // Number of consumer threads.
+    unsigned constexpr N = 1000000; // Pass this many elements from producers to consumers.
+    unsigned constexpr CAPACITY = 1024; // Queue capacity. Since there are more consumers than producers this doesn't have to be large.
 
-    using Element = uint32_t;
-    Element constexpr NIL = static_cast<Element>(-1);
+    using Element = uint32_t; // Queue element type.
+    Element constexpr NIL = static_cast<Element>(-1); // Atomic elements require a special value that cannot be pushed/popped.
+    using Queue = atomic_queue::AtomicQueueB<Element, std::allocator<Element>, NIL>; // Use heap-allocated buffer.
 
-    using Queue = atomic_queue::AtomicQueueB<Element, std::allocator<Element>, NIL>;
-
-    // Create a queue shared between producers and consumers.
+    // Create a queue object shared between producers and consumers.
     Queue q{CAPACITY};
 
-    // Start consumers.
+    // Start the consumers.
     uint64_t results[CONSUMERS];
     std::thread consumers[CONSUMERS];
     for(int i = 0; i < CONSUMERS; ++i)
@@ -33,7 +32,7 @@ int main() {
             r = sum;
         });
 
-    // Start producers.
+    // Start the producers.
     std::thread producers[PRODUCERS];
     for(int i = 0; i < PRODUCERS; ++i)
         producers[i] = std::thread([&q]() {
@@ -45,14 +44,14 @@ int main() {
     for(auto& t : producers)
         t.join();
 
-    // Stop consumers.
+    // Tell each consumer to complete and terminate.
     for(int i = CONSUMERS; i--;)
         q.push(0);
     // Wait till consumers complete and terminate.
     for(auto& t : consumers)
         t.join();
 
-    // Verify the results.
+    // Verify that each message was received exactly by one consumer only.
     uint64_t result = 0;
     for(auto& r : results) {
         result += r;
