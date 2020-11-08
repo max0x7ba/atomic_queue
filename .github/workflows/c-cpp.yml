@@ -16,6 +16,6 @@ jobs:
     - name: Environment variables
       run: make env; make TOOLSET=gcc versions; make TOOLSET=clang versions
     - name: Unit tests with gcc
-      run: make -rj2 TOOLSET=gcc run_tests
+      run: make -rj2 TOOLSET=gcc example run_tests
     - name: Unit tests with clang
-      run: make -rj2 TOOLSET=clang run_tests
+      run: make -rj2 TOOLSET=clang example run_tests
