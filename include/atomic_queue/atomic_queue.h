@@ -211,7 +211,7 @@ protected:
         else {
             for(;;) {
                 unsigned char expected = STORED;
-                if(ATOMIC_QUEUE_LIKELY(state.compare_exchange_strong(expected, LOADING, X, X))) {
+                if(ATOMIC_QUEUE_LIKELY(state.compare_exchange_strong(expected, LOADING, A, X))) {
                     T element{std::move(q_element)};
                     state.store(EMPTY, R);
                     return element;
@@ -236,7 +236,7 @@ protected:
         else {
             for(;;) {
                 unsigned char expected = EMPTY;
-                if(ATOMIC_QUEUE_LIKELY(state.compare_exchange_strong(expected, STORING, X, X))) {
+                if(ATOMIC_QUEUE_LIKELY(state.compare_exchange_strong(expected, STORING, A, X))) {
                     q_element = std::forward<U>(element);
                     state.store(STORED, R);
                     return;
