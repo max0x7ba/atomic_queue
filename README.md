@@ -139,7 +139,7 @@ The project uses `.editorconfig` and `.clang-format` to automate formatting. Pul
 
 ## Help needed
 * Submit pull requests with benchmarking code for other queues. The queues should be somewhat widely used or have exceptional performance, not my-first-mpmc-queue type projects.
-* Benchmarking results on different architectures or with much more cores. Run `scripts/run-benchmarks.sh` and email me the results file, or put it under `results/` and submit a pull request.
+* Benchmarking results on different architectures or with much more cores, in particular on AMD Ryzen CPUs. Run `scripts/run-benchmarks.sh` and email me the results file, or put it under `results/` and submit a pull request.
 
 ---
 
