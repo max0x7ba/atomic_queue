@@ -3,16 +3,14 @@
 # atomic_queue
 C++14 multiple-producer-multiple-consumer *lockless* queues based on circular buffer with [`std::atomic`][3].
 
-The main design principle these queues follow is _simplicity_: the bare minimum of atomic operations, fixed size buffer, value semantics.
-
-The circular buffer side-steps the memory reclamation problem inherent in linked-list based queues for the price of fixed buffer size. See [Effective memory reclamation for lock-free data structures in C++][4] for more details.
+The main design principle these queues follow is _minimalism_: the bare minimum of atomic operations, fixed size buffer, value semantics.
 
 These qualities are also limitations:
 
-* The maximum queue size must be set at compile time or construction time.
-* There are no OS-blocking push/pop functions.
+* The maximum queue size must be set at compile time or construction time. The circular buffer side-steps the memory reclamation problem inherent in linked-list based queues for the price of fixed buffer size. See [Effective memory reclamation for lock-free data structures in C++][4] for more details. Fixed buffer size may not be that much of a limitation, since once the queue gets larger than the maximum expected size that indicates a problem that elements aren't processed fast enough, and if the queue keeps growing it may eventually consume all available memory which may affect the entire system, rather than the problematic process only. The only apparent inconvenience is that one has to do an upfront back-of-the-envelope calculation on what would be the largest expected/acceptable queue size.
+* There are no OS-blocking push/pop functions. This queue is designed for ultra-low-latency scenarios and using an OS blocking primitive would be sacrificing push-to-pop latency. For lowest possible latency one cannot afford blocking in the OS kernel because the wake-up latency of a blocked thread is about 1-3 microseconds, whereas this queue's round-trip time can be as low as 150 nanoseconds.
 
-Nevertheless, ultra-low-latency applications need just that and nothing more. The simplicity pays off, see the [throughput and latency benchmarks][1].
+Ultra-low-latency applications need just that and nothing more. The minimalism pays off, see the [throughput and latency benchmarks][1].
 
 Available containers are:
 * `AtomicQueue` - a fixed size ring-buffer for atomic elements.
@@ -92,7 +90,7 @@ In a production multiple-producer-multiple-consumer scenario the ring-buffer siz
 
 Using a power-of-2 ring-buffer array size allows a couple of important optimizations:
 
-* The writer and reader indexes get mapped into the ring-buffer array index using modulo `% SIZE` binary operator and using a power-of-2 size turns that modulo operator into one plain `and` instruction and that is as fast as it gets.
+* The writer and reader indexes get mapped into the ring-buffer array index using remainder binary operator `% SIZE` and using a power-of-2 size turns that remainder operator into one plain `and` instruction and that is as fast as it gets.
 * The *element index within the cache line* gets swapped with the *cache line index* within the *ring-buffer array element index*, so that subsequent queue elements actually reside in different cache lines. This eliminates contention between producers and consumers on the ring-buffer cache lines. Instead of `N` producers together with `M` consumers competing on the same ring-buffer array cache line in the worst case, it is only one producer competing with one consumer. This optimisation scales better with the number of producers and consumers, and element size. With low number of producers and consumers (up to about 2 of each in these benchmarks) disabling this optimisation may yield better throughput (but higher variance across runs).
 
 The containers use `unsigned` type for size and internal indexes. On x86-64 platform `unsigned` is 32-bit wide, whereas `size_t` is 64-bit wide. 64-bit instructions utilise an extra byte instruction prefix resulting in slightly more pressure on the CPU instruction cache and the front-end. Hence, 32-bit `unsigned` indexes are used to maximise performance. That limits the queue size to 4,294,967,295 elements, which seems to be a reasonable hard limit for many applications.
