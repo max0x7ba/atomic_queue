@@ -176,4 +176,9 @@ BOOST_AUTO_TEST_CASE(try_push) {
     BOOST_CHECK_EQUAL(q.was_size(), CAPACITY);
 }
 
+BOOST_AUTO_TEST_CASE(size) {
+    atomic_queue::RetryDecorator<atomic_queue::AtomicQueueB2<float>> q(10);
+    BOOST_CHECK_EQUAL(q.capacity(), 4096);
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
