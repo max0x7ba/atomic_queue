@@ -13,6 +13,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - name: Install Boost
+      run: sudo apt-get --quiet --yes install libboost-all-dev
     - name: Environment variables
       run: make env; make TOOLSET=gcc versions; make TOOLSET=clang versions
     - name: Unit tests with gcc
