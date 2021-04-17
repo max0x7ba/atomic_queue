@@ -45,13 +45,6 @@ cppflags := ${CPPFLAGS} -Iinclude
 ldflags := -fuse-ld=gold -pthread -g ${ldflags.${TOOLSET}} ${LDFLAGS}
 ldlibs := -lrt ${LDLIBS}
 
-ifdef BOOST_ROOT_1_72_0 # E.g./opt/hostedtoolcache/boost/1.72.0/x64
-boost_unit_test_framework_inc := -I${BOOST_ROOT_1_72_0}
-boost_unit_test_framework_lib := -{L,'Wl,-rpath='}${BOOST_ROOT_1_72_0}/lib -lboost_unit_test_framework-mt-x64
-else
-boost_unit_test_framework_lib := -lboost_unit_test_framework
-endif
-
 cppflags.tbb :=
 ldlibs.tbb := {-L,'-Wl,-rpath='}/usr/local/lib -ltbb
 
@@ -85,7 +78,7 @@ ${build_dir}/benchmarks : ${benchmarks_src:%.cc=${build_dir}/%.o} Makefile | ${b
 
 tests_src := tests.cc
 ${build_dir}/tests : cppflags += ${boost_unit_test_framework_inc} -DBOOST_TEST_DYN_LINK=1
-${build_dir}/tests : ldlibs += ${boost_unit_test_framework_lib}
+${build_dir}/tests : ldlibs += -lboost_unit_test_framework
 ${build_dir}/tests : ${tests_src:%.cc=${build_dir}/%.o} Makefile | ${build_dir}
 	$(strip ${LINK.EXE})
 -include ${tests_src:%.cc=${build_dir}/%.d}
