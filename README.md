@@ -137,10 +137,6 @@ One thread posts an integer to another thread through one queue and waits for a 
 # Contributing
 The project uses `.editorconfig` and `.clang-format` to automate formatting. Pull requests are expected to be formatted using these settings.
 
-## Help needed
-* Submit pull requests with benchmarking code for other queues. The queues should be somewhat widely used or have exceptional performance, not my-first-mpmc-queue type projects.
-* Benchmarking results on different architectures or with much more cores, in particular on AMD Ryzen CPUs. Run `scripts/run-benchmarks.sh` and email me the results file, or put it under `results/` and submit a pull request.
-
 ---
 
 Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file LICENSE.
