@@ -165,8 +165,8 @@ $(function() {
     const latency_ryzen_5950x = {"AtomicQueue": [353, 370, 365, 4], "AtomicQueue2": [375, 396, 386, 4], "AtomicQueueB": [365, 371, 368, 1], "AtomicQueueB2": [380, 387, 381, 1], "OptimistAtomicQueue": [342, 346, 343, 0], "OptimistAtomicQueue2": [296, 321, 309, 6], "OptimistAtomicQueueB": [318, 327, 325, 2], "OptimistAtomicQueueB2": [337, 353, 345, 3], "boost::lockfree::queue": [741, 747, 743, 1], "boost::lockfree::spsc_queue": [403, 405, 404, 0], "moodycamel::ConcurrentQueue": [539, 623, 587, 18], "moodycamel::ReaderWriterQueue": [355, 415, 374, 16], "pthread_spinlock": [737, 747, 742, 1], "std::mutex": [1462, 1624, 1513, 22], "tbb::concurrent_bounded_queue": [971, 1000, 974, 3], "tbb::spin_mutex": [638, 646, 643, 1], "xenium::michael_scott_queue": [940, 1061, 994, 26], "xenium::ramalhete_queue": [607, 659, 629, 11], "xenium::vyukov_bounded_queue": [469, 521, 476, 7]};
     plot_scalability('scalability-9900KS-5GHz', scalability_9900KS, "Intel i9-9900KS", 60e6, 1000e6);
     plot_scalability('scalability-xeon-gold-6132', scalability_xeon_gold_6132, "Intel Xeon Gold 6132", 15e6, 300e6);
-    plot_scalability('scalability-ryzen-5950x', scalability_ryzen_5950x, "AMD Ryzen 5950x", 20e6, 500e6);
+    plot_scalability('scalability-ryzen-5950x', scalability_ryzen_5950x, "AMD Ryzen 9 5950X", 20e6, 500e6);
     plot_latency('latency-9900KS-5GHz', latency_9900KS, "Intel i9-9900KS");
     plot_latency('latency-xeon-gold-6132', latency_xeon_gold_6132, "Intel Xeon Gold 6132");
-    plot_latency('latency-ryzen-5950x', latency_ryzen_5950x, "AMD Ryzen 5950x");
+    plot_latency('latency-ryzen-5950x', latency_ryzen_5950x, "AMD Ryzen 9 5950X");
 });
