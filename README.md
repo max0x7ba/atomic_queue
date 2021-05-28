@@ -40,6 +40,7 @@ A few other thread-safe containers are used for reference in the benchmarks:
 # Using the library
 The containers provided are header-only class templates, no building/installing is necessary.
 
+## Install from GitHub
 1. Clone the project:
 ```
 git clone https://github.com/max0x7ba/atomic_queue.git
@@ -47,6 +48,10 @@ git clone https://github.com/max0x7ba/atomic_queue.git
 2. Add `atomic_queue/include` directory (use full path) to the include paths of your build system.
 3. `#include <atomic_queue/atomic_queue.h>` in your C++ source.
 
+## Install using vcpkg
+```
+vcpkg install atomic-queue
+```
 
 ## Benchmark build and run instructions
 The containers provided are header-only class templates that require only `#include <atomic_queue/atomic_queue.h>`, no building/installing is necessary.
