@@ -9,12 +9,14 @@ project(
 )
 
 cxx = meson.get_compiler('cpp')
-tbb = cxx.find_library('tbb', required : true)
 dl = cxx.find_library('dl', required : true)
 threads = dependency('threads')
 unit_test_framework = dependency('boost', modules : ['unit_test_framework'])
-xenium = declare_dependency(include_directories : '../xenium')
-moodycamel = declare_dependency(include_directories : '../')
+if get_option('benchmarks')
+  tbb = cxx.find_library('tbb', required : true)
+  xenium = declare_dependency(include_directories : '../xenium')
+  moodycamel = declare_dependency(include_directories : '../')
+endif
 
 atomic_queue = declare_dependency(include_directories : ['include'], dependencies : threads)
 
@@ -31,8 +33,10 @@ example_exe = executable(
   dependencies : [atomic_queue]
 )
 
-benchmarks_exe = executable(
-  'benchmarks',
-  ['src/benchmarks.cc', 'src/cpu_base_frequency.cc', 'src/huge_pages.cc'],
-  dependencies : [atomic_queue, xenium, moodycamel, tbb, dl]
-)
+if get_option('benchmarks')
+  benchmarks_exe = executable(
+    'benchmarks',
+    ['src/benchmarks.cc', 'src/cpu_base_frequency.cc', 'src/huge_pages.cc'],
+    dependencies : [atomic_queue, xenium, moodycamel, tbb, dl]
+  )
+endif

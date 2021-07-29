@@ -1,0 +1,2 @@
+option('benchmarks', type : 'boolean', value : true,
+       description : 'Do not build benchmarks; ignore their dependencies')
