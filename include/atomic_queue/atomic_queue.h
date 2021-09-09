@@ -76,8 +76,8 @@ constexpr T& map(T* elements, unsigned index) noexcept {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Implement a "bit-twiddling hack" for finding the next power of 2
-// in either 32 bits or 64 bits in C++11 compatible constexpr functions
+// Implement a "bit-twiddling hack" for finding the next power of 2 in either 32 bits or 64 bits
+// in C++11 compatible constexpr functions. The library no longer maintains C++11 compatibility.
 
 // "Runtime" version for 32 bits
 // --a;
@@ -89,22 +89,22 @@ constexpr T& map(T* elements, unsigned index) noexcept {
 // ++a;
 
 template<class T>
-constexpr T decrement(T x) {
+constexpr T decrement(T x) noexcept {
     return x - 1;
 }
 
 template<class T>
-constexpr T increment(T x) {
+constexpr T increment(T x) noexcept {
     return x + 1;
 }
 
 template<class T>
-constexpr T or_equal(T x, unsigned u) {
-    return (x | x >> u);
+constexpr T or_equal(T x, unsigned u) noexcept {
+    return x | x >> u;
 }
 
 template<class T, class... Args>
-constexpr T or_equal(T x, unsigned u, Args... rest) {
+constexpr T or_equal(T x, unsigned u, Args... rest) noexcept {
     return or_equal(or_equal(x, u), rest...);
 }
 

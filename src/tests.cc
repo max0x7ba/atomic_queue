@@ -105,7 +105,6 @@ void test_unique_ptr_int(Q& q) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-
 } // namespace
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -179,6 +178,20 @@ BOOST_AUTO_TEST_CASE(try_push) {
 BOOST_AUTO_TEST_CASE(size) {
     atomic_queue::RetryDecorator<atomic_queue::AtomicQueueB2<float>> q(10);
     BOOST_CHECK_EQUAL(q.capacity(), 4096);
+}
+
+BOOST_AUTO_TEST_CASE(power_of_2) {
+    using atomic_queue::details::round_up_to_power_of_2;
+    static_assert(round_up_to_power_of_2(0u) == 0u, "");
+    static_assert(round_up_to_power_of_2(1u) == 1u, "");
+    static_assert(round_up_to_power_of_2(2u) == 2u, "");
+    static_assert(round_up_to_power_of_2(3u) == 4u, "");
+    static_assert(round_up_to_power_of_2(127u) == 128u, "");
+    static_assert(round_up_to_power_of_2(128u) == 128u, "");
+    static_assert(round_up_to_power_of_2(129u) == 256u, "");
+    static_assert(round_up_to_power_of_2(0x40000000u - 1) == 0x40000000u, "");
+    static_assert(round_up_to_power_of_2(0x40000000u    ) == 0x40000000u, "");
+    static_assert(round_up_to_power_of_2(0x40000000u + 1) == 0x80000000u, "");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
