@@ -22,7 +22,7 @@ These containers have corresponding `AtomicQueueB`, `OptimistAtomicQueueB`, `Ato
 
 Totally ordered mode is supported. In this mode consumers receive messages in the same FIFO order the messages were posted. This mode is supported for `push` and `pop` functions, but for not the `try_` versions. On Intel x86 the totally ordered mode has 0 cost, as of 2019.
 
-Single-producer-single-consumer mode is supported. In this mode, no read-modify-write instructions are necessary, only the atomic loads and stores. That improves queue throughput significantly.
+Single-producer-single-consumer mode is supported. In this mode, no expensive atomic read-modify-write CPU instructions are necessary, only the cheapest atomic loads and stores. That improves queue throughput significantly.
 
 A few other thread-safe containers are used for reference in the benchmarks:
 * `std::mutex` - a fixed size ring-buffer with `std::mutex`.
@@ -95,7 +95,7 @@ In a production multiple-producer-multiple-consumer scenario the ring-buffer siz
 
 Using a power-of-2 ring-buffer array size allows a couple of important optimizations:
 
-* The writer and reader indexes get mapped into the ring-buffer array index using remainder binary operator `% SIZE` and using a power-of-2 size turns that remainder operator into one plain `and` instruction and that is as fast as it gets.
+* The writer and reader indexes get mapped into the ring-buffer array index using remainder binary operator `% SIZE`. Remainder binary operator '%' normally generates a division CPU instruction which isn't cheap, but using a power-of-2 size turns that remainder operator into one cheap binary `and` CPU instruction and that is as fast as it gets.
 * The *element index within the cache line* gets swapped with the *cache line index* within the *ring-buffer array element index*, so that subsequent queue elements actually reside in different cache lines. This eliminates contention between producers and consumers on the ring-buffer cache lines. Instead of `N` producers together with `M` consumers competing on the same ring-buffer array cache line in the worst case, it is only one producer competing with one consumer. This optimisation scales better with the number of producers and consumers, and element size. With low number of producers and consumers (up to about 2 of each in these benchmarks) disabling this optimisation may yield better throughput (but higher variance across runs).
 
 The containers use `unsigned` type for size and internal indexes. On x86-64 platform `unsigned` is 32-bit wide, whereas `size_t` is 64-bit wide. 64-bit instructions utilise an extra byte instruction prefix resulting in slightly more pressure on the CPU instruction cache and the front-end. Hence, 32-bit `unsigned` indexes are used to maximise performance. That limits the queue size to 4,294,967,295 elements, which seems to be a reasonable hard limit for many applications.
