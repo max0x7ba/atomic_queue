@@ -29,12 +29,14 @@ namespace details {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<size_t elements_per_cache_line> struct GetCacheLineIndexBits { static int constexpr value = 0; };
-template<> struct GetCacheLineIndexBits<64> { static int constexpr value = 6; };
-template<> struct GetCacheLineIndexBits<32> { static int constexpr value = 5; };
-template<> struct GetCacheLineIndexBits<16> { static int constexpr value = 4; };
-template<> struct GetCacheLineIndexBits< 8> { static int constexpr value = 3; };
-template<> struct GetCacheLineIndexBits< 4> { static int constexpr value = 2; };
-template<> struct GetCacheLineIndexBits< 2> { static int constexpr value = 1; };
+template<> struct GetCacheLineIndexBits<256> { static int constexpr value = 8; };
+template<> struct GetCacheLineIndexBits<128> { static int constexpr value = 7; };
+template<> struct GetCacheLineIndexBits< 64> { static int constexpr value = 6; };
+template<> struct GetCacheLineIndexBits< 32> { static int constexpr value = 5; };
+template<> struct GetCacheLineIndexBits< 16> { static int constexpr value = 4; };
+template<> struct GetCacheLineIndexBits<  8> { static int constexpr value = 3; };
+template<> struct GetCacheLineIndexBits<  4> { static int constexpr value = 2; };
+template<> struct GetCacheLineIndexBits<  2> { static int constexpr value = 1; };
 
 template<bool minimize_contention, unsigned array_size, size_t elements_per_cache_line>
 struct GetIndexShuffleBits {

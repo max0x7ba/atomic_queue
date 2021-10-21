@@ -156,7 +156,7 @@ BOOST_AUTO_TEST_CASE(try_push) {
       /* SPSC = */ true
       >;
 
-    constexpr unsigned CAPACITY = 4096;
+    constexpr unsigned CAPACITY = CACHE_LINE_SIZE * CACHE_LINE_SIZE;
     Queue q(CAPACITY);
     BOOST_CHECK_EQUAL(q.capacity(), CAPACITY);
     BOOST_CHECK(q.was_empty());
@@ -177,7 +177,7 @@ BOOST_AUTO_TEST_CASE(try_push) {
 
 BOOST_AUTO_TEST_CASE(size) {
     atomic_queue::RetryDecorator<atomic_queue::AtomicQueueB2<float>> q(10);
-    BOOST_CHECK_EQUAL(q.capacity(), 4096);
+    BOOST_CHECK_EQUAL(q.capacity(), CACHE_LINE_SIZE * CACHE_LINE_SIZE);
 }
 
 BOOST_AUTO_TEST_CASE(power_of_2) {
