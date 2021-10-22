@@ -126,7 +126,7 @@ ${build_dir} :
 	mkdir -p $@
 
 rtags : clean
-	${MAKE} -nk | rc -c -; true
+	${MAKE} -nk all | rtags-rc -c -; true
 
 clean :
 	rm -rf ${build_dir} ${exes}
