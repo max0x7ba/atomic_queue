@@ -64,7 +64,7 @@ void stress() {
 
     uint64_t result = 0;
     for(auto& r : results) {
-        BOOST_CHECK_GT(r, (expected_result / CONSUMERS) / 10); // Make sure a consumer didn't starve. False positives are possible here.
+        BOOST_WARN_GT(r, (expected_result / CONSUMERS) / 10); // Make sure a consumer didn't starve. False positives are possible here.
         result += r;
     }
 
