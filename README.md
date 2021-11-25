@@ -106,7 +106,9 @@ While the atomic queues can be used with any moveable element types (including `
 
 So, ideally, you may like to run your critical low-latency code on isolated cores that also no other processes can possibly use. And disable [real-time thread throttling](#real-time-thread-throttling) to prevent `SCHED_FIFO` real-time threads from being throttled.
 
-Some people proposed busy-waiting with a call to `sched_yield`/`pthread_yield`. However, `sched_yield` is a wrong tool for locking because it doesn't communicate to the OS kernel what the thread is waiting for, so that the OS scheduler can never wake up the calling thread at the "right" time, unless there are no other threads that can run on this CPU. [More details about `sched_yield` and spinlocks from Linus Torvalds](https://www.realworldtech.com/forum/?threadid=189711&curpostid=189752).
+People often propose limiting busy-waiting with a subsequent call to `sched_yield`/`pthread_yield`. However, `sched_yield` is a wrong tool for locking because it doesn't communicate to the OS kernel what the thread is waiting for, so that the OS scheduler can never reschedule the calling thread to resume when the shared state has changed (unless there are no other threads that can run on this CPU core, so that the caller resumes immediately). [More details about `sched_yield` and spinlocks from Linus Torvalds][5].
+
+On Intel CPUs one could use [the 4 debug control registers][6] to monitor the lock memory location for write access and wait on it using `select` (and its friends) or `sigwait`, see [`perf_event_open`][7] and [`uapi/linux/hw_breakpoint.h`][8] for more details. A spinlock waiter could suspend itself with `select` or `sigwait` until the spinlock state is updated. But there are only 4 of these registers, so that such a solution wouldn't scale.
 
 # Benchmarks
 [View throughput and latency benchmarks charts][1].
@@ -148,5 +150,9 @@ Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file L
 
 [1]: https://max0x7ba.github.io/atomic_queue/html/benchmarks.html
 [2]: https://www.kernel.org/doc/html/latest/scheduler/sched-rt-group.html
-[3]: https://en.cppreference.com/w/cpp/header/atomic
+[3]: https://en.cppreference.com/w/cpp/atomic/atomic
 [4]: https://repositum.tuwien.ac.at/obvutwhs/download/pdf/2582190?originalFilename=true
+[5]: https://www.realworldtech.com/forum/?threadid=189711&curpostid=189752
+[6]: https://en.wikipedia.org/wiki/X86_debug_register#DR7_-_Debug_control
+[7]: https://man7.org/linux/man-pages/man2/perf_event_open.2.html
+[8]: https://github.com/torvalds/linux/blob/master/include/uapi/linux/hw_breakpoint.h
