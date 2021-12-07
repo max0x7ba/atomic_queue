@@ -132,7 +132,7 @@ clean :
 	rm -rf ${build_dir} ${exes}
 
 env :
-	env | sort
+	env | sort --ignore-case
 
 versions:
 	${MAKE} --version | head -n1
