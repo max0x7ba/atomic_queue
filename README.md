@@ -1,8 +1,8 @@
-[![C++14](https://img.shields.io/badge/Dialect-C%2B%2B14-blue)](https://en.cppreference.com/w/cpp/14)
+[![C++14](https://img.shields.io/badge/dialect-C%2B%2B14-blue)](https://en.cppreference.com/w/cpp/14)
 [![MIT license](https://img.shields.io/github/license/max0x7ba/atomic_queue)](https://github.com/max0x7ba/atomic_queue/blob/master/LICENSE)
 ![platform Linux 64-bit](https://img.shields.io/badge/platform-Linux%2064--bit-yellow)
 ![Latest release](https://img.shields.io/github/v/tag/max0x7ba/atomic_queue?label=latest%20release)
-[![Ubuntu continuous integration](https://github.com/max0x7ba/atomic_queue/workflows/Ubuntu%20Continuous%20Integration/badge.svg)](https://github.com/max0x7ba/atomic_queue/actions?query=workflow%3A%22Ubuntu%20Continuous%20Integration%22)
+[![Ubuntu continuous integration](https://github.com/max0x7ba/atomic_queue/workflows/Ubuntu%20continuous%20integration/badge.svg)](https://github.com/max0x7ba/atomic_queue/actions?query=workflow%3A%22Ubuntu%20continuous%20integration%22)
 
 # atomic_queue
 C++14 multiple-producer-multiple-consumer *lockless* queues based on circular buffer with [`std::atomic`][3].
