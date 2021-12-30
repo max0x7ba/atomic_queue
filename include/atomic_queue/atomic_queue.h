@@ -327,7 +327,7 @@ public:
 
     unsigned was_size() const noexcept {
         // tail_ can be greater than head_ because of consumers doing pop, rather that try_pop, when the queue is empty.
-        return std::max(static_cast<int>(head_.load(X) - tail_.load(X)), 0);
+        return (std::max)(static_cast<int>(head_.load(X) - tail_.load(X)), 0);
     }
 
     unsigned capacity() const noexcept {
@@ -451,7 +451,7 @@ public:
     // The special member functions are not thread-safe.
 
     AtomicQueueB(unsigned size)
-        : size_(std::max(details::round_up_to_power_of_2(size), 1u << (SHUFFLE_BITS * 2)))
+        : size_((std::max)(details::round_up_to_power_of_2(size), 1u << (SHUFFLE_BITS * 2)))
         , elements_(AllocatorElements::allocate(size_)) {
         assert(std::atomic<T>{NIL}.is_lock_free()); // This queue is for atomic elements only. AtomicQueueB2 is for non-atomic ones.
         for(auto p = elements_, q = elements_ + size_; p < q; ++p)
@@ -536,7 +536,7 @@ public:
     // The special member functions are not thread-safe.
 
     AtomicQueueB2(unsigned size)
-        : size_(std::max(details::round_up_to_power_of_2(size), 1u << (SHUFFLE_BITS * 2)))
+        : size_((std::max)(details::round_up_to_power_of_2(size), 1u << (SHUFFLE_BITS * 2)))
         , states_(AllocatorStates::allocate(size_))
         , elements_(AllocatorElements::allocate(size_)) {
         for(auto p = states_, q = states_ + size_; p < q; ++p)
