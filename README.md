@@ -24,6 +24,8 @@ Available containers are:
 * `AtomicQueue2` - a fixed size ring-buffer for non-atomic elements.
 * `OptimistAtomicQueue2` - a faster fixed size ring-buffer for non-atomic elements which busy-waits when empty or full.
 
+In the above, _atomic elements_ are those, for which [`std::atomic<T>{T{}}.is_lock_free()`][10] returns `true`. In other words, the CPU can load, store and compare-and-exchange such elements atomically natively. On x86-64 such elements are all the [C++ standard arithmetic and pointer types][11].
+
 These containers have corresponding `AtomicQueueB`, `OptimistAtomicQueueB`, `AtomicQueueB2`, `OptimistAtomicQueueB2` versions where the buffer size is specified as an argument to the constructor.
 
 Totally ordered mode is supported. In this mode consumers receive messages in the same FIFO order the messages were posted. This mode is supported for `push` and `pop` functions, but for not the `try_` versions. On Intel x86 the totally ordered mode has 0 cost, as of 2019.
@@ -167,3 +169,5 @@ Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file L
 [7]: https://man7.org/linux/man-pages/man2/perf_event_open.2.html
 [8]: https://github.com/torvalds/linux/blob/master/include/uapi/linux/hw_breakpoint.h
 [9]: https://stackoverflow.com/a/25168942/412080
+[10]: https://en.cppreference.com/w/cpp/atomic/atomic/is_lock_free
+[11]: https://en.cppreference.com/w/cpp/language/type
