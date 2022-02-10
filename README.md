@@ -18,6 +18,8 @@ These qualities are also limitations:
 
 Ultra-low-latency applications need just that and nothing more. The minimalism pays off, see the [throughput and latency benchmarks][1].
 
+Before deciding what container to use it is important to know if the elements of your queue are atomic elements. More precisely if your queue contains elements of type T and [`std::atomic<T>.is_lock_free()` ](https://en.cppreference.com/w/cpp/atomic/atomic/is_lock_free) returns true then you can use queues that work with atomic elements only. 
+
 Available containers are:
 * `AtomicQueue` - a fixed size ring-buffer for atomic elements.
 * `OptimistAtomicQueue` - a faster fixed size ring-buffer for atomic elements which busy-waits when empty or full.
