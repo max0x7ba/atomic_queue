@@ -51,7 +51,7 @@ static inline void spin_loop_pause() noexcept {} // TODO: Find the right instruc
 namespace atomic_queue {
 constexpr int CACHE_LINE_SIZE = 64;
 static inline void spin_loop_pause() noexcept {
-    asm volatile ("nop");
+    asm volatile (".insn i 0x0F, 0, x0, x0, 0x010");
 }
 } // namespace atomic_queue
 #else
