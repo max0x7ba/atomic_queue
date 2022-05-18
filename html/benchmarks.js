@@ -58,32 +58,30 @@ $(function() {
         const tooltips = []; // Build a tooltip once and then reuse it.
         const tooltip_formatter = function() {
             const threads = this.x;
-            let tooltip = tooltips[threads];
-            if(!tooltip) {
-                const data = [];
-                for(const p of this.points) {
-                    const stats = p.series.options.atomic_queue_stats[p.point.index];
-                    data[p.series.options.index] = {
-                        name: p.series.name,
-                        color: p.series.color,
-                        min: Highcharts.numberFormat(stats[1], 0),
-                        max: Highcharts.numberFormat(stats[2], 0),
-                        mean: Highcharts.numberFormat(stats[3], 0),
-                        stdev: Highcharts.numberFormat(stats[4], 0)
-                    };
-                }
+            const tooltip = tooltips[threads];
+            if(tooltip)
+                return tooltip;
 
-                let html = `<span class="tooltip_scalability_title">${threads} producers, ${threads} consumers</span>`;
-                html += '<table class="tooltip_scalability"><tr><th></th><th>mean</th><th>stdev</th><th>min</th><th>max</th></tr>';
-                for(const d of data)
-                    if(d)
-                        html += `<tr><td style="color: ${d.color}">${d.name}: </td><td><strong>${d.mean}</strong></td><td><strong>${d.stdev}</strong></td><td>${d.min}</td><td>${d.max}</td></tr>`;
-                html += '</table>';
-
-                tooltip = html;
-                tooltips[threads] = tooltip;
+            const data = [];
+            for(const p of this.points) {
+                const stats = p.series.options.atomic_queue_stats[p.point.index];
+                data[p.series.options.index] = {
+                    name: p.series.name,
+                    color: p.series.color,
+                    min: Highcharts.numberFormat(stats[1], 0),
+                    max: Highcharts.numberFormat(stats[2], 0),
+                    mean: Highcharts.numberFormat(stats[3], 0),
+                    stdev: Highcharts.numberFormat(stats[4], 0)
+                };
             }
-            return tooltip;
+            const tbody = data.reduce((s, d) => d ? s + `<tr><td style="color: ${d.color}">${d.name}: </td><td><strong>${d.mean}</strong></td><td><strong>${d.stdev}</strong></td><td>${d.min}</td><td>${d.max}</td></tr>` : s, "");
+            return tooltips[threads] = `
+                <span class="tooltip_scalability_title">${threads} producers, ${threads} consumers</span>
+                <table class="tooltip_scalability">
+                <tr><th></th><th>mean</th><th>stdev</th><th>min</th><th>max</th></tr>
+                ${tbody}
+                </table>
+                `;
         }
 
         const chart = Highcharts.chart(div_id, {
@@ -125,8 +123,8 @@ $(function() {
                 atomic_queue_stats: stats
             };
         });
-        series.sort((a, b) => { return a.index - b.index; });
-        const categories = series.map(s => { return s.name; });
+        series.sort((a, b) => a.index - b.index);
+        const categories = series.map(s => s.name);
 
         const tooltip_formatter = function() {
             const stats = this.series.options.atomic_queue_stats;
