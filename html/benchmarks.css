@@ -6,7 +6,7 @@ body {
 
 div.chart {
     height: 500px;
-    margin-top: 2em;
+    margin-bottom: 2em;
 }
 
 p.copyright {
@@ -31,4 +31,13 @@ span.tooltip_scalability_title {
 
 table.tooltip_scalability {
     text-align: right;
+}
+
+h3.view-toggle {
+    margin-top: 0em;
+    margin-bottom: 0em;
+}
+
+h3.view-toggle > span {
+    color: #A0A0A0;
 }
