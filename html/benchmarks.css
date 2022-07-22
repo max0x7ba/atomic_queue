@@ -50,9 +50,10 @@ h3.view-toggle {
 }
 
 .view-toggle > span {
+    font-size: 1em;
     color: #A0A0A0;
-    font-size: .8em;
     display: inline-block;
+    vertical-align: -10%;
 }
 
 span.tooltip_scalability_title {
