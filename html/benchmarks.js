@@ -171,14 +171,14 @@ $(function() {
     plot_latency('latency-ryzen-5950x', latency_ryzen_5950x);
 
     $(".view-toggle")
-        .html((index, html) => `<span>⯆</span> ${html}`)
+        .html((index, html) => `<span class="material-symbols-outlined">expand_circle_down</span> ${html}`)
         .on("click", function() {
             const toggle = $(this);
             toggle.next().slideToggle();
             toggle.children("span").each(function() {
                 $(this).animate(
                     { hidden: this.hidden ^ 1 },
-                    { step: function(f) { $(this).css("transform", `rotate(${-90 * f}deg) translateX(${10 * f}%)`); } }
+                    { step: function(f) { $(this).css("transform", `rotate(${-90 * f}deg)`); } }
                 );
             });
         });

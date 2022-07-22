@@ -39,6 +39,14 @@ p.homepage {
     font-weight: bold;
 }
 
+.material-symbols-outlined {
+  font-variation-settings:
+  'FILL' 0,
+  'wght' 400,
+  'GRAD' 0,
+  'opsz' 48
+}
+
 .view-toggle {
     cursor: pointer;
     margin-bottom: 0em;
@@ -52,7 +60,6 @@ h3.view-toggle {
 .view-toggle > span {
     color: #A0A0A0;
     font-size: .8em;
-    vertical-align: middle;
     display: inline-block;
 }
 
