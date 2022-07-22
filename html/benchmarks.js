@@ -87,10 +87,7 @@ $(function() {
         const chart = Highcharts.chart(div_id, {
             chart: {
                 events: {
-                    click: function() {
-                        mode ^= 1;
-                        chart.yAxis[0].update(modes[mode]);
-                    }
+                    click: function() { this.yAxis[0].update(modes[mode ^= 1]); }
                 }
             },
             title: { text: undefined },
@@ -163,6 +160,7 @@ $(function() {
     const latency_xeon_gold_6132 = {"AtomicQueue": [231, 479, 321, 72], "AtomicQueue2": [307, 556, 394, 86], "AtomicQueueB": [344, 588, 423, 80], "AtomicQueueB2": [403, 711, 491, 111], "OptimistAtomicQueue": [283, 459, 346, 55], "OptimistAtomicQueue2": [315, 562, 392, 78], "OptimistAtomicQueueB": [321, 507, 378, 69], "OptimistAtomicQueueB2": [345, 572, 409, 84], "boost::lockfree::queue": [726, 1151, 869, 154], "boost::lockfree::spsc_queue": [269, 507, 356, 69], "moodycamel::ConcurrentQueue": [427, 789, 547, 120], "moodycamel::ReaderWriterQueue": [207, 552, 328, 94], "pthread_spinlock": [623, 1899, 946, 308], "std::mutex": [1859, 3202, 2340, 463], "tbb::concurrent_bounded_queue": [565, 993, 683, 155], "tbb::spin_mutex": [561, 1069, 741, 156], "xenium::michael_scott_queue": [733, 1255, 879, 196], "xenium::ramalhete_queue": [493, 887, 596, 139], "xenium::vyukov_bounded_queue": [436, 685, 521, 89]};
     const latency_ryzen_5950x = {"AtomicQueue": [353, 370, 365, 4], "AtomicQueue2": [375, 396, 386, 4], "AtomicQueueB": [365, 371, 368, 1], "AtomicQueueB2": [380, 387, 381, 1], "OptimistAtomicQueue": [342, 346, 343, 0], "OptimistAtomicQueue2": [296, 321, 309, 6], "OptimistAtomicQueueB": [318, 327, 325, 2], "OptimistAtomicQueueB2": [337, 353, 345, 3], "boost::lockfree::queue": [741, 747, 743, 1], "boost::lockfree::spsc_queue": [403, 405, 404, 0], "moodycamel::ConcurrentQueue": [539, 623, 587, 18], "moodycamel::ReaderWriterQueue": [355, 415, 374, 16], "pthread_spinlock": [737, 747, 742, 1], "std::mutex": [1462, 1624, 1513, 22], "tbb::concurrent_bounded_queue": [971, 1000, 974, 3], "tbb::spin_mutex": [638, 646, 643, 1], "xenium::michael_scott_queue": [940, 1061, 994, 26], "xenium::ramalhete_queue": [607, 659, 629, 11], "xenium::vyukov_bounded_queue": [469, 521, 476, 7]};
     const latency_ryzen_5825u = {"AtomicQueue": [67, 93, 87, 7], "AtomicQueue2": [71, 100, 97, 3], "AtomicQueueB": [79, 97, 95, 1], "AtomicQueueB2": [99, 103, 100, 0], "OptimistAtomicQueue": [71, 72, 71, 0], "OptimistAtomicQueue2": [82, 83, 82, 0], "OptimistAtomicQueueB": [73, 75, 74, 0], "OptimistAtomicQueueB2": [80, 86, 80, 1], "boost::lockfree::queue": [205, 211, 205, 0], "boost::lockfree::spsc_queue": [108, 111, 109, 0], "moodycamel::ConcurrentQueue": [127, 134, 130, 1], "moodycamel::ReaderWriterQueue": [94, 96, 94, 0], "pthread_spinlock": [195, 213, 212, 1], "std::mutex": [590, 631, 600, 5], "tbb::concurrent_bounded_queue": [190, 195, 191, 0], "tbb::spin_mutex": [196, 202, 198, 1], "xenium::michael_scott_queue": [283, 295, 286, 1], "xenium::ramalhete_queue": [140, 159, 144, 2], "xenium::vyukov_bounded_queue": [127, 134, 130, 1]};
+
     plot_scalability('scalability-9900KS-5GHz', scalability_9900KS, 60e6, 1000e6);
     plot_scalability('scalability-ryzen-5825u', scalability_ryzen_5825u, 40e6, 1000e6);
     plot_scalability('scalability-xeon-gold-6132', scalability_xeon_gold_6132, 15e6, 300e6);
@@ -172,11 +170,18 @@ $(function() {
     plot_latency('latency-xeon-gold-6132', latency_xeon_gold_6132);
     plot_latency('latency-ryzen-5950x', latency_ryzen_5950x);
 
-    const toggle_symbol_xor = "⮟".codePointAt(0) ^ "⮞".codePointAt(0);
-    $(".view-toggle").on("click", (event) => {
-        const target = $(event.currentTarget);
-        const toggle_symbol = target.children("span");
-        toggle_symbol.text(String.fromCodePoint(toggle_symbol.text().codePointAt(0) ^ toggle_symbol_xor));
-        target.next(".view-toggle-target").slideToggle("fast");
-    });
+    $(".view-toggle")
+        .html((index, html) => `<span>⯆</span> ${html}`)
+        .on("click", function() {
+            const toggle = $(this);
+            toggle.next().slideToggle();
+            toggle.children("span").each(function() {
+                $(this).animate(
+                    { hidden: this.hidden ^ 1 },
+                    { step: function(f) { $(this).css("transform", `rotate(${-90 * f}deg) translateX(${10 * f}%)`); } }
+                );
+            });
+        });
+
+    $("body").css("visibility", "visible");
 });

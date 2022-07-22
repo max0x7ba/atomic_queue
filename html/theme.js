@@ -197,7 +197,8 @@ Highcharts.theme = {
     maskColor: 'rgba(255,255,255,0.3)',
 
     lang: { thousandsSep: ',' },
-    credits: { enabled: false }
+    credits: { enabled: false },
+    accessibility: { enabled: false }
 };
 
 // Apply the theme

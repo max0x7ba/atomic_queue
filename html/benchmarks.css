@@ -1,18 +1,9 @@
 body {
+    visibility: hidden;
     background-color: black;
     color: white;
     font-family: 'Roboto Slab', sans-serif;
-}
-
-div.chart {
-    height: 500px;
-    margin-bottom: 2em;
-}
-
-p.copyright {
-    color: #A0A0A0;
-    text-align: left;
-    font-size: 0.8em;
+    overflow-y: scroll;
 }
 
 h1, h2, h3 {
@@ -24,6 +15,47 @@ p, li {
     margin-left: 20px;
 }
 
+ul {
+    margin-top: 0em;
+}
+
+div.chart {
+    height: 500px;
+    margin-bottom: 1em;
+}
+
+p.copyright {
+    color: #A0A0A0;
+    font-size: 0.8em;
+}
+
+h1.homepage {
+    margin-bottom: 0em;
+}
+
+p.homepage {
+    color: #A0A0A0;
+    margin-top: 0em;
+    font-weight: bold;
+}
+
+.view-toggle {
+    cursor: pointer;
+    margin-bottom: 0em;
+}
+
+h3.view-toggle {
+    margin-left: 24px;
+    margin-top: 0em;
+}
+
+.view-toggle > span {
+    color: #A0A0A0;
+    font-size: .8em;
+    vertical-align: middle;
+    display: inline-block;
+}
+
 span.tooltip_scalability_title {
     font-weight: bold;
     font-size: 1.2em;
@@ -31,13 +63,4 @@ span.tooltip_scalability_title {
 
 table.tooltip_scalability {
     text-align: right;
-}
-
-h3.view-toggle {
-    margin-top: 0em;
-    margin-bottom: 0em;
-}
-
-h3.view-toggle > span {
-    color: #A0A0A0;
 }
