@@ -42,6 +42,7 @@ p.homepage {
 .view-toggle {
     cursor: pointer;
     margin-bottom: 0em;
+    user-select: none;
 }
 
 h3.view-toggle {
