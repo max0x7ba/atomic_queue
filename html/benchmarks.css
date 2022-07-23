@@ -51,10 +51,11 @@ h3.view-toggle {
     margin-top: 0em;
 }
 
-.view-toggle > span {
-    font-size: 1em;
+svg.arrow-down-circle {
+    fill: currentColor;
+    width: 1em;
+    height: 1em;
     color: #A0A0A0;
-    display: inline-block;
     vertical-align: -10%;
 }
 
