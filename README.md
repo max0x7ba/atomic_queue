@@ -24,8 +24,6 @@ Available containers are:
 * `AtomicQueue2` - a fixed size ring-buffer for non-atomic elements.
 * `OptimistAtomicQueue2` - a faster fixed size ring-buffer for non-atomic elements which busy-waits when empty or full.
 
-In the above, _atomic elements_ are those, for which [`std::atomic<T>{T{}}.is_lock_free()`][10] returns `true`. In other words, the CPU can load, store and compare-and-exchange such elements atomically natively. On x86-64 such elements are all the [C++ standard arithmetic and pointer types][11].
-
 These containers have corresponding `AtomicQueueB`, `OptimistAtomicQueueB`, `AtomicQueueB2`, `OptimistAtomicQueueB2` versions where the buffer size is specified as an argument to the constructor.
 
 Totally ordered mode is supported. In this mode consumers receive messages in the same FIFO order the messages were posted. This mode is supported for `push` and `pop` functions, but for not the `try_` versions. On Intel x86 the totally ordered mode has 0 cost, as of 2019.
@@ -88,6 +86,8 @@ The containers support the following APIs:
 * `was_full` - Returns `true` if the container was full during the call. The state may have changed by the time the return value is examined.
 * `capacity` - Returns the maximum number of elements the queue can possibly hold.
 
+_Atomic elements_ are those, for which [`std::atomic<T>{T{}}.is_lock_free()`][10] returns `true`. In other words, the CPU can load, store and compare-and-exchange such elements atomically natively. On x86-64 such elements are all the [C++ standard arithmetic and pointer types][11]. The queues for atomic elements reserve one value to serve as an empty element marker `NIL`, its default value is `0`. `NIL` value must not be pushed into a queue and there is an [`assert`][13] statement in `push` functions to guard against that in debug mode builds. Pushing `NIL` element into a queue in release mode builds results in undefined behaviour, such as deadlocks and/or lost queue elements.
+
 Note that _optimism_ is a choice of a queue modification operation control flow, rather than a queue type. An _optimist_ `push` is fastest when the queue is not full most of the time, an optimistic `pop` - when the queue is not empty most of the time. Optimistic and not so operations can be mixed with no restrictions. The `OptimistAtomicQueue`s in [the benchmarks][1] use only _optimist_ `push` and `pop`.
 
 See [example.cc](src/example.cc) for a usage example.
@@ -140,6 +140,7 @@ When huge pages are available the benchmarks use 1x1GB or 16x2MB huge pages for 
 sudo hugeadm --pool-pages-min 1GB:1 --pool-pages-max 1GB:1
 sudo hugeadm --pool-pages-min 2MB:16 --pool-pages-max 2MB:16
 ```
+Alternatively, you may like to enable [transparent hugepages][15] in your system and use a hugepage-aware allocator, such as [tcmalloc][14].
 
 ### Real-time thread throttling
 By default, Linux scheduler throttles real-time threads from consuming 100% of CPU and that is detrimental to benchmarking. Full details can be found in [Real-Time group scheduling][2]. To disable real-time thread throttling do:
@@ -171,3 +172,7 @@ Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file L
 [9]: https://stackoverflow.com/a/25168942/412080
 [10]: https://en.cppreference.com/w/cpp/atomic/atomic/is_lock_free
 [11]: https://en.cppreference.com/w/cpp/language/type
+[12]: https://en.cppreference.com/w/cpp/types/is_arithmetic
+[13]: https://en.cppreference.com/w/cpp/error/assert
+[14]: https://google.github.io/tcmalloc/temeraire.html
+[15]: https://www.kernel.org/doc/html/latest/admin-guide/mm/transhuge.html
