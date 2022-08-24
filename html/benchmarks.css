@@ -56,7 +56,7 @@ svg.arrow-down-circle {
     width: 1em;
     height: 1em;
     color: #A0A0A0;
-    vertical-align: -10%;
+    vertical-align: -.1em;
 }
 
 span.tooltip_scalability_title {
