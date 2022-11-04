@@ -12,8 +12,8 @@ jobs:
     runs-on: ubuntu-20.04
 
     steps:
-    - uses: actions/checkout@v2
-    - name: Install Boost
+    - uses: actions/checkout@v3
+    - name: Install Boost.Test
       run: sudo apt-get --quiet --yes install libboost-test-dev
     - name: Environment variables
       run: make env; make TOOLSET=gcc versions; make TOOLSET=clang versions
