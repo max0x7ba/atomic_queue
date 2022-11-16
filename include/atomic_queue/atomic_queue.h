@@ -111,11 +111,11 @@ constexpr T or_equal(T x, unsigned u, Args... rest) noexcept {
 }
 
 constexpr uint32_t round_up_to_power_of_2(uint32_t a) noexcept {
-    return increment(or_equal(decrement(a), 1, 2, 4, 8, 16));
+    return increment(or_equal(decrement(a), 1u, 2u, 4u, 8u, 16u));
 }
 
 constexpr uint64_t round_up_to_power_of_2(uint64_t a) noexcept {
-    return increment(or_equal(decrement(a), 1, 2, 4, 8, 16, 32));
+    return increment(or_equal(decrement(a), 1ul, 2ul, 4ul, 8ul, 16ul, 32ul));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
