@@ -30,6 +30,8 @@ Totally ordered mode is supported. In this mode consumers receive messages in th
 
 Single-producer-single-consumer mode is supported. In this mode, no expensive atomic read-modify-write CPU instructions are necessary, only the cheapest atomic loads and stores. That improves queue throughput significantly.
 
+Move-only queue element types are fully supported. For example, a queue of `std::unique_ptr<T>` elements would be `AtomicQueue2B<std::unique_ptr<T>>` or `AtomicQueue2<std::unique_ptr<T>, CAPACITY>`.
+
 A few other thread-safe containers are used for reference in the benchmarks:
 * `std::mutex` - a fixed size ring-buffer with `std::mutex`.
 * `pthread_spinlock` - a fixed size ring-buffer with `pthread_spinlock_t`.
