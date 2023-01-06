@@ -86,7 +86,7 @@ The containers support the following APIs:
 * `was_full` - Returns `true` if the container was full during the call. The state may have changed by the time the return value is examined.
 * `capacity` - Returns the maximum number of elements the queue can possibly hold.
 
-_Atomic elements_ are those, for which [`std::atomic<T>{T{}}.is_lock_free()`][10] returns `true`. In other words, the CPU can load, store and compare-and-exchange such elements atomically natively. On x86-64 such elements are all the [C++ standard arithmetic and pointer types][11]. The queues for atomic elements reserve one value to serve as an empty element marker `NIL`, its default value is `0`. `NIL` value must not be pushed into a queue and there is an [`assert`][13] statement in `push` functions to guard against that in debug mode builds. Pushing `NIL` element into a queue in release mode builds results in undefined behaviour, such as deadlocks and/or lost queue elements.
+_Atomic elements_ are those, for which [`std::atomic<T>{T{}}.is_lock_free()`][10] returns `true`, and, when C++17 features are available, [`std::atomic<T>::is_always_lock_free`][16] evaluates to `true` at compile time. In other words, the CPU can load, store and compare-and-exchange such elements atomically natively. On x86-64 such elements are all the [C++ standard arithmetic and pointer types][11]. The queues for atomic elements reserve one value to serve as an empty element marker `NIL`, its default value is `0`. `NIL` value must not be pushed into a queue and there is an [`assert`][13] statement in `push` functions to guard against that in debug mode builds. Pushing `NIL` element into a queue in release mode builds results in undefined behaviour, such as deadlocks and/or lost queue elements.
 
 Note that _optimism_ is a choice of a queue modification operation control flow, rather than a queue type. An _optimist_ `push` is fastest when the queue is not full most of the time, an optimistic `pop` - when the queue is not empty most of the time. Optimistic and not so operations can be mixed with no restrictions. The `OptimistAtomicQueue`s in [the benchmarks][1] use only _optimist_ `push` and `pop`.
 
@@ -176,3 +176,4 @@ Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file L
 [13]: https://en.cppreference.com/w/cpp/error/assert
 [14]: https://google.github.io/tcmalloc/temeraire.html
 [15]: https://www.kernel.org/doc/html/latest/admin-guide/mm/transhuge.html
+[16]: https://en.cppreference.com/w/cpp/atomic/atomic/is_always_lock_free
