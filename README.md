@@ -94,6 +94,8 @@ _Atomic elements_ are those, for which [`std::atomic<T>{T{}}.is_lock_free()`][10
 
 Note that _optimism_ is a choice of a queue modification operation control flow, rather than a queue type. An _optimist_ `push` is fastest when the queue is not full most of the time, an optimistic `pop` - when the queue is not empty most of the time. Optimistic and not so operations can be mixed with no restrictions. The `OptimistAtomicQueue`s in [the benchmarks][1] use only _optimist_ `push` and `pop`.
 
+`push` and `try_push` operations _synchronize-with_ (as defined in [`std::memory_order`][17]) with any subsequent `pop` or `try_pop` operation of the same queue object.
+
 See [example.cc](src/example.cc) for a usage example.
 
 TODO: full API reference.
@@ -181,3 +183,4 @@ Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file L
 [14]: https://google.github.io/tcmalloc/temeraire.html
 [15]: https://www.kernel.org/doc/html/latest/admin-guide/mm/transhuge.html
 [16]: https://en.cppreference.com/w/cpp/atomic/atomic/is_always_lock_free
+[17]: https://en.cppreference.com/w/cpp/atomic/memory_order

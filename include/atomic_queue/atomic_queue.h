@@ -179,7 +179,7 @@ protected:
         }
         else {
             for(;;) {
-                T element = q_element.exchange(NIL, R); // (2) The store to wait for.
+                T element = q_element.exchange(NIL, AR); // (2) The store to wait for.
                 if(ATOMIC_QUEUE_LIKELY(element != NIL))
                     return element;
                 // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
@@ -274,7 +274,7 @@ public:
             do {
                 if(static_cast<int>(head - tail_.load(X)) >= static_cast<int>(static_cast<Derived&>(*this).size_))
                     return false;
-            } while(ATOMIC_QUEUE_UNLIKELY(!head_.compare_exchange_strong(head, head + 1, A, X))); // This loop is not FIFO.
+            } while(ATOMIC_QUEUE_UNLIKELY(!head_.compare_exchange_strong(head, head + 1, X, X))); // This loop is not FIFO.
         }
 
         static_cast<Derived&>(*this).do_push(std::forward<T>(element), head);
@@ -293,7 +293,7 @@ public:
             do {
                 if(static_cast<int>(head_.load(X) - tail) <= 0)
                     return false;
-            } while(ATOMIC_QUEUE_UNLIKELY(!tail_.compare_exchange_strong(tail, tail + 1, A, X))); // This loop is not FIFO.
+            } while(ATOMIC_QUEUE_UNLIKELY(!tail_.compare_exchange_strong(tail, tail + 1, X, X))); // This loop is not FIFO.
         }
 
         element = static_cast<Derived&>(*this).do_pop(tail);
@@ -308,7 +308,7 @@ public:
             head_.store(head + 1, X);
         }
         else {
-            constexpr auto memory_order = Derived::total_order_ ? std::memory_order_seq_cst : std::memory_order_acquire;
+            constexpr auto memory_order = Derived::total_order_ ? std::memory_order_seq_cst : std::memory_order_relaxed;
             head = head_.fetch_add(1, memory_order); // FIFO and total order on Intel regardless, as of 2019.
         }
         static_cast<Derived&>(*this).do_push(std::forward<T>(element), head);
@@ -321,7 +321,7 @@ public:
             tail_.store(tail + 1, X);
         }
         else {
-            constexpr auto memory_order = Derived::total_order_ ? std::memory_order_seq_cst : std::memory_order_acquire;
+            constexpr auto memory_order = Derived::total_order_ ? std::memory_order_seq_cst : std::memory_order_relaxed;
             tail = tail_.fetch_add(1, memory_order); // FIFO and total order on Intel regardless, as of 2019.
         }
         return static_cast<Derived&>(*this).do_pop(tail);

@@ -82,6 +82,7 @@ auto constexpr A = std::memory_order_acquire;
 auto constexpr R = std::memory_order_release;
 auto constexpr X = std::memory_order_relaxed;
 auto constexpr C = std::memory_order_seq_cst;
+auto constexpr AR = std::memory_order_acq_rel;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
