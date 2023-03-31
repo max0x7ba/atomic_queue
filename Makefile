@@ -4,6 +4,7 @@
 # time make -rC ~/src/atomic_queue -j8 run_benchmarks
 # time make -rC ~/src/atomic_queue -j8 TOOLSET=clang run_benchmarks
 # time make -rC ~/src/atomic_queue -j8 BUILD=debug run_tests
+# time make -rC ~/src/atomic_queue -j8 BUILD=sanitize run_tests
 
 SHELL := /bin/bash
 BUILD := release
@@ -28,13 +29,18 @@ AR := ${ar.${TOOLSET}}
 
 cxxflags.gcc.debug := -Og -fstack-protector-all -fno-omit-frame-pointer # -D_GLIBCXX_DEBUG
 cxxflags.gcc.release := -O3 -mtune=native -ffast-math -falign-{functions,loops}=64 -DNDEBUG
+cxxflags.gcc.sanitize := ${cxxflags.gcc.release} -fsanitize=thread
 cxxflags.gcc := -pthread -march=native -std=gnu++14 -W{all,extra,error,no-{maybe-uninitialized,unused-variable,unused-function,unused-local-typedefs}} -g -fmessage-length=0 ${cxxflags.gcc.${BUILD}}
+ldflags.gcc.sanitize := ${ldflags.gcc.release} -fsanitize=thread
+ldflags.gcc := ${ldflags.gcc.${BUILD}}
 
 cflags.gcc := -pthread -march=native -W{all,extra} -g -fmessage-length=0 ${cxxflags.gcc.${BUILD}}
 
 cxxflags.clang.debug := -O0 -fstack-protector-all
 cxxflags.clang.release := -O3 -mtune=native -ffast-math -falign-functions=64 -DNDEBUG
+cxxflags.clang.sanitize := ${cxxflags.clang.release} -fsanitize=thread
 cxxflags.clang := -stdlib=libstdc++ -pthread -march=native -std=gnu++14 -W{all,extra,error,no-{unused-variable,unused-function,unused-local-typedefs}} -g -fmessage-length=0 ${cxxflags.clang.${BUILD}}
+ldflags.clang.sanitize := ${ldflags.clang.release} -fsanitize=thread
 ldflags.clang := -stdlib=libstdc++ ${ldflags.clang.${BUILD}}
 
 # Additional CPPFLAGS, CXXFLAGS, CFLAGS, LDLIBS, LDFLAGS can come from the command line, e.g. make CPPFLAGS='-I<my-include-dir>', or from environment variables.
