@@ -168,7 +168,7 @@ protected:
     static T do_pop_atomic(std::atomic<T>& q_element) noexcept {
         if(Derived::spsc_) {
             for(;;) {
-                T element = q_element.load(X);
+                T element = q_element.load(A);
                 if(ATOMIC_QUEUE_LIKELY(element != NIL)) {
                     q_element.store(NIL, R);
                     return element;
