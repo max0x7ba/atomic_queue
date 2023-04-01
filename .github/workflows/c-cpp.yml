@@ -19,5 +19,9 @@ jobs:
       run: make env; make TOOLSET=gcc versions; make TOOLSET=clang versions
     - name: Unit tests with gcc
       run: make -rj2 TOOLSET=gcc example run_tests
+    - name: Unit tests with gcc thread sanitizer
+      run: make -rj2 TOOLSET=gcc BUILD=sanitize run_tests
     - name: Unit tests with clang
       run: make -rj2 TOOLSET=clang example run_tests
+    - name: Unit tests with clang thread sanitizer
+      run: make -rj2 TOOLSET=clang BUILD=sanitize run_tests
