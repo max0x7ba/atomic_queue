@@ -170,7 +170,7 @@ protected:
             for(;;) {
                 T element = q_element.load(A);
                 if(ATOMIC_QUEUE_LIKELY(element != NIL)) {
-                    q_element.store(NIL, R);
+                    q_element.store(NIL, X);
                     return element;
                 }
                 if(Derived::maximize_throughput_)
@@ -179,7 +179,7 @@ protected:
         }
         else {
             for(;;) {
-                T element = q_element.exchange(NIL, AR); // (2) The store to wait for.
+                T element = q_element.exchange(NIL, A); // (2) The store to wait for.
                 if(ATOMIC_QUEUE_LIKELY(element != NIL))
                     return element;
                 // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
