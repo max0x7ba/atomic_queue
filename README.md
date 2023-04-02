@@ -39,7 +39,7 @@ A few other thread-safe containers are used for reference in the benchmarks:
 * `pthread_spinlock` - a fixed size ring-buffer with `pthread_spinlock_t`.
 * `boost::lockfree::spsc_queue` - a wait-free single-producer-single-consumer queue from Boost library.
 * `boost::lockfree::queue` - a lock-free multiple-producer-multiple-consumer queue from Boost library.
-* `moodycamel::ConcurrentQueue` - a lock-free multiple-producer-multiple-consumer queue used in non-blocking mode.
+* `moodycamel::ConcurrentQueue` - a lock-free multiple-producer-multiple-consumer queue used in non-blocking mode. This queue is rather unlike others because it is designed to top throughput benchmarks at the expense of increased latency and eschewing the global time order of elements pushed into one queue by different threads. It may look good in throughput benchmarks, but it fails in real-world usage when time order of elements/events pushed into one queue must be preserved, unlike the rest of the queues in the benchmark here.
 * `moodycamel::ReaderWriterQueue` - a lock-free single-producer-single-consumer queue used in non-blocking mode.
 * `xenium::michael_scott_queue` - a lock-free multi-producer-multi-consumer queue proposed by [Michael and Scott](http://www.cs.rochester.edu/~scott/papers/1996_PODC_queues.pdf) (this queue is similar to `boost::lockfree::queue` which is also based on the same proposal).
 * `xenium::ramalhete_queue` - a lock-free multi-producer-multi-consumer queue proposed by [Ramalhete and Correia](http://concurrencyfreaks.blogspot.com/2016/11/faaarrayqueue-mpmc-lock-free-queue-part.html).
