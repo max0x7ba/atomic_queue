@@ -597,6 +597,10 @@ public:
     friend void swap(AtomicQueueB2& a, AtomicQueueB2& b) noexcept {
         a.swap(b);
     }
+
+	[[nodiscard]] const T* data() const noexcept {
+		return elements_;
+	}
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
