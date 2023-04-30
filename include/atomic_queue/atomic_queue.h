@@ -57,13 +57,10 @@ struct GetIndexShuffleBits<false, array_size, elements_per_cache_line> {
 // the element within the cache line) with the next N bits (which are the index of the cache line)
 // of the element index.
 template<int BITS>
-constexpr unsigned remap_index_with_mix(unsigned index, unsigned mix) {
-    return index ^ mix ^ (mix << BITS);
-}
-
-template<int BITS>
 constexpr unsigned remap_index(unsigned index) noexcept {
-    return remap_index_with_mix<BITS>(index, (index ^ (index >> BITS)) & ((1u << BITS) - 1));
+    unsigned constexpr mix_mask{(1u << BITS) - 1};
+    unsigned const mix{(index ^ (index >> BITS)) & mix_mask};
+    return index ^ mix ^ (mix << BITS);
 }
 
 template<>
