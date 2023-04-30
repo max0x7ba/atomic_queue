@@ -25,7 +25,7 @@
   <body>
     <h1 class="view-toggle">Scalability Benchmark</h1>
     <div>
-      <p>N producer threads push a 4-byte integer into one same queue, N consumer threads pop the integers from the queue. All producers posts 1,000,000 messages in total. Total time to send and receive all the messages is measured. The benchmark is run for from 1 producer and 1 consumer up to (total-number-of-cpus / 2) producers/consumers to measure the scalabilty of different queues.</p>
+      <p>N producer threads push a 4-byte integer into one same queue, N consumer threads pop the integers from the queue. All producers posts 1,000,000 messages in total. Total time to send and receive all the messages is measured. The benchmark is run for from 1 producer and 1 consumer up to (total-number-of-cpus / 2) producers/consumers to measure the scalabilty of different queues. The minimum, maximum, mean and standard deviation of at least 33 runs are reported in the tooltip.</p>
       <h3 class="view-toggle">Scalability on Intel i9-9900KS</h3><div class="chart" id="scalability-9900KS-5GHz"></div>
       <h3 class="view-toggle">Scalability on AMD Ryzen 7 5825U</h3><div class="chart" id="scalability-ryzen-5825u"></div>
       <h3 class="view-toggle">Scalability on Intel Xeon Gold 6132</h3><div class="chart" id="scalability-xeon-gold-6132"></div>
@@ -34,7 +34,7 @@
 
     <h1 class="view-toggle">Latency Benchmark</h1>
     <div>
-      <p>One thread posts a 4-byte integer to another thread through one queue and waits for a reply from another queue (2 queues in total). The benchmark measures the total time of 100,000 ping-pongs, best of 10 runs. Contention is minimal here (1-producer-1-consumer, 1 element in the queue) to be able to achieve and measure the lowest latency. Reports the average round-trip time.</p>
+      <p>One thread posts a 4-byte integer to another thread through one queue and waits for a reply from another queue (2 queues in total). The benchmark measures the total time of 100,000 ping-pongs, best of 10 runs. Contention is minimal here (1-producer-1-consumer, 1 element in the queue) to be able to achieve and measure the lowest latency. Reports the average round-trip time, i.e. the time it takes to post a message to another thread and receive a reply. The minimum, maximum, mean and standard deviation of at least 33 runs are reported in the tooltip.</p>
       <h3 class="view-toggle">Latency on Intel i9-9900KS</h3><div class="chart" id="latency-9900KS-5GHz"></div>
       <h3 class="view-toggle">Latency on AMD Ryzen 7 5825U</h3><div class="chart" id="latency-ryzen-5825u"></div>
       <h3 class="view-toggle">Latency on Intel Xeon Gold 6132</h3><div class="chart" id="latency-xeon-gold-6132"></div>

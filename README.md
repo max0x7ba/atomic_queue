@@ -14,9 +14,12 @@ C++14 multiple-producer-multiple-consumer *lockless* queues based on circular bu
 
 It has been developed, tested and benchmarked on Linux, but should support any C++14 platforms which implement `std::atomic`.
 
-These queues have been designed to be as low-latency as it can possibly get to let the CPUs perform at their peak capacities unimpeded. When minimizing latency a good design is not when there is nothing left to add, rather when there is nothing left to remove, as these queues exemplify. The main design principle these queues follow is _minimalism_: the bare minimum of atomic operations, fixed size buffer, value semantics.
+These queues have been designed with a goal to minimize the latency between one thread pushing an element into a queue and another thread popping it from the queue.
 
-These qualities are also limitations:
+## Design Principles
+When minimizing latency a good design is not when there is nothing left to add, but rather when there is nothing left to remove, as these queues exemplify. The main design principle these queues follow is _minimalism_, which results in such design choices as the bare minimum of atomic operations, contention/false-sharing minimization, fixed size buffer, value semantics. The impact of each of these small design choices on their own can be barely measurable, but their total impact is much greater then a simple sum of the constituents' impacts, aka synergy. The synergy emerging from combining multiple of these small design choices together is what allows CPUs to perform at their peak capacities least unimpeded.
+
+These design choices are also limitations:
 
 * The maximum queue size must be set at compile time or construction time. The circular buffer side-steps the memory reclamation problem inherent in linked-list based queues for the price of fixed buffer size. See [Effective memory reclamation for lock-free data structures in C++][4] for more details. Fixed buffer size may not be that much of a limitation, since once the queue gets larger than the maximum expected size that indicates a problem that elements aren't consumed fast enough, and if the queue keeps growing it may eventually consume all available memory which may affect the entire system, rather than the problematic process only. The only apparent inconvenience is that one has to do an upfront calculation on what would be the largest expected/acceptable number of unconsumed elements in the queue.
 * There are no OS-blocking push/pop functions. This queue is designed for ultra-low-latency scenarios and using an OS blocking primitive would be sacrificing push-to-pop latency. For lowest possible latency one cannot afford blocking in the OS kernel because the wake-up latency of a blocked thread is about 1-3 microseconds, whereas this queue's round-trip time can be as low as 150 nanoseconds.
@@ -25,9 +28,9 @@ Ultra-low-latency applications need just that and nothing more. The minimalism p
 
 Available containers are:
 * `AtomicQueue` - a fixed size ring-buffer for atomic elements.
-* `OptimistAtomicQueue` - a faster fixed size ring-buffer for atomic elements which busy-waits when empty or full.
+* `OptimistAtomicQueue` - a faster fixed size ring-buffer for atomic elements which busy-waits when empty or full. It is `AtomicQueue` used with `push`/`pop` instead of `try_push`/`try_pop`.
 * `AtomicQueue2` - a fixed size ring-buffer for non-atomic elements.
-* `OptimistAtomicQueue2` - a faster fixed size ring-buffer for non-atomic elements which busy-waits when empty or full.
+* `OptimistAtomicQueue2` - a faster fixed size ring-buffer for non-atomic elements which busy-waits when empty or full. It is `AtomicQueue2` used with `push`/`pop` instead of `try_push`/`try_pop`.
 
 These containers have corresponding `AtomicQueueB`, `OptimistAtomicQueueB`, `AtomicQueueB2`, `OptimistAtomicQueueB2` versions where the buffer size is specified as an argument to the constructor.
 
@@ -37,7 +40,8 @@ Single-producer-single-consumer mode is supported. In this mode, no expensive at
 
 Move-only queue element types are fully supported. For example, a queue of `std::unique_ptr<T>` elements would be `AtomicQueue2B<std::unique_ptr<T>>` or `AtomicQueue2<std::unique_ptr<T>, CAPACITY>`.
 
-A few other thread-safe containers are used for reference in the benchmarks:
+## Role Models
+Several other well established and popular thread-safe containers are used for reference in the [benchmarks][1]:
 * `std::mutex` - a fixed size ring-buffer with `std::mutex`.
 * `pthread_spinlock` - a fixed size ring-buffer with `pthread_spinlock_t`.
 * `boost::lockfree::spsc_queue` - a wait-free single-producer-single-consumer queue from Boost library.
