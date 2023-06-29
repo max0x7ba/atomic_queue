@@ -55,7 +55,11 @@ static inline void spin_loop_pause() noexcept {
 }
 } // namespace atomic_queue
 #else
+#ifdef _MSC_VER
+#pragma message("Unknown CPU architecture. Using L1 cache line size of 64 bytes and no spinloop pause instruction.")
+#else
 #warning "Unknown CPU architecture. Using L1 cache line size of 64 bytes and no spinloop pause instruction."
+#endif
 namespace atomic_queue {
 constexpr int CACHE_LINE_SIZE = 64; // TODO: Review that this is the correct value.
 static inline void spin_loop_pause() noexcept {}
