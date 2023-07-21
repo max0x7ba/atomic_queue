@@ -30,7 +30,7 @@ AR := ${ar.${TOOLSET}}
 cxxflags.gcc.debug := -Og -fstack-protector-all -fno-omit-frame-pointer # -D_GLIBCXX_DEBUG
 cxxflags.gcc.release := -O3 -mtune=native -ffast-math -falign-{functions,loops}=64 -DNDEBUG
 cxxflags.gcc.sanitize := ${cxxflags.gcc.release} -fsanitize=thread
-cxxflags.gcc := -pthread -march=native -std=gnu++14 -W{all,extra,error,no-{maybe-uninitialized,unused-variable,unused-function,unused-local-typedefs}} -g -fmessage-length=0 ${cxxflags.gcc.${BUILD}}
+cxxflags.gcc := -pthread -march=native -std=gnu++14 -W{all,extra,error,no-{maybe-uninitialized,unused-variable,unused-function,unused-local-typedefs,error=array-bounds}} -g -fmessage-length=0 ${cxxflags.gcc.${BUILD}}
 ldflags.gcc.sanitize := ${ldflags.gcc.release} -fsanitize=thread
 ldflags.gcc := ${ldflags.gcc.${BUILD}}
 
