@@ -1,0 +1,31 @@
+name: Continuous Integrations
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build-and-test:
+    strategy:
+      matrix:
+        toolset: [gcc, clang]
+        os: [ubuntu-20.04, ubuntu-22.04]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install Boost.Test
+      run: sudo apt-get --quiet --yes install libboost-test-dev
+
+    - name: Environment variables
+      run: make -r TOOLSET=${{ matrix.toolset }} env versions
+
+    - name: Unit tests with ${{ matrix.toolset }}
+      run: make -rj2 TOOLSET=${{ matrix.toolset }} example run_tests
+
+    - name: Unit tests with ${{ matrix.toolset }} thread sanitizer
+      run: make -rj2 TOOLSET=${{ matrix.toolset }} BUILD=sanitize run_tests
