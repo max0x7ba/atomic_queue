@@ -7,11 +7,11 @@ on:
     branches: [ master ]
 
 jobs:
-  build-and-test:
+  unit-test:
     strategy:
       matrix:
-        os: [ubuntu-20.04, ubuntu-22.04]
         toolset: [gcc, clang]
+        os: [ubuntu-20.04, ubuntu-22.04]
 
     runs-on: ${{ matrix.os }}
 
