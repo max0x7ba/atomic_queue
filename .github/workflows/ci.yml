@@ -10,8 +10,8 @@ jobs:
   build-and-test:
     strategy:
       matrix:
-        toolset: [gcc, clang]
         os: [ubuntu-20.04, ubuntu-22.04]
+        toolset: [gcc, clang]
 
     runs-on: ${{ matrix.os }}
 
@@ -21,11 +21,11 @@ jobs:
     - name: Install Boost.Test
       run: sudo apt-get --quiet --yes install libboost-test-dev
 
-    - name: Environment variables
+    - name: Log environment variables
       run: make -r TOOLSET=${{ matrix.toolset }} env versions
 
-    - name: Unit tests with ${{ matrix.toolset }}
+    - name: Build and run unit tests
       run: make -rj2 TOOLSET=${{ matrix.toolset }} example run_tests
 
-    - name: Unit tests with ${{ matrix.toolset }} thread sanitizer
+    - name: Build and run unit tests with thread sanitizer
       run: make -rj2 TOOLSET=${{ matrix.toolset }} BUILD=sanitize run_tests
