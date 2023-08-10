@@ -48,7 +48,7 @@ ldflags.clang := -stdlib=libstdc++ ${ldflags.clang.${BUILD}}
 cxxflags := ${cxxflags.${TOOLSET}} ${CXXFLAGS}
 cflags := ${cflags.${TOOLSET}} ${CFLAGS}
 cppflags := ${CPPFLAGS} -Iinclude
-ldflags := -pthread -g ${ldflags.${TOOLSET}} ${LDFLAGS}
+ldflags := -fuse-ld=gold -pthread -g ${ldflags.${TOOLSET}} ${LDFLAGS}
 ldlibs := -lrt ${LDLIBS}
 
 cppflags.tbb :=
