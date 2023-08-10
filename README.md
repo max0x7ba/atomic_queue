@@ -10,7 +10,7 @@
 ![platform Linux IBM System/390](https://img.shields.io/badge/platform-Linux%20IBM%20System/390-yellow)
 
 # atomic_queue
-C++14 multiple-producer-multiple-consumer *lockless* queues based on circular buffer with [`std::atomic`][3].
+C++14 multiple-producer-multiple-consumer *lock-free* queues based on circular buffer with [`std::atomic`][3].
 
 It has been developed, tested and benchmarked on Linux, but should support any C++14 platforms which implement `std::atomic`.
 
@@ -117,13 +117,14 @@ See [example.cc](src/example.cc) for a usage example.
 TODO: full API reference.
 
 # Implementation Notes
-The available queues here use a ring-buffer array for storing elements. The size of the queue is fixed at compile time or construction time.
+## Ring-buffer capacity
+The available queues here use a ring-buffer array for storing elements. The capacity of the queue is fixed at compile time or construction time.
 
-In a production multiple-producer-multiple-consumer scenario the ring-buffer size should be set to the maximum expected queue size. When the ring-buffer gets full it means that the consumers cannot consume the elements fast enough. A fix for that is any of:
+In a production multiple-producer-multiple-consumer scenario the ring-buffer capacity should be set to the maximum expected queue size. When the ring-buffer gets full it means that the consumers cannot consume the elements fast enough. A fix for that is any of:
 
-* increase the buffer size to be able to handle temporary spikes of produced elements, or,
-* increase the number of consumers to consume elements faster, or,
-* decrease the number of producers to producer fewer elements.
+* Increase the queue capacity in order to handle temporary spikes of pending elements in the queue. This normally requires restarting the application after re-configuration/re-compilation has been done.
+* Increase the number of consumers to drain the queue faster. The number of consumers can be managed dynamically, e.g.: when a consumer observes that the number of elements pending in the queue keeps growing, that calls for deploying more consumer threads to drain the queue at a faster rate; mostly empty queue calls for suspending/terminating excess consumer threads.
+* Decrease the rate of pushing elements into the queue. `push` and `pop` calls always incur some expensive CPU cycles to maintain the integrity of queue state in atomic/consistent/isolated fashion with respect to other threads and these costs increase super-linearly as queue contention grows. Producer batching of multiple small elements or elements resulting from one event into one queue message is often a reasonable solution.
 
 Using a power-of-2 ring-buffer array size allows a couple of important optimizations:
 
@@ -132,11 +133,32 @@ Using a power-of-2 ring-buffer array size allows a couple of important optimizat
 
 The containers use `unsigned` type for size and internal indexes. On x86-64 platform `unsigned` is 32-bit wide, whereas `size_t` is 64-bit wide. 64-bit instructions utilise an extra byte instruction prefix resulting in slightly more pressure on the CPU instruction cache and the front-end. Hence, 32-bit `unsigned` indexes are used to maximise performance. That limits the queue size to 4,294,967,295 elements, which seems to be a reasonable hard limit for many applications.
 
-While the atomic queues can be used with any moveable element types (including `std::unique_ptr`), for best througput and latency the queue elements should be cheap to copy and lock-free (e.g. `unsigned` or `T*`), so that `push` and `pop` operations complete fastest.
+While the atomic queues can be used with any moveable element types (including `std::unique_ptr`), for best throughput and latency the queue elements should be cheap to copy and lock-free (e.g. `unsigned` or `T*`), so that `push` and `pop` operations complete fastest.
 
-`push` and `pop` both perform two atomic operations: increment the counter to claim the element slot and store the element into the array. If a thread calling `push` or `pop` is pre-empted between the two atomic operations that causes another thread calling `pop` or `push` (corresondingly) on the same slot to spin on loading the element until the element is stored; other threads calling `push` and `pop` are not affected. Using real-time `SCHED_FIFO` threads reduces the risk of pre-emption, however, a higher priority `SCHED_FIFO` thread or kernel interrupt handler can still preempt your `SCHED_FIFO` thread. If the queues are used on isolated cores with real-time priority threads, in which case no pre-emption or interrupts occur, the queues operations become _lock-free_.
+## Lock-free guarantees
+*Conceptually*, a `push` or `pop` operation does two atomic steps:
 
-So, ideally, you may like to run your critical low-latency code on isolated cores that also no other processes can possibly use. And disable [real-time thread throttling](#real-time-thread-throttling) to prevent `SCHED_FIFO` real-time threads from being throttled.
+1. Atomically and exclusively claims the queue slot index to store/load an element to/from. That's producers incrementing `head` index, consumers incrementing `tail` index.
+2. Atomically store/load the element into/from the slot. Producers storing into a slot change its state to be non-`NIL`, consumers loading from a slot change its state to be `NIL`.
+
+These queues anticipate that a thread doing `push` or `pop` may complete step 1 and then be preempted before completing step 2.
+
+An algorithm is *lock-free* if there is guaranteed system-wide progress. These queue guarantee system-wide progress by the following properties:
+
+* Each `push` is independent of any preceding `push`. An incomplete (preempted) `push` by one producer thread doesn't affect `push` of any other thread.
+* Each `pop` is independent of any preceding `pop`. An incomplete (preempted) `pop` by one consumer thread doesn't affect `pop` of any other thread.
+* An incomplete (preempted) `push` from one producer thread affects only one consumer thread `pop`ing an element from this particular queue slot. All other threads `pop`s are unaffected.
+* An incomplete (preempted) `pop` from one consumer thread affects only one producer thread `push`ing an element into this particular queue slot while expecting it to have been consumed long time ago, in the rather unlikely scenario that producers have wrapped around the entire ring-buffer while this consumer hasn't completed its `pop`. All other threads `push`s and `pop`s are unaffected.
+
+## Preemption
+Linux task scheduler thread preemption is something no user-space process should be able to affect or escape, otherwise any/every malicious application would exploit that.
+
+Still, there are a few things one can do to minimize preemption of one's mission critical application threads:
+
+* Use real-time `SCHED_FIFO` scheduling class for your threads, e.g. `chrt --fifo 50 <app>`. A higher priority `SCHED_FIFO` thread or kernel interrupt handler can still preempt your `SCHED_FIFO` threads.
+* Disable [real-time thread throttling](#real-time-thread-throttling) to prevent `SCHED_FIFO` real-time threads from being throttled.
+* Isolate CPU cores, so that no interrupt handlers or applications ever run on it. Mission critical applications should be explicitly placed on these isolated cores with `taskset`.
+* Pin threads to specific cores, otherwise the task scheduler keeps moving threads to other idle CPU cores to level voltage/heat-induced wear-and-tear accross CPU cores. Keeping a thread running on one same CPU core maximizes CPU cache hit rate. Moving a thread to another CPU core incurs otherwise unnecessary CPU cache thrashing.
 
 People often propose limiting busy-waiting with a subsequent call to `sched_yield`/`pthread_yield`. However, `sched_yield` is a wrong tool for locking because it doesn't communicate to the OS kernel what the thread is waiting for, so that the OS thread scheduler can never reschedule the calling thread to resume when the shared state has changed (unless there are no other threads that can run on this CPU core, so that the caller resumes immediately). [More details about `sched_yield` and spinlocks from Linus Torvalds][5].
 
