@@ -149,23 +149,6 @@ void check_huge_pages_leaks(char const* name, HugePages& hp) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct ThreadCound {
-    unsigned producers;
-    unsigned comsumers;
-};
-
-template<class T>
-struct ConstructorAdapter : T{
-    using T::T;
-};
-
-// template<class T>
-// struct ConstructorAdapter : {
-//     using T::T;
-// };
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 // According to my benchmarking, it looks like the best performance is achieved with the following parameters:
 // * For SPSC: SPSC=true,  MINIMIZE_CONTENTION=false, MAXIMIZE_THROUGHPUT=false.
 // * For MPMC: SPSC=false, MINIMIZE_CONTENTION=true,  MAXIMIZE_THROUGHPUT=true.
