@@ -1,10 +1,11 @@
 # Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file LICENSE.
 
 # Usage examples (assuming this directory is ~/src/atomic_queue):
-# time make -rC ~/src/atomic_queue -j8 run_benchmarks
-# time make -rC ~/src/atomic_queue -j8 TOOLSET=clang run_benchmarks
-# time make -rC ~/src/atomic_queue -j8 BUILD=debug run_tests
-# time make -rC ~/src/atomic_queue -j8 BUILD=sanitize run_tests
+#   time make -rC ~/src/atomic_queue -j8
+#   time make -rC ~/src/atomic_queue -j8 run_benchmarks
+#   time make -rC ~/src/atomic_queue -j8 TOOLSET=clang run_benchmarks
+#   time make -rC ~/src/atomic_queue -j8 BUILD=debug run_tests
+#   time make -rC ~/src/atomic_queue -j8 BUILD=sanitize TOOLSET=clang run_tests
 
 SHELL := /bin/bash
 BUILD := release
@@ -61,7 +62,7 @@ cppflags.xenium := -I${abspath ../xenium}
 ldlibs.xenium :=
 
 COMPILE.CXX = ${CXX} -o $@ -c ${cppflags} ${cxxflags} -MD -MP $(abspath $<)
-COMPILE.S = ${CXX} -o- -S -masm=intel ${cppflags} ${cxxflags} $(abspath $<) | c++filt | egrep -v '^[[:space:]]*\.(loc|cfi|L[A-Z])' > $@
+COMPILE.S = ${CXX} -o- -S -fverbose-asm -masm=intel ${cppflags} ${cxxflags} $(abspath $<) | c++filt | egrep -v '^[[:space:]]*\.(loc|cfi|L[A-Z])' > $@
 PREPROCESS.CXX = ${CXX} -o $@ -E ${cppflags} ${cxxflags} $(abspath $<)
 COMPILE.C = ${CC} -o $@ -c ${cppflags} ${cflags} -MD -MP $(abspath $<)
 LINK.EXE = ${LD} -o $@ $(ldflags) $(filter-out Makefile,$^) $(ldlibs)
@@ -121,18 +122,19 @@ ${build_dir}/%.o : src/%.cc Makefile | ${build_dir}
 ${build_dir}/%.o : src/%.c Makefile | ${build_dir}
 	$(strip ${COMPILE.C})
 
-%.S : cppflags += ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium}
-%.S : src/%.cc Makefile | ${build_dir}
+${build_dir}/%.S : cppflags += ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium}
+${build_dir}/%.S : src/%.cc Makefile | ${build_dir}
 	$(strip ${COMPILE.S})
 
-%.I : src/%.cc
+${build_dir}/%.I : cppflags += ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium}
+${build_dir}/%.I : src/%.cc Makefile | ${build_dir}
 	$(strip ${PREPROCESS.CXX})
 
 ${build_dir} :
 	mkdir -p $@
 
-rtags : clean
-	${MAKE} -nk all | rtags-rc -c -; true
+rtags :
+	${MAKE} --always-make --just-print all | rtags-rc -c -; true
 
 clean :
 	rm -rf ${build_dir} ${exes}
