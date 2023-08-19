@@ -12,6 +12,9 @@ jobs:
       matrix:
         toolset: [gcc, clang]
         os: [ubuntu-20.04, ubuntu-22.04]
+        include:
+            - os: ubuntu-22.04 # Work-around for https://bugs.launchpad.net/ubuntu/+source/gcc-10/+bug/2029910
+              sanitize: 1
 
     runs-on: ${{ matrix.os }}
 
@@ -30,5 +33,6 @@ jobs:
     - name: Build and run unit tests
       run: make -rj2 TOOLSET=${{ matrix.toolset }} example run_tests
 
-    - name: Build and run unit tests with thread sanitizer
+    - if: ${{ matrix.sanitize }}
+      name: Build and run unit tests with thread sanitizer
       run: make -rj2 TOOLSET=${{ matrix.toolset }} BUILD=sanitize run_tests
