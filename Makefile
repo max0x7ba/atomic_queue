@@ -6,12 +6,17 @@
 #   time make -rC ~/src/atomic_queue -j8 TOOLSET=clang run_benchmarks
 #   time make -rC ~/src/atomic_queue -j8 BUILD=debug run_tests
 #   time make -rC ~/src/atomic_queue -j8 BUILD=sanitize TOOLSET=clang run_tests
+# Additional CPPFLAGS, CXXFLAGS, CFLAGS, LDLIBS, LDFLAGS can come from the command line, e.g. make CPPFLAGS='-I<my-include-dir>', or from environment variables.
 
 SHELL := /bin/bash
-BUILD := release
+.SHELLFLAGS := -o pipefail -c
 
+BUILD := release
 TOOLSET := gcc
+
 build_dir := ${CURDIR}/build/${BUILD}/${TOOLSET}
+build_env := ${build_dir}/.env
+rebuild := ${build_dir}/.rebuild
 
 cxx.gcc := g++
 cc.gcc := gcc
@@ -45,7 +50,6 @@ ldflags.clang.sanitize := ${ldflags.clang.release} -fsanitize=thread
 ldflags.clang := -stdlib=libstdc++ ${ldflags.clang.${BUILD}}
 
 # Additional CPPFLAGS, CXXFLAGS, CFLAGS, LDLIBS, LDFLAGS can come from the command line, e.g. make CPPFLAGS='-I<my-include-dir>', or from environment variables.
-# However, a clean build is required when changing the flags in the command line or in environment variables, this makefile doesn't detect such changes.
 cxxflags := ${cxxflags.${TOOLSET}} ${CXXFLAGS}
 cflags := ${cflags.${TOOLSET}} ${CFLAGS}
 cppflags := ${CPPFLAGS} -Iinclude
@@ -65,9 +69,9 @@ COMPILE.CXX = ${CXX} -o $@ -c ${cppflags} ${cxxflags} -MD -MP $(abspath $<)
 COMPILE.S = ${CXX} -o- -S -fverbose-asm -masm=intel ${cppflags} ${cxxflags} $(abspath $<) | c++filt | egrep -v '^[[:space:]]*\.(loc|cfi|L[A-Z])' > $@
 PREPROCESS.CXX = ${CXX} -o $@ -E ${cppflags} ${cxxflags} $(abspath $<)
 COMPILE.C = ${CC} -o $@ -c ${cppflags} ${cflags} -MD -MP $(abspath $<)
-LINK.EXE = ${LD} -o $@ $(ldflags) $(filter-out Makefile,$^) $(ldlibs)
-LINK.SO = ${LD} -o $@ -shared $(ldflags) $(filter-out Makefile,$^) $(ldlibs)
-LINK.A = ${AR} rscT $@ $(filter-out Makefile,$^)
+LINK.EXE = ${LD} -o $@ $(ldflags) $(filter-out ${rebuild},$^) $(ldlibs)
+LINK.SO = ${LD} -o $@ -shared $(ldflags) $(filter-out ${rebuild},$^) $(ldlibs)
+LINK.A = ${AR} rscT $@ $(filter-out ${rebuild},$^)
 
 exes := benchmarks tests example
 
@@ -79,27 +83,27 @@ ${exes} : % : ${build_dir}/%
 benchmarks_src := benchmarks.cc cpu_base_frequency.cc huge_pages.cc
 ${build_dir}/benchmarks : cppflags += ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium}
 ${build_dir}/benchmarks : ldlibs += ${ldlibs.tbb} ${ldlibs.moodycamel} ${ldlibs.xenium} -ldl
-${build_dir}/benchmarks : ${benchmarks_src:%.cc=${build_dir}/%.o} Makefile | ${build_dir}
+${build_dir}/benchmarks : ${benchmarks_src:%.cc=${build_dir}/%.o} ${rebuild} | ${build_dir}
 	$(strip ${LINK.EXE})
 -include ${benchmarks_src:%.cc=${build_dir}/%.d}
 
 tests_src := tests.cc
 ${build_dir}/tests : cppflags += ${boost_unit_test_framework_inc} -DBOOST_TEST_DYN_LINK=1
 ${build_dir}/tests : ldlibs += -lboost_unit_test_framework
-${build_dir}/tests : ${tests_src:%.cc=${build_dir}/%.o} Makefile | ${build_dir}
+${build_dir}/tests : ${tests_src:%.cc=${build_dir}/%.o} ${rebuild} | ${build_dir}
 	$(strip ${LINK.EXE})
 -include ${tests_src:%.cc=${build_dir}/%.d}
 
 example_src := example.cc
-${build_dir}/example : ${example_src:%.cc=${build_dir}/%.o} Makefile | ${build_dir}
+${build_dir}/example : ${example_src:%.cc=${build_dir}/%.o} ${rebuild} | ${build_dir}
 	$(strip ${LINK.EXE})
 -include ${example_src:%.cc=${build_dir}/%.d}
 
 ${build_dir}/%.so : cxxflags += -fPIC
-${build_dir}/%.so : Makefile | ${build_dir}
+${build_dir}/%.so : ${rebuild} | ${build_dir}
 	$(strip ${LINK.SO})
 
-${build_dir}/%.a : Makefile | ${build_dir}
+${build_dir}/%.a : ${rebuild} | ${build_dir}
 	$(strip ${LINK.A})
 
 run_benchmarks : ${build_dir}/benchmarks
@@ -116,18 +120,18 @@ run_% : ${build_dir}/%
 	@echo "---- running $< ----"
 	$<
 
-${build_dir}/%.o : src/%.cc Makefile | ${build_dir}
+${build_dir}/%.o : src/%.cc ${rebuild} | ${build_dir}
 	$(strip ${COMPILE.CXX})
 
-${build_dir}/%.o : src/%.c Makefile | ${build_dir}
+${build_dir}/%.o : src/%.c ${rebuild} | ${build_dir}
 	$(strip ${COMPILE.C})
 
 ${build_dir}/%.S : cppflags += ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium}
-${build_dir}/%.S : src/%.cc Makefile | ${build_dir}
+${build_dir}/%.S : src/%.cc ${rebuild} | ${build_dir}
 	$(strip ${COMPILE.S})
 
 ${build_dir}/%.I : cppflags += ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium}
-${build_dir}/%.I : src/%.cc Makefile | ${build_dir}
+${build_dir}/%.I : src/%.cc ${rebuild} | ${build_dir}
 	$(strip ${PREPROCESS.CXX})
 
 ${build_dir} :
@@ -146,4 +150,14 @@ versions:
 	${MAKE} --version | head -n1
 	${CXX} --version | head -n1
 
-.PHONY : env versions rtags run_benchmarks clean all run_%
+# Track toolset versions and build flag values which may depend on the environment.
+build_env_text := printf "%s\n" $(foreach exe,${CXX} ${LD} ${AR},"$(shell ${exe} --version |& head -n1)") ${cppflags} ${cxxflags} ${ldflags} ${cppflags.tbb} ${ldlibs.tbb} ${cppflags.moodycamel} ${ldlibs.moodycamel} ${cppflags.xenium} ${ldlibs.xenium}
+${build_env} : Makefile $(shell cmp --quiet <(${build_env_text}) ${build_env} || echo update_build_env) | ${build_dir}
+	${build_env_text} >$@
+
+# Trigger rebuild when Makefile or build environment change.
+${rebuild} : Makefile ${build_env} | ${build_dir}
+	@[[ ! -f $@ ]] || { u="$?"; echo "Rebuild is triggered by changes in $${u// /, }."; }
+	touch $@
+
+.PHONY : update_build_env env versions rtags run_benchmarks clean all run_%
