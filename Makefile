@@ -137,7 +137,7 @@ ${build_dir} :
 	mkdir -p $@
 
 rtags :
-	${MAKE} --always-make --just-print all | rtags-rc -c -; true
+	${MAKE} --always-make --just-print all | { rtags-rc -c -; true; }
 
 clean :
 	rm -rf ${build_dir} ${exes}
@@ -145,12 +145,13 @@ clean :
 env :
 	env | sort --ignore-case
 
+head1 := awk 'FNR<2 {print}' # `make | head -n1` fails when `head` closes its stdin early. Use `awk` to keep reading stdin till EOF instead of `head`.
 versions:
-	${MAKE} --version | head -n1
-	${CXX} --version | head -n1
+	${MAKE} --version | ${head1}
+	${CXX} --version | ${head1}
 
 # Track toolset versions and build flag values which may depend on the environment.
-build_env_text := printf "%s\n" $(foreach exe,${CXX} ${LD} ${AR},"$(shell ${exe} --version |& head -n1)") ${cppflags} ${cxxflags} ${ldflags} ${cppflags.tbb} ${ldlibs.tbb} ${cppflags.moodycamel} ${ldlibs.moodycamel} ${cppflags.xenium} ${ldlibs.xenium}
+build_env_text := printf "%s\n" $(foreach exe,${CXX} ${LD} ${AR},"$(shell ${exe} --version |& ${head1})") ${cppflags} ${cxxflags} ${ldflags} ${cppflags.tbb} ${ldlibs.tbb} ${cppflags.moodycamel} ${ldlibs.moodycamel} ${cppflags.xenium} ${ldlibs.xenium}
 ${build_env} : Makefile $(shell cmp --quiet <(${build_env_text}) ${build_env} || echo update_build_env) | ${build_dir}
 	${build_env_text} >$@
 
