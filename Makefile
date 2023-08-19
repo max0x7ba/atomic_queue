@@ -9,7 +9,6 @@
 # Additional CPPFLAGS, CXXFLAGS, CFLAGS, LDLIBS, LDFLAGS can come from the command line, e.g. make CPPFLAGS='-I<my-include-dir>', or from environment variables.
 
 SHELL := /bin/bash
-.SHELLFLAGS := -o pipefail -c
 
 BUILD := release
 TOOLSET := gcc
