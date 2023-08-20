@@ -126,7 +126,8 @@ ${build_dir}/.make : | ${build_dir}
 ${build_dir} ${build_dir}/.make:
 	mkdir -p $@
 
-ver = "$(shell ${1} --version | awk 'FNR<2 {print}')" # `make | head -n1` fails when `head` closes its stdin early. Use `awk` to keep reading stdin till EOF instead of `head`.
+head1 := awk 'FNR<2 {print}' # `make | head -n1` fails when `head` closes its stdin early. Use `awk` to keep reading stdin till EOF instead of `head`.
+ver = "$(shell ${1} --version | ${head1})"
 
 # Trigger recompilation when compiler environment change.
 env.compile := $(call ver,${CXX}) ${cppflags} ${cxxflags} ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium}
@@ -165,8 +166,8 @@ clean :
 	rm -rf ${build_dir} ${exes}
 
 versions:
-	$(call ver,${MAKE})
-	$(call ver,${CXX})
+	${MAKE} --version | ${head1}
+	${CXX} --version | ${head1}
 
 env :
 	env | sort --ignore-case
