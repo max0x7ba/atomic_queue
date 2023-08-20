@@ -14,8 +14,6 @@ BUILD := release
 TOOLSET := gcc
 
 build_dir := ${CURDIR}/build/${BUILD}/${TOOLSET}
-build_env := ${build_dir}/.env
-rebuild := ${build_dir}/.rebuild
 
 cxx.gcc := g++
 cc.gcc := gcc
@@ -64,13 +62,16 @@ ldlibs.moodycamel :=
 cppflags.xenium := -I${abspath ../xenium}
 ldlibs.xenium :=
 
+recompile := ${build_dir}/.make/recompile
+relink := ${build_dir}/.make/relink
+
 COMPILE.CXX = ${CXX} -o $@ -c ${cppflags} ${cxxflags} -MD -MP $(abspath $<)
 COMPILE.S = ${CXX} -o- -S -fverbose-asm -masm=intel ${cppflags} ${cxxflags} $(abspath $<) | c++filt | egrep -v '^[[:space:]]*\.(loc|cfi|L[A-Z])' > $@
 PREPROCESS.CXX = ${CXX} -o $@ -E ${cppflags} ${cxxflags} $(abspath $<)
 COMPILE.C = ${CC} -o $@ -c ${cppflags} ${cflags} -MD -MP $(abspath $<)
-LINK.EXE = ${LD} -o $@ $(ldflags) $(filter-out ${rebuild},$^) $(ldlibs)
-LINK.SO = ${LD} -o $@ -shared $(ldflags) $(filter-out ${rebuild},$^) $(ldlibs)
-LINK.A = ${AR} rscT $@ $(filter-out ${rebuild},$^)
+LINK.EXE = ${LD} -o $@ $(ldflags) $(filter-out ${relink},$^) $(ldlibs)
+LINK.SO = ${LD} -o $@ -shared $(ldflags) $(filter-out ${relink},$^) $(ldlibs)
+LINK.A = ${AR} rscT $@ $(filter-out ${relink},$^)
 
 exes := benchmarks tests example
 
@@ -82,28 +83,66 @@ ${exes} : % : ${build_dir}/%
 benchmarks_src := benchmarks.cc cpu_base_frequency.cc huge_pages.cc
 ${build_dir}/benchmarks : cppflags += ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium}
 ${build_dir}/benchmarks : ldlibs += ${ldlibs.tbb} ${ldlibs.moodycamel} ${ldlibs.xenium} -ldl
-${build_dir}/benchmarks : ${benchmarks_src:%.cc=${build_dir}/%.o} ${rebuild} | ${build_dir}
+${build_dir}/benchmarks : ${benchmarks_src:%.cc=${build_dir}/%.o} ${relink} | ${build_dir}
 	$(strip ${LINK.EXE})
 -include ${benchmarks_src:%.cc=${build_dir}/%.d}
 
 tests_src := tests.cc
-${build_dir}/tests : cppflags += ${boost_unit_test_framework_inc} -DBOOST_TEST_DYN_LINK=1
+${build_dir}/tests : cppflags += -DBOOST_TEST_DYN_LINK=1
 ${build_dir}/tests : ldlibs += -lboost_unit_test_framework
-${build_dir}/tests : ${tests_src:%.cc=${build_dir}/%.o} ${rebuild} | ${build_dir}
+${build_dir}/tests : ${tests_src:%.cc=${build_dir}/%.o} ${relink} | ${build_dir}
 	$(strip ${LINK.EXE})
 -include ${tests_src:%.cc=${build_dir}/%.d}
 
 example_src := example.cc
-${build_dir}/example : ${example_src:%.cc=${build_dir}/%.o} ${rebuild} | ${build_dir}
+${build_dir}/example : ${example_src:%.cc=${build_dir}/%.o} ${relink} | ${build_dir}
 	$(strip ${LINK.EXE})
 -include ${example_src:%.cc=${build_dir}/%.d}
 
 ${build_dir}/%.so : cxxflags += -fPIC
-${build_dir}/%.so : ${rebuild} | ${build_dir}
+${build_dir}/%.so : ${relink} | ${build_dir}
 	$(strip ${LINK.SO})
 
-${build_dir}/%.a : ${rebuild} | ${build_dir}
+${build_dir}/%.a : ${relink} | ${build_dir}
 	$(strip ${LINK.A})
+
+${build_dir}/%.o : src/%.cc ${recompile} | ${build_dir}
+	$(strip ${COMPILE.CXX})
+
+${build_dir}/%.o : src/%.c ${recompile} | ${build_dir}
+	$(strip ${COMPILE.C})
+
+${build_dir}/%.S : cppflags += ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium}
+${build_dir}/%.S : src/%.cc ${recompile} | ${build_dir}
+	$(strip ${COMPILE.S})
+
+${build_dir}/%.I : cppflags += ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium}
+${build_dir}/%.I : src/%.cc ${recompile} | ${build_dir}
+	$(strip ${PREPROCESS.CXX})
+
+${build_dir}/%.d : ;
+
+${build_dir}/.make : | ${build_dir}
+${build_dir} ${build_dir}/.make:
+	mkdir -p $@
+
+ver = "$(shell ${1} --version | awk 'FNR<2 {print}')" # `make | head -n1` fails when `head` closes its stdin early. Use `awk` to keep reading stdin till EOF instead of `head`.
+
+# Trigger recompilation when compiler environment change.
+env.compile := $(call ver,${CXX}) ${cppflags} ${cxxflags} ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium}
+# Trigger relink when linker environment change.
+env.link := $(call ver,${LD}) ${ldflags} ${ldlibs} ${ldlibs.tbb} ${ldlibs.moodycamel} ${ldlibs.xenium}
+
+define env_txt_rule
+${build_dir}/.make/env.${1}.txt : $(shell cmp --quiet ${build_dir}/.make/env.${1}.txt <(printf "%s\n" ${env.${1}}) || echo update_env_txt) Makefile | ${build_dir}/.make
+	printf "%s\n" ${env.${1}} >$$@
+endef
+$(eval $(call env_txt_rule,compile))
+$(eval $(call env_txt_rule,link))
+${recompile} ${relink} : ${build_dir}/.make/re% : ${build_dir}/.make/env.%.txt Makefile
+	@[[ ! -f $@ ]] || { u="$?"; echo "Re-$* is triggered by changes in $${u// /, }."; }
+	touch $@
+# cd ~/src/atomic_queue; make -r clean; set -x; make -rj8; make -rj8; make -rj8 CPPFLAGS=-DXYZ=1; make -rj8 CPPFLAGS=-DXYZ=1; make -rj8; make -rj8; make -rj8 LDLIBS=-lrt; make -rj8 LDLIBS=-lrt; make -rj8; make -rj8
 
 run_benchmarks : ${build_dir}/benchmarks
 	@echo "---- running $< ----"
@@ -119,45 +158,17 @@ run_% : ${build_dir}/%
 	@echo "---- running $< ----"
 	$<
 
-${build_dir}/%.o : src/%.cc ${rebuild} | ${build_dir}
-	$(strip ${COMPILE.CXX})
-
-${build_dir}/%.o : src/%.c ${rebuild} | ${build_dir}
-	$(strip ${COMPILE.C})
-
-${build_dir}/%.S : cppflags += ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium}
-${build_dir}/%.S : src/%.cc ${rebuild} | ${build_dir}
-	$(strip ${COMPILE.S})
-
-${build_dir}/%.I : cppflags += ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium}
-${build_dir}/%.I : src/%.cc ${rebuild} | ${build_dir}
-	$(strip ${PREPROCESS.CXX})
-
-${build_dir} :
-	mkdir -p $@
-
 rtags :
 	${MAKE} --always-make --just-print all | { rtags-rc -c -; true; }
 
 clean :
 	rm -rf ${build_dir} ${exes}
 
+versions:
+	$(call ver,${MAKE})
+	$(call ver,${CXX})
+
 env :
 	env | sort --ignore-case
 
-head1 := awk 'FNR<2 {print}' # `make | head -n1` fails when `head` closes its stdin early. Use `awk` to keep reading stdin till EOF instead of `head`.
-versions:
-	${MAKE} --version | ${head1}
-	${CXX} --version | ${head1}
-
-# Track toolset versions and build flag values which may depend on the environment.
-build_env_text := printf "%s\n" $(foreach exe,${CXX} ${LD} ${AR},"$(shell ${exe} --version |& ${head1})") ${cppflags} ${cxxflags} ${ldflags} ${ldlibs} ${cppflags.tbb} ${ldlibs.tbb} ${cppflags.moodycamel} ${ldlibs.moodycamel} ${cppflags.xenium} ${ldlibs.xenium}
-${build_env} : Makefile $(shell cmp --quiet <(${build_env_text}) ${build_env} || echo update_build_env) | ${build_dir}
-	${build_env_text} >$@
-
-# Trigger rebuild when Makefile or build environment change.
-${rebuild} : Makefile ${build_env} | ${build_dir}
-	@[[ ! -f $@ ]] || { u="$?"; echo "Rebuild is triggered by changes in $${u// /, }."; }
-	touch $@
-
-.PHONY : update_build_env env versions rtags run_benchmarks clean all run_%
+.PHONY : update_env_txt env versions rtags run_benchmarks clean all run_%
