@@ -151,7 +151,7 @@ versions:
 	${CXX} --version | ${head1}
 
 # Track toolset versions and build flag values which may depend on the environment.
-build_env_text := printf "%s\n" $(foreach exe,${CXX} ${LD} ${AR},"$(shell ${exe} --version |& ${head1})") ${cppflags} ${cxxflags} ${ldflags} ${cppflags.tbb} ${ldlibs.tbb} ${cppflags.moodycamel} ${ldlibs.moodycamel} ${cppflags.xenium} ${ldlibs.xenium}
+build_env_text := printf "%s\n" $(foreach exe,${CXX} ${LD} ${AR},"$(shell ${exe} --version |& ${head1})") ${cppflags} ${cxxflags} ${ldflags} ${ldlibs} ${cppflags.tbb} ${ldlibs.tbb} ${cppflags.moodycamel} ${ldlibs.moodycamel} ${cppflags.xenium} ${ldlibs.xenium}
 ${build_env} : Makefile $(shell cmp --quiet <(${build_env_text}) ${build_env} || echo update_build_env) | ${build_dir}
 	${build_env_text} >$@
 
