@@ -126,9 +126,7 @@ ${build_dir}/.make : | ${build_dir}
 ${build_dir} ${build_dir}/.make:
 	mkdir -p $@
 
-head1 := awk 'FNR<2 {print}' # `make | head -n1` fails when `head` closes its stdin early. Use `awk` to keep reading stdin till EOF instead of `head`.
-ver = "$(shell ${1} --version | ${head1})"
-
+ver = "$(shell ${1} --version | head -n1)"
 # Trigger recompilation when compiler environment change.
 env.compile := $(call ver,${CXX}) ${cppflags} ${cxxflags} ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium}
 # Trigger relink when linker environment change.
@@ -136,7 +134,7 @@ env.link := $(call ver,${LD}) ${ldflags} ${ldlibs} ${ldlibs.tbb} ${ldlibs.moodyc
 
 define env_txt_rule
 ${build_dir}/.make/env.${1}.txt : $(shell cmp --quiet ${build_dir}/.make/env.${1}.txt <(printf "%s\n" ${env.${1}}) || echo update_env_txt) Makefile | ${build_dir}/.make
-	printf "%s\n" ${env.${1}} >$$@
+	@printf "%s\n" ${env.${1}} >$$@
 endef
 $(eval $(call env_txt_rule,compile))
 $(eval $(call env_txt_rule,link))
@@ -166,8 +164,8 @@ clean :
 	rm -rf ${build_dir} ${exes}
 
 versions:
-	${MAKE} --version | ${head1}
-	${CXX} --version | ${head1}
+	${MAKE} --version | awk 'FNR<2 {print}'
+	${CXX} --version | head -n1
 
 env :
 	env | sort --ignore-case
