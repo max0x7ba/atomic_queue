@@ -1,12 +1,17 @@
 # Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file LICENSE.
 
 # Usage examples (assuming this directory is ~/src/atomic_queue):
+#
 #   time make -rC ~/src/atomic_queue -j8
 #   time make -rC ~/src/atomic_queue -j8 run_benchmarks
 #   time make -rC ~/src/atomic_queue -j8 TOOLSET=clang run_benchmarks
 #   time make -rC ~/src/atomic_queue -j8 BUILD=debug run_tests
 #   time make -rC ~/src/atomic_queue -j8 BUILD=sanitize TOOLSET=clang run_tests
-# Additional CPPFLAGS, CXXFLAGS, CFLAGS, LDLIBS, LDFLAGS can come from the command line, e.g. make CPPFLAGS='-I<my-include-dir>', or from environment variables.
+#
+# Additional CPPFLAGS, CXXFLAGS, CFLAGS, LDLIBS, LDFLAGS can come from the command line, e.g. make CPPFLAGS='-I<my-include-dir>', or from environment variables.  For example, also produce assembly outputs:
+#
+#   time make -rC ~/src/atomic_queue -j8 CXXFLAGS="-save-temps=obj -fverbose-asm -masm=intel"
+#
 
 SHELL := /bin/bash
 
