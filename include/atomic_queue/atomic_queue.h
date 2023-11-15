@@ -197,7 +197,7 @@ protected:
             q_element.store(element, R);
         }
         else {
-            for(T expected = NIL; ATOMIC_QUEUE_UNLIKELY(!q_element.compare_exchange_strong(expected, element, R, X)); expected = NIL) {
+            for(T expected = NIL; ATOMIC_QUEUE_UNLIKELY(!q_element.compare_exchange_weak(expected, element, R, X)); expected = NIL) {
                 do
                     spin_loop_pause(); // (1) Wait for store (2) to complete.
                 while(Derived::maximize_throughput_ && q_element.load(X) != NIL);
@@ -220,7 +220,7 @@ protected:
         else {
             for(;;) {
                 unsigned char expected = STORED;
-                if(ATOMIC_QUEUE_LIKELY(state.compare_exchange_strong(expected, LOADING, A, X))) {
+                if(ATOMIC_QUEUE_LIKELY(state.compare_exchange_weak(expected, LOADING, A, X))) {
                     T element{std::move(q_element)};
                     state.store(EMPTY, R);
                     return element;
@@ -245,7 +245,7 @@ protected:
         else {
             for(;;) {
                 unsigned char expected = EMPTY;
-                if(ATOMIC_QUEUE_LIKELY(state.compare_exchange_strong(expected, STORING, A, X))) {
+                if(ATOMIC_QUEUE_LIKELY(state.compare_exchange_weak(expected, STORING, A, X))) {
                     q_element = std::forward<U>(element);
                     state.store(STORED, R);
                     return;
@@ -271,7 +271,7 @@ public:
             do {
                 if(static_cast<int>(head - tail_.load(X)) >= static_cast<int>(static_cast<Derived&>(*this).size_))
                     return false;
-            } while(ATOMIC_QUEUE_UNLIKELY(!head_.compare_exchange_strong(head, head + 1, X, X))); // This loop is not FIFO.
+            } while(ATOMIC_QUEUE_UNLIKELY(!head_.compare_exchange_weak(head, head + 1, X, X))); // This loop is not FIFO.
         }
 
         static_cast<Derived&>(*this).do_push(std::forward<T>(element), head);
@@ -290,7 +290,7 @@ public:
             do {
                 if(static_cast<int>(head_.load(X) - tail) <= 0)
                     return false;
-            } while(ATOMIC_QUEUE_UNLIKELY(!tail_.compare_exchange_strong(tail, tail + 1, X, X))); // This loop is not FIFO.
+            } while(ATOMIC_QUEUE_UNLIKELY(!tail_.compare_exchange_weak(tail, tail + 1, X, X))); // This loop is not FIFO.
         }
 
         element = static_cast<Derived&>(*this).do_pop(tail);
