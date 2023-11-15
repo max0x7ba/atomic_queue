@@ -492,7 +492,7 @@ public:
         swap(elements_, b.elements_);
     }
 
-    friend void swap(AtomicQueueB& a, AtomicQueueB& b) {
+    friend void swap(AtomicQueueB& a, AtomicQueueB& b) noexcept {
         a.swap(b);
     }
 };
