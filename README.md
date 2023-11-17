@@ -21,7 +21,7 @@ The main design principle these queues follow is _minimalism_, which results in 
 
 * Bare minimum of atomic instructions. Inlinable by default push and pop functions can hardly be any cheaper in terms of CPU instruction number / L1i cache pressure.
 * Explicit contention/false-sharing avoidance for queue and its elements.
-* Linear fixed size ring-buffer array. No heap memory allocations after a queue object has constructed. It doesn't get any more CPU L1d or TLB cache friendly than that. 
+* Linear fixed size ring-buffer array. No heap memory allocations after a queue object has constructed. It doesn't get any more CPU L1d or TLB cache friendly than that.
 * Value semantics. Meaning that the queues make a copy/move upon `push`/`pop`, no reference/pointer to elements in the queue can be obtained.
 
 The impact of each of these small design choices on their own is barely measurable, but their total impact is much greater than a simple sum of the constituents' impacts, aka super-scalar compounding or synergy. The synergy emerging from combining multiple of these small design choices together is what allows CPUs to perform at their peak capacities least impeded.
@@ -136,8 +136,8 @@ While the atomic queues can be used with any moveable element types (including `
 ## Lock-free guarantees
 *Conceptually*, a `push` or `pop` operation does two atomic steps:
 
-1. Atomically and exclusively claims the queue slot index to store/load an element to/from. That's producers incrementing `head` index, consumers incrementing `tail` index.
-2. Atomically store/load the element into/from the slot. Producers storing into a slot change its state to be non-`NIL`, consumers loading from a slot change its state to be `NIL`.
+1. Atomically and exclusively claims the queue slot index to store/load an element to/from. That's producers incrementing `head` index, consumers incrementing `tail` index. Each slot is accessed by one producer and one consumer threads only.
+2. Atomically store/load the element into/from the slot. Producer storing into a slot changes its state to be non-`NIL`, consumer loading from a slot changes its state to be `NIL`. The slot is a spinlock for its one producer and one consumer threads.
 
 These queues anticipate that a thread doing `push` or `pop` may complete step 1 and then be preempted before completing step 2.
 
@@ -154,11 +154,12 @@ Linux task scheduler thread preemption is something no user-space process should
 Still, there are a few things one can do to minimize preemption of one's mission critical application threads:
 
 * Use real-time `SCHED_FIFO` scheduling class for your threads, e.g. `chrt --fifo 50 <app>`. A higher priority `SCHED_FIFO` thread or kernel interrupt handler can still preempt your `SCHED_FIFO` threads.
+* Use one same fixed real-time scheduling priority for all threads accessing same queue objects. Real-time threads with different scheduling priorities modifying one queue object may cause priority inversion and deadlocks. Using the default scheduling class `SCHED_OTHER` with its dynamically adjusted priorities defeats the purpose of using these queues.
 * Disable [real-time thread throttling](#real-time-thread-throttling) to prevent `SCHED_FIFO` real-time threads from being throttled.
 * Isolate CPU cores, so that no interrupt handlers or applications ever run on it. Mission critical applications should be explicitly placed on these isolated cores with `taskset`.
 * Pin threads to specific cores, otherwise the task scheduler keeps moving threads to other idle CPU cores to level voltage/heat-induced wear-and-tear accross CPU cores. Keeping a thread running on one same CPU core maximizes CPU cache hit rate. Moving a thread to another CPU core incurs otherwise unnecessary CPU cache thrashing.
 
-People often propose limiting busy-waiting with a subsequent call to `sched_yield`/`pthread_yield`. However, `sched_yield` is a wrong tool for locking because it doesn't communicate to the OS kernel what the thread is waiting for, so that the OS thread scheduler can never reschedule the calling thread to resume when the shared state has changed (unless there are no other threads that can run on this CPU core, so that the caller resumes immediately). [More details about `sched_yield` and spinlocks from Linus Torvalds][5].
+People often propose limiting busy-waiting with a subsequent call to `std::this_thread::yield()`/`sched_yield`/`pthread_yield`. However, `sched_yield` is a wrong tool for locking because it doesn't communicate to the OS kernel what the thread is waiting for, so that the OS thread scheduler can never schedule the calling thread to resume at the right time when the shared state has changed (unless there are no other threads that can run on this CPU core, so that the caller resumes immediately). See notes section in [`man sched_yield`][19] and [a Linux kernel thread about `sched_yield` and spinlocks][5] for more details.
 
 [In Linux, there is mutex type `PTHREAD_MUTEX_ADAPTIVE_NP`][9] which busy-waits a locked mutex for a number of iterations and then makes a blocking syscall into the kernel to deschedule the waiting thread. In the benchmarks it was the worst performer and I couldn't find a way to make it perform better, and that's the reason it is not included in the benchmarks.
 
@@ -197,7 +198,7 @@ N producer threads push a 4-byte integer into one same queue, N consumer threads
 One thread posts an integer to another thread through one queue and waits for a reply from another queue (2 queues in total). The benchmarks measures the total time of 100,000 ping-pongs, best of 10 runs. Contention is minimal here (1-producer-1-consumer, 1 element in the queue) to be able to achieve and measure the lowest latency. Reports the average round-trip time.
 
 # Contributing
-The project uses `.editorconfig` and `.clang-format` to automate formatting. Pull requests are expected to be formatted using these settings.
+Contributions are more than welcome. `.editorconfig` and `.clang-format` can be used to automatically match code formatting.
 
 ---
 
@@ -221,3 +222,4 @@ Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file L
 [16]: https://en.cppreference.com/w/cpp/atomic/atomic/is_always_lock_free
 [17]: https://en.cppreference.com/w/cpp/atomic/memory_order
 [18]: https://github.com/max0x7ba/atomic_queue/blob/master/.github/workflows/ci.yml
+[19]: https://man7.org/linux/man-pages/man2/sched_yield.2.html
