@@ -94,7 +94,7 @@ make -r -j4 run_benchmarks
 The benchmark also requires Intel TBB library to be available. It assumes that it is installed in `/usr/local/include` and `/usr/local/lib`. If it is installed elsewhere you may like to modify `cppflags.tbb` and `ldlibs.tbb` in `Makefile`.
 
 # API
-The containers support the following APIs:
+The queue class templates provide the following member functions:
 * `try_push` - Appends an element to the end of the queue. Returns `false` when the queue is full.
 * `try_pop` - Removes an element from the front of the queue. Returns `false` when the queue is empty.
 * `push` (optimist) - Appends an element to the end of the queue. Busy waits when the queue is full. Faster than `try_push` when the queue is not full. Optional FIFO producer queuing and total order.
@@ -104,15 +104,21 @@ The containers support the following APIs:
 * `was_full` - Returns `true` if the container was full during the call. The state may have changed by the time the return value is examined.
 * `capacity` - Returns the maximum number of elements the queue can possibly hold.
 
-_Atomic elements_ are those, for which [`std::atomic<T>{T{}}.is_lock_free()`][10] returns `true`, and, when C++17 features are available, [`std::atomic<T>::is_always_lock_free`][16] evaluates to `true` at compile time. In other words, the CPU can load, store and compare-and-exchange such elements atomically natively. On x86-64 such elements are all the [C++ standard arithmetic and pointer types][11]. The queues for atomic elements reserve one value to serve as an empty element marker `NIL`, its default value is `0`. `NIL` value must not be pushed into a queue and there is an [`assert`][13] statement in `push` functions to guard against that in debug mode builds. Pushing `NIL` element into a queue in release mode builds results in undefined behaviour, such as deadlocks and/or lost queue elements.
+_Atomic elements_ are those, for which [`std::atomic<T>{T{}}.is_lock_free()`][10] returns `true`, and, when C++17 features are available, [`std::atomic<T>::is_always_lock_free`][16] evaluates to `true` at compile time. In other words, the CPU can load, store and compare-and-exchange such elements atomically natively. On x86-64 such elements are all the [C++ standard arithmetic and pointer types][11].
+
+The queues for atomic elements reserve one value to serve as an empty element marker `NIL`, its default value is `0`. `NIL` value must not be pushed into a queue and there is an [`assert`][13] statement in `push` functions to guard against that in debug mode builds. Pushing `NIL` element into a queue in release mode builds results in undefined behaviour, such as deadlocks and/or lost queue elements.
 
 Note that _optimism_ is a choice of a queue modification operation control flow, rather than a queue type. An _optimist_ `push` is fastest when the queue is not full most of the time, an optimistic `pop` - when the queue is not empty most of the time. Optimistic and not so operations can be mixed with no restrictions. The `OptimistAtomicQueue`s in [the benchmarks][1] use only _optimist_ `push` and `pop`.
-
-`push` and `try_push` operations _synchronize-with_ (as defined in [`std::memory_order`][17]) with any subsequent `pop` or `try_pop` operation of the same queue object.
 
 See [example.cc](src/example.cc) for a usage example.
 
 TODO: full API reference.
+
+## Memory order of non-atomic loads and stores
+`push` and `try_push` operations _synchronize-with_ (as defined in [`std::memory_order`][17]) with any subsequent `pop` or `try_pop` operation of the same queue object. Meaning that:
+* No non-atomic load/store gets reordered past `push`/`try_push`, which is a `memory_order::release` operation. Same memory order as that of `std::mutex::unlock`.
+* No non-atomic load/store gets reordered prior to `pop`/`try_pop`, which is a `memory_order::acquire` operation. Same memory order as that of `std::mutex::lock`.
+* The effects of a producer thread's non-atomic stores followed by `push`/`try_push` of an element into a queue become visible in the consumer's thread which `pop`/`try_pop` that particular element.
 
 # Implementation Notes
 ## Ring-buffer capacity
