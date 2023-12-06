@@ -78,6 +78,14 @@ LINK.EXE = ${LD} -o $@ $(ldflags) $(filter-out ${relink},$^) $(ldlibs)
 LINK.SO = ${LD} -o $@ -shared $(ldflags) $(filter-out ${relink},$^) $(ldlibs)
 LINK.A = ${AR} rscT $@ $(filter-out ${relink},$^)
 
+ifneq (,$(findstring n,$(firstword -${MAKEFLAGS})))
+# Perform bash parameter expansion when --just-print for rtags.
+strip2 = $(shell printf '%q ' ${1})
+else
+# Unduplicate whitespace.
+strip2 = $(strip ${1})
+endif
+
 exes := benchmarks tests example
 
 all : ${exes}
@@ -89,41 +97,41 @@ benchmarks_src := benchmarks.cc cpu_base_frequency.cc huge_pages.cc
 ${build_dir}/benchmarks : cppflags += ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium}
 ${build_dir}/benchmarks : ldlibs += ${ldlibs.tbb} ${ldlibs.moodycamel} ${ldlibs.xenium} -ldl
 ${build_dir}/benchmarks : ${benchmarks_src:%.cc=${build_dir}/%.o} ${relink} | ${build_dir}
-	$(strip ${LINK.EXE})
+	$(call strip2,${LINK.EXE})
 -include ${benchmarks_src:%.cc=${build_dir}/%.d}
 
 tests_src := tests.cc
 ${build_dir}/tests : cppflags += -DBOOST_TEST_DYN_LINK=1
 ${build_dir}/tests : ldlibs += -lboost_unit_test_framework
 ${build_dir}/tests : ${tests_src:%.cc=${build_dir}/%.o} ${relink} | ${build_dir}
-	$(strip ${LINK.EXE})
+	$(call strip2,${LINK.EXE})
 -include ${tests_src:%.cc=${build_dir}/%.d}
 
 example_src := example.cc
 ${build_dir}/example : ${example_src:%.cc=${build_dir}/%.o} ${relink} | ${build_dir}
-	$(strip ${LINK.EXE})
+	$(call strip2,${LINK.EXE})
 -include ${example_src:%.cc=${build_dir}/%.d}
 
 ${build_dir}/%.so : cxxflags += -fPIC
 ${build_dir}/%.so : ${relink} | ${build_dir}
-	$(strip ${LINK.SO})
+	$(call strip2,${LINK.SO})
 
 ${build_dir}/%.a : ${relink} | ${build_dir}
-	$(strip ${LINK.A})
+	$(call strip2,${LINK.A})
 
 ${build_dir}/%.o : src/%.cc ${recompile} | ${build_dir}
-	$(strip ${COMPILE.CXX})
+	$(call strip2,${COMPILE.CXX})
 
 ${build_dir}/%.o : src/%.c ${recompile} | ${build_dir}
-	$(strip ${COMPILE.C})
+	$(call strip2,${COMPILE.C})
 
 ${build_dir}/%.S : cppflags += ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium}
 ${build_dir}/%.S : src/%.cc ${recompile} | ${build_dir}
-	$(strip ${COMPILE.S})
+	$(call strip2,${COMPILE.S})
 
 ${build_dir}/%.I : cppflags += ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium}
 ${build_dir}/%.I : src/%.cc ${recompile} | ${build_dir}
-	$(strip ${PREPROCESS.CXX})
+	$(call strip2,${PREPROCESS.CXX})
 
 ${build_dir}/%.d : ;
 
