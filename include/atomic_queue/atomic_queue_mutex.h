@@ -77,8 +77,10 @@ public:
 template<class T, unsigned SIZE, class Mutex, bool MINIMIZE_CONTENTION = true>
 using AtomicQueueMutex = AtomicQueueMutexT<T, Mutex, SIZE, MINIMIZE_CONTENTION>;
 
+#ifdef ATOMIC_QUEUE_ENABLE_DEFAULT_SPINLOCK
 template<class T, unsigned SIZE, bool MINIMIZE_CONTENTION = true>
 using AtomicQueueSpinlock = AtomicQueueMutexT<T, Spinlock, SIZE, MINIMIZE_CONTENTION>;
+#endif
 
 // template<class T, unsigned SIZE, bool MINIMIZE_CONTENTION = true>
 // using AtomicQueueSpinlockHle = AtomicQueueMutexT<T, SpinlockHle, SIZE, MINIMIZE_CONTENTION>;
