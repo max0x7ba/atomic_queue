@@ -62,7 +62,7 @@ jobs:
       if: matrix.os == 'windows-latest'
       run: |
           vcpkg integrate install
-          vcpkg.exe install boost --triplet x64-windows-static
+          vcpkg.exe install boost-test --triplet x64-windows-static
 
 
     - name: Configure CMake
