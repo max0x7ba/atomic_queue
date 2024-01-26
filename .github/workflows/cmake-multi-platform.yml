@@ -63,7 +63,7 @@ jobs:
         -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
         -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
         -DATOMIC_QUEUE_BUILD_TESTS=ON
-        -ATOMIC_QUEUE_BUILD_EXAMPLES=ON
+        -DATOMIC_QUEUE_BUILD_EXAMPLES=ON
         -S ${{ github.workspace }}
 
     - name: Build
