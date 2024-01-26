@@ -117,7 +117,7 @@ struct test_stateful_allocator : std::allocator<T> {
         : state(s) {}
 
     test_stateful_allocator(const test_stateful_allocator& other) noexcept
-        : state(other.state) {}
+        : std::allocator<T>(other), state(other.state) {}
 
     template<class U>
     test_stateful_allocator(const test_stateful_allocator<U, State>& other) noexcept
