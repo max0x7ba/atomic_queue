@@ -33,7 +33,7 @@ void stress() {
 
     std::thread producers[PRODUCERS];
     for(unsigned i = 0; i < PRODUCERS; ++i)
-        producers[i] = std::thread([&q, &barrier, N]() {
+        producers[i] = std::thread([&q, &barrier, N=N]() {
             barrier.wait();
             for(unsigned n = N; n; --n)
                 q.push(n);
