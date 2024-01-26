@@ -30,7 +30,6 @@ jobs:
           - os: windows-latest
             c_compiler: cl
             cpp_compiler: cl
-            toolchain: -DCMAKE_TOOLCHAIN_FILE=C:\\vcpkg\scripts\buildsystems\vcpkg.cmake
           - os: ubuntu-latest
             c_compiler: gcc
             cpp_compiler: g++
@@ -66,9 +65,10 @@ jobs:
           vcpkg.exe install boost-test --triplet x64-windows-static
 
 
-    - name: Configure CMake
+    - name: Configure CMake Windows
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
       # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
+      if: matrix.os == 'windows-latest'
       run: >
         cmake -B ${{ steps.strings.outputs.build-output-dir }}
         -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
@@ -76,7 +76,20 @@ jobs:
         -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
         -DATOMIC_QUEUE_BUILD_TESTS=ON
         -DATOMIC_QUEUE_BUILD_EXAMPLES=ON
-        ${{toolchain}}
+        -DCMAKE_TOOLCHAIN_FILE=C:\\vcpkg\scripts\buildsystems\vcpkg.cmake
+        -S ${{ github.workspace }}
+
+    - name: Configure CMake Ubuntu
+      # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
+      # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
+      if: matrix.os == 'ubuntu-latest'
+      run: >
+        cmake -B ${{ steps.strings.outputs.build-output-dir }}
+        -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
+        -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
+        -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+        -DATOMIC_QUEUE_BUILD_TESTS=ON
+        -DATOMIC_QUEUE_BUILD_EXAMPLES=ON
         -S ${{ github.workspace }}
 
     - name: Build
