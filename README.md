@@ -2,6 +2,7 @@
 [![MIT license](https://img.shields.io/github/license/max0x7ba/atomic_queue)](https://github.com/max0x7ba/atomic_queue/blob/master/LICENSE)
 ![Latest release](https://img.shields.io/github/v/tag/max0x7ba/atomic_queue?label=latest%20release)
 [![Continuous Integrations](https://github.com/max0x7ba/atomic_queue/actions/workflows/ci.yml/badge.svg)](https://github.com/max0x7ba/atomic_queue/actions/workflows/ci.yml)
+[![CMake on multiple platforms](https://github.com/max0x7ba/atomic_queue/actions/workflows/cmake-multi-platform.yml/badge.svg)](https://github.com/max0x7ba/atomic_queue/actions/workflows/cmake-multi-platform.yml)
 <br>
 ![platform Linux x86_64](https://img.shields.io/badge/platform-Linux%20x86_64--bit-yellow)
 ![platform Linux ARM](https://img.shields.io/badge/platform-Linux%20ARM-yellow)
@@ -75,6 +76,15 @@ git clone https://github.com/max0x7ba/atomic_queue.git
 ## Install using vcpkg
 ```
 vcpkg install atomic-queue
+```
+
+## Install using CMake
+```cmake
+include(FetchContent)
+
+FetchContent_Declare(atomic_queue GIT_REPOSITORY https://github.com/max0x7ba/atomic_queue.git)
+FetchContent_MakeAvailable(atomic_queue)
+target_link_libraries(foo PRIVATE max0x7ba::atomic_queue)
 ```
 
 ## Benchmark build and run instructions
