@@ -30,6 +30,7 @@ jobs:
           - os: windows-latest
             c_compiler: cl
             cpp_compiler: cl
+            toolchain: -DCMAKE_TOOLCHAIN_FILE=C:\\vcpkg\scripts\buildsystems\vcpkg.cmake
           - os: ubuntu-latest
             c_compiler: gcc
             cpp_compiler: g++
@@ -75,6 +76,7 @@ jobs:
         -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
         -DATOMIC_QUEUE_BUILD_TESTS=ON
         -DATOMIC_QUEUE_BUILD_EXAMPLES=ON
+        ${{toolchain}}
         -S ${{ github.workspace }}
 
     - name: Build
