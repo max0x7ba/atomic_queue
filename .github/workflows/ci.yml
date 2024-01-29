@@ -2,7 +2,7 @@ name: Continuous Integrations
 
 on:
   push:
-    branches: [ master , allocator-aware-constructors ]
+    branches: [ master ]
   pull_request:
     branches: [ master ]
 
