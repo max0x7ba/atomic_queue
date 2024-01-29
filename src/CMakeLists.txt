@@ -13,7 +13,6 @@ if ( ATOMIC_QUEUE_BUILD_EXAMPLES )
 endif()
 
 if ( ATOMIC_QUEUE_BUILD_TESTS )
-    enable_testing()
     find_package(Boost REQUIRED COMPONENTS unit_test_framework)
 
     add_executable(

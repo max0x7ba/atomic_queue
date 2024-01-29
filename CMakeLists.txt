@@ -19,6 +19,10 @@ endif()
 
 add_subdirectory( include )
 
+if ( ATOMIC_QUEUE_BUILD_TESTS )
+    enable_testing()
+endif()
+
 if ( ATOMIC_QUEUE_BUILD_TESTS OR ATOMIC_QUEUE_BUILD_EXAMPLES)
     add_subdirectory( src )
 endif()
