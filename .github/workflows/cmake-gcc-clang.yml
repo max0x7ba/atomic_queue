@@ -1,6 +1,6 @@
 # This starter workflow is for a CMake project running on multiple platforms. There is a different starter workflow if you just want a single platform.
 # See: https://github.com/actions/starter-workflows/blob/main/ci/cmake-single-platform.yml
-name: CMake on multiple platforms
+name: CMake with GCC / Clang
 
 on:
   push:
@@ -58,26 +58,6 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
       run: |
         sudo apt-get install -y libboost-all-dev
-    - name: Install boost via vcpkg
-      if: matrix.os == 'windows-latest'
-      run: |
-          vcpkg integrate install
-          vcpkg.exe install boost-test --triplet x64-windows
-
-    - name: Configure CMake Windows
-      # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
-      # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
-      if: matrix.os == 'windows-latest'
-      run: >
-        cmake -B ${{ steps.strings.outputs.build-output-dir }}
-        -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
-        -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
-        -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
-        -DATOMIC_QUEUE_BUILD_TESTS=ON
-        -DATOMIC_QUEUE_BUILD_EXAMPLES=ON
-        -DCMAKE_TOOLCHAIN_FILE=C:\\vcpkg\scripts\buildsystems\vcpkg.cmake
-        -DVCPKG_TARGET_TRIPLET=x64-windows
-        -S ${{ github.workspace }}
 
     - name: Configure CMake Ubuntu
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
