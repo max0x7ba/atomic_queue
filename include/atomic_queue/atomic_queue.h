@@ -454,11 +454,12 @@ class AtomicQueueB : public AtomicQueueCommon<AtomicQueueB<T, A, NIL, MAXIMIZE_T
 
 public:
     using value_type = T;
-
+    using allocator_type = A;
     // The special member functions are not thread-safe.
 
-    AtomicQueueB(unsigned size)
-        : size_(std::max(details::round_up_to_power_of_2(size), 1u << (SHUFFLE_BITS * 2)))
+    AtomicQueueB(unsigned size, const allocator_type& alloc = A())
+        : AllocatorElements(AllocatorElements(alloc))
+        , size_(std::max(details::round_up_to_power_of_2(size), 1u << (SHUFFLE_BITS * 2)))
         , elements_(AllocatorElements::allocate(size_)) {
         assert(std::atomic<T>{NIL}.is_lock_free()); // Queue element type T is not atomic. Use AtomicQueue2/AtomicQueueB2 for such element types.
         for(auto p = elements_, q = elements_ + size_; p < q; ++p)
@@ -495,13 +496,17 @@ public:
     friend void swap(AtomicQueueB& a, AtomicQueueB& b) noexcept {
         a.swap(b);
     }
+
+    allocator_type get_allocator() const noexcept {
+        return static_cast<allocator_type>(static_cast<const AllocatorElements&>(*this));
+    }
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<class T, class A = std::allocator<T>, bool MAXIMIZE_THROUGHPUT = true, bool TOTAL_ORDER = false, bool SPSC = false>
 class AtomicQueueB2 : public AtomicQueueCommon<AtomicQueueB2<T, A, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>>,
-                      private A,
+                      private A, // TODO: Do we want to inherit from two allocators if we are dealing with a stateful allocator?
                       private std::allocator_traits<A>::template rebind_alloc<std::atomic<uint8_t>> {
     using Base = AtomicQueueCommon<AtomicQueueB2<T, A, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>>;
     using State = typename Base::State;
@@ -539,11 +544,14 @@ class AtomicQueueB2 : public AtomicQueueCommon<AtomicQueueB2<T, A, MAXIMIZE_THRO
 
 public:
     using value_type = T;
+    using allocator_type = A;
 
     // The special member functions are not thread-safe.
 
-    AtomicQueueB2(unsigned size)
-        : size_(std::max(details::round_up_to_power_of_2(size), 1u << (SHUFFLE_BITS * 2)))
+    AtomicQueueB2(unsigned size, const allocator_type& alloc = A())
+        : AllocatorElements(alloc)
+        , AllocatorStates(AllocatorElements(alloc))
+        , size_(std::max(details::round_up_to_power_of_2(size), 1u << (SHUFFLE_BITS * 2)))
         , states_(AllocatorStates::allocate(size_))
         , elements_(AllocatorElements::allocate(size_)) {
         for(auto p = states_, q = states_ + size_; p < q; ++p)
@@ -593,6 +601,10 @@ public:
 
     friend void swap(AtomicQueueB2& a, AtomicQueueB2& b) noexcept {
         a.swap(b);
+    }
+
+    allocator_type get_allocator() const noexcept {
+        return static_cast<allocator_type>(static_cast<const allocator_type&>(*this));
     }
 };
 
