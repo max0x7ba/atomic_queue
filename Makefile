@@ -177,7 +177,7 @@ clean :
 	rm -rf ${build_dir} ${exes}
 
 versions:
-	${MAKE} --version | awk 'FNR<2 {print}'
+	${MAKE} --version | awk 'FNR<2'
 	${CXX} --version | head -n1
 
 env :
