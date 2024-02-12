@@ -143,6 +143,12 @@ struct HugePageAllocator : HugePageAllocatorBase
 
     using value_type = T;
 
+    HugePageAllocator() noexcept = default;
+
+    template<class U>
+    HugePageAllocator(HugePageAllocator<U>) noexcept
+    {}
+
     T* allocate(size_t n) const {
         return static_cast<T*>(hp->allocate(n * sizeof(T)));
     }
@@ -151,11 +157,13 @@ struct HugePageAllocator : HugePageAllocatorBase
         hp->deallocate(p, n * sizeof(T));
     }
 
-    bool operator==(HugePageAllocator b) const {
+    template<class U>
+    bool operator==(HugePageAllocator<U> b) const {
         return hp == b.hp;
     }
 
-    bool operator!=(HugePageAllocator b) const {
+    template<class U>
+    bool operator!=(HugePageAllocator<U> b) const {
         return hp != b.hp;
     }
 };
