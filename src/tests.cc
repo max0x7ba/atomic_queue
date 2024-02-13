@@ -11,6 +11,7 @@
 
 #include <cstdint>
 #include <thread>
+#include <string>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -32,7 +33,7 @@ void stress() {
 
     std::thread producers[PRODUCERS];
     for(unsigned i = 0; i < PRODUCERS; ++i)
-        producers[i] = std::thread([&q, &barrier]() {
+        producers[i] = std::thread([&q, &barrier, N=N]() {
             barrier.wait();
             for(unsigned n = N; n; --n)
                 q.push(n);
@@ -105,6 +106,55 @@ void test_unique_ptr_int(Q& q) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+template<class T, class State>
+struct test_stateful_allocator : std::allocator<T> {
+    State state;
+    test_stateful_allocator() = delete;
+
+    // disambiguate constructor with std::nullptr_t
+    // std::in_place available since C++17
+    test_stateful_allocator(std::nullptr_t, const State& s) noexcept
+        : state(s) {}
+
+    test_stateful_allocator(const test_stateful_allocator& other) noexcept
+        : std::allocator<T>(other), state(other.state) {}
+
+    template<class U>
+    test_stateful_allocator(const test_stateful_allocator<U, State>& other) noexcept
+        : state(other.state) {}
+
+    test_stateful_allocator& operator=(const test_stateful_allocator& other) noexcept {
+        state = other.state;
+        return *this;
+    }
+
+    ~test_stateful_allocator() noexcept = default;
+
+    template<class U>
+    struct rebind {
+        using other = test_stateful_allocator<U, State>;
+    };
+};
+
+// Required by boost-test
+template<class T, class State>
+std::ostream& operator<<(std::ostream& os, const test_stateful_allocator<T, State>& allocator) {
+    return os << allocator.state;
+}
+
+template<class T1, class T2, class State>
+bool operator==(const test_stateful_allocator<T1, State>& lhs, const test_stateful_allocator<T2, State>& rhs) {
+    return lhs.state == rhs.state;
+}
+
+template<class T1, class T2, class State>
+bool operator!=(const test_stateful_allocator<T1, State>& lhs, const test_stateful_allocator<T2, State>& rhs) {
+    return !(lhs.state == rhs.state);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
 } // namespace
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -135,6 +185,28 @@ BOOST_AUTO_TEST_CASE(move_only_2) {
 BOOST_AUTO_TEST_CASE(move_only_b2) {
     AtomicQueueB2<std::unique_ptr<int>> q(2);
     test_unique_ptr_int(q);
+}
+
+BOOST_AUTO_TEST_CASE(allocator_constructor_only_b) {
+    using allocator_type = test_stateful_allocator<int, std::string>;
+    const auto allocator = allocator_type(nullptr, "Capybara");
+
+    AtomicQueueB<int, allocator_type> q(2, allocator);
+
+    BOOST_CHECK_EQUAL(q.get_allocator(), allocator);
+    auto q2 = std::move(q);
+    BOOST_CHECK_EQUAL(q2.get_allocator(), allocator);
+}
+
+BOOST_AUTO_TEST_CASE(allocator_constructor_only_b2) {
+    using allocator_type = test_stateful_allocator<std::unique_ptr<int>, std::string>;
+    const auto allocator = allocator_type(nullptr, "Fox");
+
+    AtomicQueueB2<std::unique_ptr<int>, allocator_type> q(2, allocator);
+
+    BOOST_CHECK_EQUAL(q.get_allocator(), allocator);
+    auto q2 = std::move(q);
+    BOOST_CHECK_EQUAL(q2.get_allocator(), allocator);
 }
 
 BOOST_AUTO_TEST_CASE(move_constructor_assignment) {
