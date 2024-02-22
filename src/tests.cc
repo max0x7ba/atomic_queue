@@ -77,6 +77,7 @@ void stress() {
 
 template<class Q>
 void test_unique_ptr_int(Q& q) {
+    using std::move;
     BOOST_CHECK(q.was_empty());
     BOOST_CHECK_EQUAL(q.was_size(), 0u);
     std::unique_ptr<int> p{new int{1}};
