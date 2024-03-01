@@ -26,5 +26,3 @@ endif()
 if ( ATOMIC_QUEUE_BUILD_TESTS OR ATOMIC_QUEUE_BUILD_EXAMPLES)
     add_subdirectory( src )
 endif()
-
-add_library(max0x7ba::atomic_queue ALIAS atomic_queue)
