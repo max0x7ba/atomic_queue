@@ -1,5 +1,7 @@
 CMAKE_MINIMUM_REQUIRED( VERSION 3.25 )
 
+include(GNUInstallDirs)
+
 add_library(
     atomic_queue
     INTERFACE
@@ -11,7 +13,8 @@ add_library(
 )
 
 target_include_directories(
-    atomic_queue
+    ${PROJECT_NAME}
     INTERFACE
-    ${CMAKE_CURRENT_SOURCE_DIR}
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
