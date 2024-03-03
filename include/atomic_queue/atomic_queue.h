@@ -125,6 +125,13 @@ constexpr T nil() noexcept {
     return {};
 }
 
+template<class T, class U>
+inline void trivial_uninitialized_fill_n(std::atomic<T>* p, unsigned n, U value) noexcept {
+    static_assert(std::is_trivial<std::atomic<T>>::value, "std::atomic<T> must be a trivial type, its constructor and destructor aren't invoked.");
+    for(auto q = p + n; p < q; ++p)
+        p->store(value, X);
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 } // namespace details
@@ -355,7 +362,7 @@ class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL, MINIMIZE_
     static constexpr bool spsc_ = SPSC;
     static constexpr bool maximize_throughput_ = MAXIMIZE_THROUGHPUT;
 
-    alignas(CACHE_LINE_SIZE) std::atomic<T> elements_[size_] = {}; // Empty elements are NIL.
+    alignas(CACHE_LINE_SIZE) std::atomic<T> elements_[size_];
 
     T do_pop(unsigned tail) noexcept {
         std::atomic<T>& q_element = details::map<SHUFFLE_BITS>(elements_, tail % size_);
@@ -372,9 +379,7 @@ public:
 
     AtomicQueue() noexcept {
         assert(std::atomic<T>{NIL}.is_lock_free()); // Queue element type T is not atomic. Use AtomicQueue2/AtomicQueueB2 for such element types.
-        if(details::nil<T>() != NIL)
-            for(auto& element : elements_)
-                element.store(NIL, X);
+        details::trivial_uninitialized_fill_n(elements_, size_, NIL);
     }
 
     AtomicQueue(AtomicQueue const&) = delete;
@@ -462,8 +467,7 @@ public:
         , size_(std::max(details::round_up_to_power_of_2(size), 1u << (SHUFFLE_BITS * 2)))
         , elements_(AllocatorElements::allocate(size_)) {
         assert(std::atomic<T>{NIL}.is_lock_free()); // Queue element type T is not atomic. Use AtomicQueue2/AtomicQueueB2 for such element types.
-        for(auto p = elements_, q = elements_ + size_; p < q; ++p)
-            p->store(NIL, X);
+        details::trivial_uninitialized_fill_n(elements_, size_, NIL);
         assert(get_allocator() == allocator); // The standard requires the original and rebound allocators to manage the same state.
     }
 
@@ -562,10 +566,9 @@ public:
         , size_(std::max(details::round_up_to_power_of_2(size), 1u << (SHUFFLE_BITS * 2)))
         , states_(allocate_<AtomicState>())
         , elements_(allocate_<T>()) {
-        for(auto p = states_, q = states_ + size_; p < q; ++p)
-            p->store(Base::EMPTY, X);
+        details::trivial_uninitialized_fill_n(states_, size_, Base::EMPTY);
         A a = get_allocator();
-        assert(a == allocator); // The standard requires stateful and rebound allocators to manage the same state.
+        assert(a == allocator); // The standard requires the original and rebound allocators to manage the same state.
         for(auto p = elements_, q = elements_ + size_; p < q; ++p)
             std::allocator_traits<A>::construct(a, p);
     }
