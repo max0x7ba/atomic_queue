@@ -464,6 +464,7 @@ public:
         assert(std::atomic<T>{NIL}.is_lock_free()); // Queue element type T is not atomic. Use AtomicQueue2/AtomicQueueB2 for such element types.
         for(auto p = elements_, q = elements_ + size_; p < q; ++p)
             p->store(NIL, X);
+        assert(get_allocator() == allocator); // The standard requires the original and rebound allocators to manage the same state.
     }
 
     AtomicQueueB(AtomicQueueB&& b) noexcept
@@ -484,7 +485,7 @@ public:
     }
 
     A get_allocator() const noexcept {
-        return *this;
+        return *this; // The standard requires implicit conversion between rebound allocators.
     }
 
     void swap(AtomicQueueB& b) noexcept {
@@ -564,6 +565,7 @@ public:
         for(auto p = states_, q = states_ + size_; p < q; ++p)
             p->store(Base::EMPTY, X);
         A a = get_allocator();
+        assert(a == allocator); // The standard requires stateful and rebound allocators to manage the same state.
         for(auto p = elements_, q = elements_ + size_; p < q; ++p)
             std::allocator_traits<A>::construct(a, p);
     }
@@ -592,7 +594,7 @@ public:
     }
 
     A get_allocator() const noexcept {
-        return *this;
+        return *this; // The standard requires implicit conversion between rebound allocators.
     }
 
     void swap(AtomicQueueB2& b) noexcept {
