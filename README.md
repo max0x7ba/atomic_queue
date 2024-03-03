@@ -186,8 +186,8 @@ I only have access to a few x86-64 machines. If you have access to different har
 ### Huge pages
 When huge pages are available the benchmarks use 1x1GB or 16x2MB huge pages for the queues to minimise TLB misses. To enable huge pages do one of:
 ```
-sudo hugeadm --pool-pages-min 1GB:1 --pool-pages-max 1GB:1
-sudo hugeadm --pool-pages-min 2MB:16 --pool-pages-max 2MB:16
+sudo hugeadm --pool-pages-min 1GB:1
+sudo hugeadm --pool-pages-min 2MB:16
 ```
 Alternatively, you may like to enable [transparent hugepages][15] in your system and use a hugepage-aware allocator, such as [tcmalloc][14].
 
