@@ -303,22 +303,24 @@ void run_throughput_benchmark(char const* name, HugePages& hp, std::vector<unsig
     }
 }
 
+constexpr int N_TROUGHPUT_MESSAGES = 1000000;
+
 template<class Queue>
 void run_throughput_mpmc_benchmark(char const* name, HugePages& hp, std::vector<unsigned> const& hw_thread_ids, Type<Queue>, unsigned thread_count_min = 1) {
     unsigned const thread_count_max = hw_thread_ids.size() / 2;
-    run_throughput_benchmark<Queue>(name, hp, hw_thread_ids, 1000000, thread_count_min, thread_count_max);
+    run_throughput_benchmark<Queue>(name, hp, hw_thread_ids, N_TROUGHPUT_MESSAGES, thread_count_min, thread_count_max);
 }
 
 template<class... Args>
 void run_throughput_spsc_benchmark(char const* name, HugePages& hp, std::vector<unsigned> const& hw_thread_ids,
                                    Type<BoostSpScAdapter<boost::lockfree::spsc_queue<Args...>>>) {
     using Queue = BoostSpScAdapter<boost::lockfree::spsc_queue<Args...>>;
-    run_throughput_benchmark<Queue>(name, hp, hw_thread_ids, 1000000, 1, 1); // spsc_queue can only handle 1 producer and 1 consumer.
+    run_throughput_benchmark<Queue>(name, hp, hw_thread_ids, N_TROUGHPUT_MESSAGES, 1, 1); // spsc_queue can only handle 1 producer and 1 consumer.
 }
 
 template<class Queue>
 void run_throughput_spsc_benchmark(char const* name, HugePages& hp, std::vector<unsigned> const& hw_thread_ids, Type<Queue>) {
-    run_throughput_benchmark<Queue>(name, hp, hw_thread_ids, 1000000, 1, 1); // Special case for 1 producer and 1 consumer.
+    run_throughput_benchmark<Queue>(name, hp, hw_thread_ids, N_TROUGHPUT_MESSAGES, 1, 1); // Special case for 1 producer and 1 consumer.
 }
 
 void run_throughput_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const& cpu_topology) {
@@ -447,7 +449,7 @@ inline std::array<cycles_t, 2> ping_pong_benchmark(unsigned N, HugePages& hp, un
 
 template<class Queue>
 void run_ping_pong_benchmark(char const* name, HugePages& hp, std::vector<unsigned> const& hw_thread_ids) {
-    int constexpr N = 100000;
+    int constexpr N_PING_PONG_MESSAGES = 100000;
     int constexpr RUNS = 10;
 
     unsigned const cpus[2] = {hw_thread_ids[0], hw_thread_ids[1]};
@@ -455,7 +457,7 @@ void run_ping_pong_benchmark(char const* name, HugePages& hp, std::vector<unsign
     // select the best of RUNS runs.
     std::array<cycles_t, 2> best_times = {std::numeric_limits<int64_t>::max(), std::numeric_limits<int64_t>::max()};
     for(unsigned run = RUNS; run--;) {
-        auto times = ping_pong_benchmark<Queue>(N, hp, cpus);
+        auto times = ping_pong_benchmark<Queue>(N_PING_PONG_MESSAGES, hp, cpus);
         if(best_times[0] + best_times[1] > times[0] + times[1])
             best_times = times;
 
@@ -463,7 +465,7 @@ void run_ping_pong_benchmark(char const* name, HugePages& hp, std::vector<unsign
     }
 
     auto avg_time = to_seconds((best_times[0] + best_times[1]) / 2);
-    auto round_trip_time = avg_time / N;
+    auto round_trip_time = avg_time / N_PING_PONG_MESSAGES;
     std::printf("%32s: %.9f sec/round-trip\n", name, round_trip_time);
 }
 
