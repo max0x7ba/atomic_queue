@@ -206,6 +206,12 @@ One thread posts an integer to another thread through one queue and waits for a 
 # Contributing
 Contributions are more than welcome. `.editorconfig` and `.clang-format` can be used to automatically match code formatting.
 
+# Reading material
+Some books on the subject of multi-threaded programming I found instructive:
+
+* _Programming with POSIX Threads_ by David R. Butenhof.
+* _The Art of Multiprocessor Programming_ by Maurice Herlihy, Nir Shavit.
+
 ---
 
 Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file LICENSE.
