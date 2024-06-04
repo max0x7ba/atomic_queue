@@ -168,7 +168,7 @@ protected:
 
     template<class T, T NIL>
     static T do_pop_atomic(std::atomic<T>& q_element) noexcept {
-        if(Derived::spsc_) {
+        if constexpr (Derived::spsc_) {
             for(;;) {
                 T element = q_element.load(A);
                 if(ATOMIC_QUEUE_LIKELY(element != NIL)) {
@@ -195,7 +195,7 @@ protected:
     template<class T, T NIL>
     static void do_push_atomic(T element, std::atomic<T>& q_element) noexcept {
         assert(element != NIL);
-        if(Derived::spsc_) {
+        if constexpr (Derived::spsc_) {
             while(ATOMIC_QUEUE_UNLIKELY(q_element.load(X) != NIL))
                 if(Derived::maximize_throughput_)
                     spin_loop_pause();
@@ -214,7 +214,7 @@ protected:
 
     template<class T>
     static T do_pop_any(std::atomic<unsigned char>& state, T& q_element) noexcept {
-        if(Derived::spsc_) {
+        if constexpr (Derived::spsc_) {
             while(ATOMIC_QUEUE_UNLIKELY(state.load(A) != STORED))
                 if(Derived::maximize_throughput_)
                     spin_loop_pause();
@@ -240,7 +240,7 @@ protected:
 
     template<class U, class T>
     static void do_push_any(U&& element, std::atomic<unsigned char>& state, T& q_element) noexcept {
-        if(Derived::spsc_) {
+        if constexpr (Derived::spsc_) {
             while(ATOMIC_QUEUE_UNLIKELY(state.load(A) != EMPTY))
                 if(Derived::maximize_throughput_)
                     spin_loop_pause();
@@ -267,7 +267,7 @@ public:
     template<class T>
     bool try_push(T&& element) noexcept {
         auto head = head_.load(X);
-        if(Derived::spsc_) {
+        if constexpr (Derived::spsc_) {
             if(static_cast<int>(head - tail_.load(X)) >= static_cast<int>(static_cast<Derived&>(*this).size_))
                 return false;
             head_.store(head + 1, X);
@@ -286,7 +286,7 @@ public:
     template<class T>
     bool try_pop(T& element) noexcept {
         auto tail = tail_.load(X);
-        if(Derived::spsc_) {
+        if constexpr (Derived::spsc_) {
             if(static_cast<int>(head_.load(X) - tail) <= 0)
                 return false;
             tail_.store(tail + 1, X);
@@ -305,7 +305,7 @@ public:
     template<class T>
     void push(T&& element) noexcept {
         unsigned head;
-        if(Derived::spsc_) {
+        if constexpr (Derived::spsc_) {
             head = head_.load(X);
             head_.store(head + 1, X);
         }
@@ -318,7 +318,7 @@ public:
 
     auto pop() noexcept {
         unsigned tail;
-        if(Derived::spsc_) {
+        if constexpr (Derived::spsc_) {
             tail = tail_.load(X);
             tail_.store(tail + 1, X);
         }
