@@ -1,0 +1,18 @@
+Contributors:
+
+- Jean-Michaël Celerier (https://github.com/max0x7ba/atomic_queue/pull/1)
+- Manuel Pöter (https://github.com/max0x7ba/atomic_queue/pull/9)
+- Paul Ferrand (https://github.com/max0x7ba/atomic_queue/pull/13)
+- Paul Ferrand (https://github.com/max0x7ba/atomic_queue/pull/14)
+- JP Cimalando (https://github.com/max0x7ba/atomic_queue/pull/16)
+- Cameron (https://github.com/max0x7ba/atomic_queue/pull/22)
+- Ben Beasley (https://github.com/max0x7ba/atomic_queue/pull/30)
+- Xeonacid (https://github.com/max0x7ba/atomic_queue/pull/38)
+- XieJiSS (https://github.com/max0x7ba/atomic_queue/pull/43)
+- Jan Niklas Hasse (https://github.com/max0x7ba/atomic_queue/pull/53)
+- Jan Niklas Hasse (https://github.com/max0x7ba/atomic_queue/pull/54)
+- Jonathan Wakely (https://github.com/max0x7ba/atomic_queue/pull/56)
+- Andriy06 (https://github.com/max0x7ba/atomic_queue/pull/58)
+- RedSkittleFox (https://github.com/max0x7ba/atomic_queue/pull/61)
+- RedSkittleFox (https://github.com/max0x7ba/atomic_queue/pull/62)
+- Yvan (https://github.com/max0x7ba/atomic_queue/pull/63)
