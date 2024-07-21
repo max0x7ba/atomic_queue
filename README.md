@@ -179,7 +179,7 @@ There are a few OS behaviours that complicate benchmarking:
 * CPU scheduler can place threads on different CPU cores each run. To avoid that the threads are pinned to specific CPU cores.
 * CPU scheduler can preempt threads. To avoid that real-time `SCHED_FIFO` priority 50 is used to disable scheduler time quantum expiry and make the threads non-preemptable by lower priority processes/threads.
 * Real-time thread throttling disabled.
-* Adverse address space randomisation may cause extra CPU cache conflicts, as well as other processes running on the system. To minimise effects of that `benchmarks` executable is run at least 33 times. The benchmark charts show the average; the standard deviation, minimum and maximum values are shown in the chart tooltips.
+* Adverse address space randomisation may cause extra CPU cache conflicts, as well as other processes running on the system. To minimise effects of that `benchmarks` executable is run at least 33 times. The benchmark charts display average values. The chart tooltip also displays the standard deviation, minimum and maximum values.
 
 I only have access to a few x86-64 machines. If you have access to different hardware feel free to submit the output file of `scripts/run-benchmarks.sh` and I will include your results into the benchmarks page.
 
