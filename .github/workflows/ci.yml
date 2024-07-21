@@ -1,4 +1,4 @@
-##name: Makefile Continuous Integrations
+name: Makefile Continuous Integrations
 
 on:
   push:
