@@ -56,6 +56,14 @@ static inline void spin_loop_pause() noexcept {
     asm volatile (".insn i 0x0F, 0, x0, x0, 0x010");
 }
 } // namespace atomic_queue
+#elif defined(__loongarch__)
+namespace atomic_queue {
+constexpr int CACHE_LINE_SIZE = 64;
+static inline void spin_loop_pause() noexcept
+{
+    asm volatile("nop \n nop \n nop \n nop \n nop \n nop \n nop \n nop");
+}
+} // namespace atomic_queue
 #else
 #ifdef _MSC_VER
 #pragma message("Unknown CPU architecture. Using L1 cache line size of 64 bytes and no spinloop pause instruction.")
