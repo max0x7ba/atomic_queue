@@ -18,3 +18,4 @@ Contributors:
 - Yvan (https://github.com/max0x7ba/atomic_queue/pull/63)
 - Luiz Feldmann (https://github.com/max0x7ba/atomic_queue/pull/72)
 - dummyunit (https://github.com/max0x7ba/atomic_queue/pull/73)
+- NakanoMiku (https://github.com/max0x7ba/atomic_queue/pull/74)
