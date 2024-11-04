@@ -38,20 +38,6 @@ These design choices are also limitations:
 
 Ultra-low-latency applications need just that and nothing more. The minimalism pays off, see the [throughput and latency benchmarks][1].
 
-Available containers are:
-* `AtomicQueue` - a fixed size ring-buffer for atomic elements.
-* `OptimistAtomicQueue` - a faster fixed size ring-buffer for atomic elements which busy-waits when empty or full. It is `AtomicQueue` used with `push`/`pop` instead of `try_push`/`try_pop`.
-* `AtomicQueue2` - a fixed size ring-buffer for non-atomic elements.
-* `OptimistAtomicQueue2` - a faster fixed size ring-buffer for non-atomic elements which busy-waits when empty or full. It is `AtomicQueue2` used with `push`/`pop` instead of `try_push`/`try_pop`.
-
-These containers have corresponding `AtomicQueueB`, `OptimistAtomicQueueB`, `AtomicQueueB2`, `OptimistAtomicQueueB2` versions where the buffer size is specified as an argument to the constructor.
-
-Totally ordered mode is supported. In this mode consumers receive messages in the same FIFO order the messages were posted. This mode is supported for `push` and `pop` functions, but for not the `try_` versions. On Intel x86 the totally ordered mode has 0 cost, as of 2019.
-
-Single-producer-single-consumer mode is supported. In this mode, no expensive atomic read-modify-write CPU instructions are necessary, only the cheapest atomic loads and stores. That improves queue throughput significantly.
-
-Move-only queue element types are fully supported. For example, a queue of `std::unique_ptr<T>` elements would be `AtomicQueue2B<std::unique_ptr<T>>` or `AtomicQueue2<std::unique_ptr<T>, CAPACITY>`.
-
 ## Role Models
 Several other well established and popular thread-safe containers are used for reference in the [benchmarks][1]:
 * `std::mutex` - a fixed size ring-buffer with `std::mutex`.
@@ -102,7 +88,22 @@ make -r -j4 run_benchmarks
 
 The benchmark also requires Intel TBB library to be available. It assumes that it is installed in `/usr/local/include` and `/usr/local/lib`. If it is installed elsewhere you may like to modify `cppflags.tbb` and `ldlibs.tbb` in `Makefile`.
 
-# API
+# Library contemts
+## Available queues
+* `AtomicQueue` - a fixed size ring-buffer for atomic elements.
+* `OptimistAtomicQueue` - a faster fixed size ring-buffer for atomic elements which busy-waits when empty or full. It is `AtomicQueue` used with `push`/`pop` instead of `try_push`/`try_pop`.
+* `AtomicQueue2` - a fixed size ring-buffer for non-atomic elements.
+* `OptimistAtomicQueue2` - a faster fixed size ring-buffer for non-atomic elements which busy-waits when empty or full. It is `AtomicQueue2` used with `push`/`pop` instead of `try_push`/`try_pop`.
+
+These containers have corresponding `AtomicQueueB`, `OptimistAtomicQueueB`, `AtomicQueueB2`, `OptimistAtomicQueueB2` versions where the buffer size is specified as an argument to the constructor.
+
+Totally ordered mode is supported. In this mode consumers receive messages in the same FIFO order the messages were posted. This mode is supported for `push` and `pop` functions, but for not the `try_` versions. On Intel x86 the totally ordered mode has 0 cost, as of 2019.
+
+Single-producer-single-consumer mode is supported. In this mode, no expensive atomic read-modify-write CPU instructions are necessary, only the cheapest atomic loads and stores. That improves queue throughput significantly.
+
+Move-only queue element types are fully supported. For example, a queue of `std::unique_ptr<T>` elements would be `AtomicQueue2B<std::unique_ptr<T>>` or `AtomicQueue2<std::unique_ptr<T>, CAPACITY>`.
+
+## Queue API
 The queue class templates provide the following member functions:
 * `try_push` - Appends an element to the end of the queue. Returns `false` when the queue is full.
 * `try_pop` - Removes an element from the front of the queue. Returns `false` when the queue is empty.
@@ -121,15 +122,13 @@ Note that _optimism_ is a choice of a queue modification operation control flow,
 
 See [example.cc](src/example.cc) for a usage example.
 
-TODO: full API reference.
-
+# Implementation Notes
 ## Memory order of non-atomic loads and stores
 `push` and `try_push` operations _synchronize-with_ (as defined in [`std::memory_order`][17]) with any subsequent `pop` or `try_pop` operation of the same queue object. Meaning that:
 * No non-atomic load/store gets reordered past `push`/`try_push`, which is a `memory_order::release` operation. Same memory order as that of `std::mutex::unlock`.
 * No non-atomic load/store gets reordered prior to `pop`/`try_pop`, which is a `memory_order::acquire` operation. Same memory order as that of `std::mutex::lock`.
 * The effects of a producer thread's non-atomic stores followed by `push`/`try_push` of an element into a queue become visible in the consumer's thread which `pop`/`try_pop` that particular element.
 
-# Implementation Notes
 ## Ring-buffer capacity
 The available queues here use a ring-buffer array for storing elements. The capacity of the queue is fixed at compile time or construction time.
 
@@ -216,7 +215,7 @@ One thread posts an integer to another thread through one queue and waits for a 
 Contributions are more than welcome. `.editorconfig` and `.clang-format` can be used to automatically match code formatting.
 
 # Reading material
-Some books on the subject of multi-threaded programming I found instructive:
+Some books on the subject of multi-threaded programming I found quite instructive:
 
 * _Programming with POSIX Threads_ by David R. Butenhof.
 * _The Art of Multiprocessor Programming_ by Maurice Herlihy, Nir Shavit.
