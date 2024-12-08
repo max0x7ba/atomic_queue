@@ -15,12 +15,16 @@
 ![platform Linux IBM System/390](https://img.shields.io/badge/platform-Linux%20IBM%20System/390-yellow)
 
 # atomic_queue
-C++14 multiple-producer-multiple-consumer *lock-free* queues based on circular buffer and [`std::atomic`][3]. Designed with a goal to minimize the latency between one thread pushing an element into a queue and another thread popping it from the queue.
+C++14 multiple-producer-multiple-consumer *lock-free* queues based on circular buffer and [`std::atomic`][3].
+
+Designed with a goal to minimize the latency between one thread pushing an element into a queue and another thread popping it from the queue.
 
 It has been developed, tested and benchmarked on Linux, but should support any C++14 platforms which implement `std::atomic`. Reported as compatible with Windows, but the continuous integrations hosted by GitHub are currently set up only for x86_64 platform on Ubuntu-20.04 and Ubuntu-22.04. Pull requests to extend the [continuous integrations][18] to run on other architectures and/or platforms are welcome.
 
 ## Design Principles
 When minimizing latency a good design is not when there is nothing left to add, but rather when there is nothing left to remove, as these queues exemplify.
+
+Minimizing latency naturally maximizes throughput. Low latency reciprocal is high throuhput, in ideal mathematical and practical engineering sense. Low latency is incompatible with any delays and/or batching, which destroy original (hardware) global time order of events pushed into one queue by different threads. Maximizing throughput, on the other hand, can be done at expense of latency by delaying and batching multiple updates.
 
 The main design principle these queues follow is _minimalism_, which results in such design choices as:
 
@@ -188,6 +192,8 @@ There are a few OS behaviours that complicate benchmarking:
 * CPU scheduler can preempt threads. To avoid that real-time `SCHED_FIFO` priority 50 is used to disable scheduler time quantum expiry and make the threads non-preemptable by lower priority processes/threads.
 * Real-time thread throttling disabled.
 * Adverse address space randomisation may cause extra CPU cache conflicts, as well as other processes running on the system. To minimise effects of that `benchmarks` executable is run at least 33 times. The benchmark charts display average values. The chart tooltip also displays the standard deviation, minimum and maximum values.
+
+Benchmark performance of single-producer-single-consumer queues `boost::lockfree::spsc_queue`, `moodycamel::ReaderWriterQueue` and these queues in single-producer-single-consumer mode should be identical because they implement exactly the same algorithm using exactly the same atomic load and store instructions. `boost::lockfree::spsc_queue` implementation benchmarked at that time had no optimizations for minimizing L1d cache contention, cold branch misprediction or pipeline stalls from subtler issues noticable only in the generated assembly code.
 
 I only have access to a few x86-64 machines. If you have access to different hardware feel free to submit the output file of `scripts/run-benchmarks.sh` and I will include your results into the benchmarks page.
 
