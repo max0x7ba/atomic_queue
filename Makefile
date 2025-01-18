@@ -38,7 +38,7 @@ AR := ${ar.${TOOLSET}}
 cxxflags.gcc.debug := -Og -fstack-protector-all -fno-omit-frame-pointer # -D_GLIBCXX_DEBUG
 cxxflags.gcc.release := -O3 -mtune=native -ffast-math -falign-{functions,loops}=64 -DNDEBUG
 cxxflags.gcc.sanitize := ${cxxflags.gcc.release} -fsanitize=thread
-cxxflags.gcc := -std=gnu++14 -pthread -march=native -W{all,extra,error,no-{maybe-uninitialized,unused-variable,unused-function,unused-local-typedefs,error=array-bounds}} -fmessage-length=0 ${cxxflags.gcc.${BUILD}}
+cxxflags.gcc := -std=gnu++14 -pthread -march=native -W{all,extra,error,no-{array-bounds,maybe-uninitialized,unused-variable,unused-function,unused-local-typedefs}} -fmessage-length=0 ${cxxflags.gcc.${BUILD}}
 ldflags.gcc.sanitize := ${ldflags.gcc.release} -fsanitize=thread
 ldflags.gcc := ${ldflags.gcc.${BUILD}}
 
@@ -65,6 +65,7 @@ cppflags.moodycamel := -I$(abspath ..)
 ldlibs.moodycamel :=
 
 cppflags.xenium := -I${abspath ../xenium}
+cxxflags.xenium := -std=gnu++17
 ldlibs.xenium :=
 
 recompile := ${build_dir}/.make/recompile
@@ -95,6 +96,7 @@ ${exes} : % : ${build_dir}/%
 
 benchmarks_src := benchmarks.cc cpu_base_frequency.cc huge_pages.cc
 ${build_dir}/benchmarks : cppflags += ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium}
+${build_dir}/benchmarks : cxxflags += ${cxxflags.tbb} ${cxxflags.moodycamel} ${cxxflags.xenium}
 ${build_dir}/benchmarks : ldlibs += ${ldlibs.tbb} ${ldlibs.moodycamel} ${ldlibs.xenium} -ldl
 ${build_dir}/benchmarks : ${benchmarks_src:%.cc=${build_dir}/%.o} ${relink} | ${build_dir}
 	$(call strip2,${LINK.EXE})
@@ -141,7 +143,7 @@ ${build_dir} ${build_dir}/.make:
 
 ver = "$(shell ${1} --version | head -n1)"
 # Trigger recompilation when compiler environment change.
-env.compile := $(call ver,${CXX}) ${cppflags} ${cxxflags} ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium}
+env.compile := $(call ver,${CXX}) ${cppflags} ${cxxflags} ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium} ${cxxflags.tbb} ${cxxflags.moodycamel} ${cxxflags.xenium}
 # Trigger relink when linker environment change.
 env.link := $(call ver,${LD}) ${ldflags} ${ldlibs} ${ldlibs.tbb} ${ldlibs.moodycamel} ${ldlibs.xenium}
 
