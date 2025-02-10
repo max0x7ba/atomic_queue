@@ -107,6 +107,14 @@ Single-producer-single-consumer mode is supported. In this mode, no expensive at
 
 Move-only queue element types are fully supported. For example, a queue of `std::unique_ptr<T>` elements would be `AtomicQueue2B<std::unique_ptr<T>>` or `AtomicQueue2<std::unique_ptr<T>, CAPACITY>`.
 
+## Queue schematics
+
+```
+queue-end                 queue-front
+[newest-element, ..., oldest-element]
+push()                          pop()
+```
+
 ## Queue API
 The queue class templates provide the following member functions:
 * `try_push` - Appends an element to the end of the queue. Returns `false` when the queue is full.
