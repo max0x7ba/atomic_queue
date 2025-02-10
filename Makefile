@@ -49,6 +49,7 @@ cxxflags.clang.release := -O3 -mtune=native -ffast-math -falign-functions=64 -DN
 cxxflags.clang.sanitize := ${cxxflags.clang.release} -fsanitize=thread
 cxxflags.clang := -std=gnu++14 -pthread -march=native -stdlib=libstdc++ -W{all,extra,error,no-{unused-variable,unused-function,unused-local-typedefs}} -fmessage-length=0 ${cxxflags.clang.${BUILD}}
 ldflags.clang.sanitize := ${ldflags.clang.release} -fsanitize=thread
+ldflags.clang.debug := -latomic
 ldflags.clang := -stdlib=libstdc++ ${ldflags.clang.${BUILD}}
 
 # Additional CPPFLAGS, CXXFLAGS, CFLAGS, LDLIBS, LDFLAGS can come from the command line, e.g. make CPPFLAGS='-I<my-include-dir>', or from environment variables.
@@ -186,3 +187,7 @@ env :
 	env | sort --ignore-case
 
 .PHONY : update_env_txt env versions rtags run_benchmarks clean all run_%
+
+# Local Variables:
+# compile-command: "/bin/time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) BUILD=debug run_tests"
+# End:
