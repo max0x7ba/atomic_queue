@@ -73,8 +73,6 @@ recompile := ${build_dir}/.make/recompile
 relink := ${build_dir}/.make/relink
 
 COMPILE.CXX = ${CXX} -o $@ -c ${cppflags} ${cxxflags} -MD -MP $(abspath $<)
-COMPILE.S = ${CXX} -o- -S -fverbose-asm -masm=intel ${cppflags} ${cxxflags} $(abspath $<) | c++filt | egrep -v '^[[:space:]]*\.(loc|cfi|L[A-Z])' > $@
-PREPROCESS.CXX = ${CXX} -o $@ -E ${cppflags} ${cxxflags} $(abspath $<)
 COMPILE.C = ${CC} -o $@ -c ${cppflags} ${cflags} -MD -MP $(abspath $<)
 LINK.EXE = ${LD} -o $@ $(ldflags) $(filter-out ${relink},$^) $(ldlibs)
 LINK.SO = ${LD} -o $@ -shared $(ldflags) $(filter-out ${relink},$^) $(ldlibs)
@@ -88,12 +86,13 @@ else
 strip2 = $(strip ${1})
 endif
 
+#
+# Build targets definitions begin.
+#
+
 exes := benchmarks tests example
 
 all : ${exes}
-
-${exes} : % : ${build_dir}/%
-	ln -sf ${<:${CURDIR}/%=%}
 
 benchmarks_src := benchmarks.cc cpu_base_frequency.cc huge_pages.cc
 ${build_dir}/benchmarks : cppflags += ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium}
@@ -115,6 +114,13 @@ ${build_dir}/example : ${example_src:%.cc=${build_dir}/%.o} ${relink} | ${build_
 	$(call strip2,${LINK.EXE})
 -include ${example_src:%.cc=${build_dir}/%.d}
 
+#
+# Build targets definitions end.
+#
+
+${exes} : % : ${build_dir}/%
+	ln -sf ${<:${CURDIR}/%=%}
+
 ${build_dir}/%.so : cxxflags += -fPIC
 ${build_dir}/%.so : ${relink} | ${build_dir}
 	$(call strip2,${LINK.SO})
@@ -127,14 +133,6 @@ ${build_dir}/%.o : src/%.cc ${recompile} | ${build_dir}
 
 ${build_dir}/%.o : src/%.c ${recompile} | ${build_dir}
 	$(call strip2,${COMPILE.C})
-
-${build_dir}/%.S : cppflags += ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium}
-${build_dir}/%.S : src/%.cc ${recompile} | ${build_dir}
-	$(call strip2,${COMPILE.S})
-
-${build_dir}/%.I : cppflags += ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium}
-${build_dir}/%.I : src/%.cc ${recompile} | ${build_dir}
-	$(call strip2,${PREPROCESS.CXX})
 
 ${build_dir}/%.d : ;
 
@@ -177,7 +175,7 @@ rtags :
 	${MAKE} --always-make --just-print all | { rtags-rc -c -; true; }
 
 clean :
-	rm -rf ${build_dir} ${exes}
+	rm -rf ${exes} ${build_dir}
 
 versions:
 	${MAKE} --version | awk 'FNR<2'
@@ -187,6 +185,9 @@ env :
 	env | sort --ignore-case
 
 .PHONY : update_env_txt env versions rtags run_benchmarks clean all run_%
+.DELETE_ON_ERROR:
+.SECONDARY:
+.SUFFIXES:
 
 # Local Variables:
 # compile-command: "/bin/time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) BUILD=debug run_tests"
