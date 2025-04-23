@@ -45,3 +45,20 @@ if get_option('benchmarks')
     dependencies : [atomic_queue_dep, dl_dep, xenium_dep, boost_dep, tbb_dep, moodycamel_dep],
   )
 endif
+
+install_headers(
+  files(
+    'include/atomic_queue/atomic_queue.h',
+    'include/atomic_queue/atomic_queue_mutex.h',
+    'include/atomic_queue/barrier.h',
+    'include/atomic_queue/defs.h',
+    'include/atomic_queue/spinlock.h',
+  ),
+  subdir: 'atomic_queue'
+)
+pkg = import('pkgconfig')
+pkg.generate(
+  name: 'atomic_queue',
+  description: 'C++14 multiple-producer-multiple-consumer lock-free queues based on circular buffers',
+  libraries: [threads_dep]
+)
