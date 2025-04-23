@@ -15,7 +15,7 @@
 ![platform Linux IBM System/390](https://img.shields.io/badge/platform-Linux%20IBM%20System/390-yellow)
 
 # atomic_queue
-C++14 multiple-producer-multiple-consumer *lock-free* queues based on circular buffer and [`std::atomic`][3].
+C++14 multiple-producer-multiple-consumer *lock-free* queues based on circular buffers and [`std::atomic`][3].
 
 Designed with a goal to minimize the latency between one thread pushing an element into a queue and another thread popping it from the queue.
 
@@ -92,7 +92,7 @@ make -r -j4 run_benchmarks
 
 The benchmark also requires Intel TBB library to be available. It assumes that it is installed in `/usr/local/include` and `/usr/local/lib`. If it is installed elsewhere you may like to modify `cppflags.tbb` and `ldlibs.tbb` in `Makefile`.
 
-# Library contemts
+# Library contents
 ## Available queues
 * `AtomicQueue` - a fixed size ring-buffer for atomic elements.
 * `OptimistAtomicQueue` - a faster fixed size ring-buffer for atomic elements which busy-waits when empty or full. It is `AtomicQueue` used with `push`/`pop` instead of `try_push`/`try_pop`.
