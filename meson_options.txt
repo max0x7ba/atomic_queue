@@ -1,2 +1,4 @@
 option('benchmarks', type : 'boolean', value : true,
-       description : 'Do not build benchmarks; ignore their dependencies')
+       description : 'Build benchmarks (requires Boost, TBB, Xenium and moodycamel)')
+option('tests', type : 'boolean', value : true,
+       description : 'Build tests and example (requires Boost)')
