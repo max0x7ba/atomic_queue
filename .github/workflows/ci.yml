@@ -11,7 +11,7 @@ jobs:
     strategy:
       matrix:
         toolset: [gcc, clang]
-        os: [ubuntu-20.04, ubuntu-22.04, ubuntu-24.04]
+        os: [ubuntu-22.04, ubuntu-24.04]
         include:
             - sanitize: 1
             - os: ubuntu-20.04 # Work-around for https://bugs.launchpad.net/ubuntu/+source/gcc-10/+bug/2029910
