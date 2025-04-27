@@ -6,7 +6,6 @@
 #include <boost/test/unit_test.hpp>
 
 #include "atomic_queue/atomic_queue.h"
-#include "atomic_queue/atomic_queue_mutex.h"
 #include "atomic_queue/barrier.h"
 
 #include <cstdint>
