@@ -334,7 +334,7 @@ public:
     }
 
     bool was_full() const noexcept {
-        return was_size() >= static_cast<int>(static_cast<Derived const&>(*this).size_);
+        return was_size() >= capacity();
     }
 
     unsigned was_size() const noexcept {
