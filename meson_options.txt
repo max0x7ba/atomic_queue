@@ -1,4 +1,4 @@
-option('benchmarks', type : 'boolean', value : true,
-       description : 'Build benchmarks (requires Boost, TBB, Xenium and moodycamel)')
+option('benchmarks', type : 'boolean', value : false,
+       description : 'Build benchmarks (requires Boost, TBB, Xenium, moodycamel and C++17)')
 option('tests', type : 'boolean', value : true,
        description : 'Build tests and example (requires Boost)')
