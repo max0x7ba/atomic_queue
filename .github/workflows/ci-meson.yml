@@ -1,0 +1,32 @@
+name: Meson Continuous Integrations
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build-and-test:
+    strategy:
+      matrix:
+        cpp_compiler: [g++, clang++]
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Meson and Boost.Test
+        run: sudo apt-get --quiet --yes install meson libboost-test-dev
+
+      - name: Setup
+        env:
+          CXX: ${{ matrix.cpp_compiler }}
+        run: meson setup build -Dwerror=true -Dwarning_level=3
+
+      - name: Compile
+        run: meson compile -C build
+
+      - name: Test
+        run: meson test -C build
