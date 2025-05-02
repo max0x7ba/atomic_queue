@@ -9,8 +9,10 @@ on:
 jobs:
   build-and-test:
     strategy:
+      fail-fast: false
       matrix:
         cpp_compiler: [g++, clang++]
+        sanitize: [address ,undefined, thread]
 
     runs-on: ubuntu-latest
 
@@ -23,10 +25,10 @@ jobs:
       - name: Setup
         env:
           CXX: ${{ matrix.cpp_compiler }}
-        run: meson setup build -Dwerror=true -Dwarning_level=3
+        run: meson setup build -Dwerror=true -Dwarning_level=3 -Db_sanitize=${{ matrix.sanitize }}
 
       - name: Compile
         run: meson compile -C build
 
       - name: Test
-        run: meson test -C build
+        run: meson test -C build --print-errorlogs
