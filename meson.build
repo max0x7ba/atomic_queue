@@ -43,12 +43,13 @@ if get_option('benchmarks')
   tbb_dep = cxx.find_library('tbb')
   moodycamel_dep = declare_dependency(include_directories : '../')
 
-  executable(
+  benchmarks_exe = executable(
     'benchmarks',
     ['src/benchmarks.cc', 'src/cpu_base_frequency.cc', 'src/huge_pages.cc'],
     include_directories : ['src'],
     dependencies : [atomic_queue_dep, dl_dep, xenium_dep, boost_dep, tbb_dep, moodycamel_dep],
   )
+  benchmark('benchmarks', benchmarks_exe)
 endif
 
 install_headers(
