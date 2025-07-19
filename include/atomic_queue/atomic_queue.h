@@ -56,19 +56,19 @@ struct GetIndexShuffleBits<false, array_size, elements_per_cache_line> {
 // the element within the cache line) with the next N bits (which are the index of the cache line)
 // of the element index.
 template<int BITS>
-constexpr unsigned remap_index(unsigned index) noexcept {
+ATOMIC_QUEUE_INLINE static constexpr unsigned remap_index(unsigned index) noexcept {
     unsigned constexpr mix_mask{(1u << BITS) - 1};
     unsigned const mix{(index ^ (index >> BITS)) & mix_mask};
     return index ^ mix ^ (mix << BITS);
 }
 
 template<>
-constexpr unsigned remap_index<0>(unsigned index) noexcept {
+ATOMIC_QUEUE_INLINE constexpr unsigned remap_index<0>(unsigned index) noexcept {
     return index;
 }
 
 template<int BITS, class T>
-constexpr T& map(T* elements, unsigned index) noexcept {
+ATOMIC_QUEUE_INLINE static constexpr T& map(T* elements, unsigned index) noexcept {
     return elements[remap_index<BITS>(index)];
 }
 
@@ -87,30 +87,30 @@ constexpr T& map(T* elements, unsigned index) noexcept {
 // ++a;
 
 template<class T>
-constexpr T decrement(T x) noexcept {
+ATOMIC_QUEUE_INLINE static constexpr T decrement(T x) noexcept {
     return x - 1;
 }
 
 template<class T>
-constexpr T increment(T x) noexcept {
+ATOMIC_QUEUE_INLINE static constexpr T increment(T x) noexcept {
     return x + 1;
 }
 
 template<class T>
-constexpr T or_equal(T x, unsigned u) noexcept {
+ATOMIC_QUEUE_INLINE static constexpr T or_equal(T x, unsigned u) noexcept {
     return x | x >> u;
 }
 
 template<class T, class... Args>
-constexpr T or_equal(T x, unsigned u, Args... rest) noexcept {
+ATOMIC_QUEUE_INLINE static constexpr T or_equal(T x, unsigned u, Args... rest) noexcept {
     return or_equal(or_equal(x, u), rest...);
 }
 
-constexpr uint32_t round_up_to_power_of_2(uint32_t a) noexcept {
+ATOMIC_QUEUE_INLINE static constexpr uint32_t round_up_to_power_of_2(uint32_t a) noexcept {
     return increment(or_equal(decrement(a), 1, 2, 4, 8, 16));
 }
 
-constexpr uint64_t round_up_to_power_of_2(uint64_t a) noexcept {
+ATOMIC_QUEUE_INLINE static constexpr uint64_t round_up_to_power_of_2(uint64_t a) noexcept {
     return increment(or_equal(decrement(a), 1, 2, 4, 8, 16, 32));
 }
 
@@ -125,9 +125,21 @@ constexpr T nil() noexcept {
 }
 
 template<class T>
-inline void destroy_n(T* p, unsigned n) noexcept {
+ATOMIC_QUEUE_INLINE static void destroy_n(T* p, unsigned n) noexcept {
     for(auto q = p + n; p != q;)
         (p++)->~T();
+}
+
+template<class T>
+ATOMIC_QUEUE_INLINE static void swap_relaxed(std::atomic<T>& a, std::atomic<T>& b) noexcept {
+    auto a2 = a.load(X);
+    a.store(b.load(X), X);
+    b.store(a2, X);
+}
+
+template<class T>
+ATOMIC_QUEUE_INLINE static void copy_relaxed(std::atomic<T>& a, std::atomic<T> const& b) noexcept {
+    a.store(b.load(X), X);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -152,18 +164,15 @@ protected:
         , tail_(b.tail_.load(X)) {}
 
     AtomicQueueCommon& operator=(AtomicQueueCommon const& b) noexcept {
-        head_.store(b.head_.load(X), X);
-        tail_.store(b.tail_.load(X), X);
+        details::copy_relaxed(head_, b.head_);
+        details::copy_relaxed(tail_, b.tail_);
         return *this;
     }
 
+    // Relatively semi-special swap is not thread-safe either.
     void swap(AtomicQueueCommon& b) noexcept {
-        unsigned h = head_.load(X);
-        unsigned t = tail_.load(X);
-        head_.store(b.head_.load(X), X);
-        tail_.store(b.tail_.load(X), X);
-        b.head_.store(h, X);
-        b.tail_.store(t, X);
+        details::swap_relaxed(head_, b.head_);
+        details::swap_relaxed(tail_, b.tail_);
     }
 
     template<class T, T NIL>

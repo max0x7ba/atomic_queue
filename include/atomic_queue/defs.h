@@ -84,10 +84,12 @@ namespace atomic_queue {
 #define ATOMIC_QUEUE_LIKELY(expr) __builtin_expect(static_cast<bool>(expr), 1)
 #define ATOMIC_QUEUE_UNLIKELY(expr) __builtin_expect(static_cast<bool>(expr), 0)
 #define ATOMIC_QUEUE_NOINLINE __attribute__((noinline))
+#define ATOMIC_QUEUE_INLINE inline __attribute__((always_inline))
 #else
 #define ATOMIC_QUEUE_LIKELY(expr) (expr)
 #define ATOMIC_QUEUE_UNLIKELY(expr) (expr)
 #define ATOMIC_QUEUE_NOINLINE
+#define ATOMIC_QUEUE_INLINE inline
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
