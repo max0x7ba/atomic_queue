@@ -339,7 +339,8 @@ public:
 
     unsigned was_size() const noexcept {
         // tail_ can be greater than head_ because of consumers doing pop, rather that try_pop, when the queue is empty.
-        return std::max(static_cast<int>(head_.load(X) - tail_.load(X)), 0);
+        unsigned n{head_.load(X) - tail_.load(X)};
+        return static_cast<int>(n) < 0 ? 0 : n; // Windows headers break std::min/max by default. Do std::max<int>(n, 0) the hard way here.
     }
 
     unsigned capacity() const noexcept {
