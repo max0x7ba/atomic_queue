@@ -30,6 +30,5 @@ jobs:
     - name: Build and run unit tests
       run: make -rj2 TOOLSET=${{ matrix.toolset }} example run_tests
 
-    - if: ${{ matrix.sanitize }}
-      name: Build and run unit tests with thread sanitizer
+    - name: Build and run unit tests with thread sanitizer
       run: make -rj2 TOOLSET=${{ matrix.toolset }} BUILD=sanitize run_tests
