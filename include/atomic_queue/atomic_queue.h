@@ -176,7 +176,7 @@ protected:
     }
 
     template<class T, T NIL>
-    static T do_pop_atomic(std::atomic<T>& q_element) noexcept {
+    ATOMIC_QUEUE_INLINE static T do_pop_atomic(std::atomic<T>& q_element) noexcept {
         if(Derived::spsc_) {
             for(;;) {
                 T element = q_element.load(A);
@@ -202,7 +202,7 @@ protected:
     }
 
     template<class T, T NIL>
-    static void do_push_atomic(T element, std::atomic<T>& q_element) noexcept {
+    ATOMIC_QUEUE_INLINE static void do_push_atomic(T element, std::atomic<T>& q_element) noexcept {
         assert(element != NIL);
         if(Derived::spsc_) {
             while(ATOMIC_QUEUE_UNLIKELY(q_element.load(X) != NIL))
@@ -222,7 +222,7 @@ protected:
     enum State : unsigned char { EMPTY, STORING, STORED, LOADING };
 
     template<class T>
-    static T do_pop_any(std::atomic<unsigned char>& state, T& q_element) noexcept {
+    ATOMIC_QUEUE_INLINE static T do_pop_any(std::atomic<unsigned char>& state, T& q_element) noexcept {
         if(Derived::spsc_) {
             while(ATOMIC_QUEUE_UNLIKELY(state.load(A) != STORED))
                 if(Derived::maximize_throughput_)
@@ -248,7 +248,7 @@ protected:
     }
 
     template<class U, class T>
-    static void do_push_any(U&& element, std::atomic<unsigned char>& state, T& q_element) noexcept {
+    ATOMIC_QUEUE_INLINE static void do_push_any(U&& element, std::atomic<unsigned char>& state, T& q_element) noexcept {
         if(Derived::spsc_) {
             while(ATOMIC_QUEUE_UNLIKELY(state.load(A) != EMPTY))
                 if(Derived::maximize_throughput_)
@@ -274,7 +274,7 @@ protected:
 
 public:
     template<class T>
-    bool try_push(T&& element) noexcept {
+    ATOMIC_QUEUE_INLINE bool try_push(T&& element) noexcept {
         auto head = head_.load(X);
         if(Derived::spsc_) {
             if(static_cast<int>(head - tail_.load(X)) >= static_cast<int>(static_cast<Derived&>(*this).size_))
@@ -293,7 +293,7 @@ public:
     }
 
     template<class T>
-    bool try_pop(T& element) noexcept {
+    ATOMIC_QUEUE_INLINE bool try_pop(T& element) noexcept {
         auto tail = tail_.load(X);
         if(Derived::spsc_) {
             if(static_cast<int>(head_.load(X) - tail) <= 0)
@@ -312,7 +312,7 @@ public:
     }
 
     template<class T>
-    void push(T&& element) noexcept {
+    ATOMIC_QUEUE_INLINE void push(T&& element) noexcept {
         unsigned head;
         if(Derived::spsc_) {
             head = head_.load(X);
@@ -325,7 +325,7 @@ public:
         static_cast<Derived&>(*this).do_push(std::forward<T>(element), head);
     }
 
-    auto pop() noexcept {
+    ATOMIC_QUEUE_INLINE auto pop() noexcept {
         unsigned tail;
         if(Derived::spsc_) {
             tail = tail_.load(X);
@@ -338,21 +338,21 @@ public:
         return static_cast<Derived&>(*this).do_pop(tail);
     }
 
-    bool was_empty() const noexcept {
+    ATOMIC_QUEUE_INLINE bool was_empty() const noexcept {
         return !was_size();
     }
 
-    bool was_full() const noexcept {
+    ATOMIC_QUEUE_INLINE bool was_full() const noexcept {
         return was_size() >= capacity();
     }
 
-    unsigned was_size() const noexcept {
+    ATOMIC_QUEUE_INLINE unsigned was_size() const noexcept {
         // tail_ can be greater than head_ because of consumers doing pop, rather that try_pop, when the queue is empty.
         unsigned n{head_.load(X) - tail_.load(X)};
         return static_cast<int>(n) < 0 ? 0 : n; // Windows headers break std::min/max by default. Do std::max<int>(n, 0) the hard way here.
     }
 
-    unsigned capacity() const noexcept {
+    ATOMIC_QUEUE_INLINE unsigned capacity() const noexcept {
         return static_cast<Derived const&>(*this).size_;
     }
 };
@@ -372,12 +372,12 @@ class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL, MINIMIZE_
 
     alignas(CACHE_LINE_SIZE) std::atomic<T> elements_[size_];
 
-    T do_pop(unsigned tail) noexcept {
+    ATOMIC_QUEUE_INLINE T do_pop(unsigned tail) noexcept {
         std::atomic<T>& q_element = details::map<SHUFFLE_BITS>(elements_, tail % size_);
         return Base::template do_pop_atomic<T, NIL>(q_element);
     }
 
-    void do_push(T element, unsigned head) noexcept {
+    ATOMIC_QUEUE_INLINE void do_push(T element, unsigned head) noexcept {
         std::atomic<T>& q_element = details::map<SHUFFLE_BITS>(elements_, head % size_);
         Base::template do_push_atomic<T, NIL>(element, q_element);
     }
@@ -412,13 +412,13 @@ class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE, MINIMIZE_CON
     alignas(CACHE_LINE_SIZE) std::atomic<unsigned char> states_[size_] = {};
     alignas(CACHE_LINE_SIZE) T elements_[size_] = {};
 
-    T do_pop(unsigned tail) noexcept {
+    ATOMIC_QUEUE_INLINE T do_pop(unsigned tail) noexcept {
         unsigned index = details::remap_index<SHUFFLE_BITS>(tail % size_);
         return Base::do_pop_any(states_[index], elements_[index]);
     }
 
     template<class U>
-    void do_push(U&& element, unsigned head) noexcept {
+    ATOMIC_QUEUE_INLINE void do_push(U&& element, unsigned head) noexcept {
         unsigned index = details::remap_index<SHUFFLE_BITS>(head % size_);
         Base::do_push_any(std::forward<U>(element), states_[index], elements_[index]);
     }
@@ -455,12 +455,12 @@ class AtomicQueueB : private std::allocator_traits<A>::template rebind_alloc<std
     alignas(CACHE_LINE_SIZE) unsigned size_;
     std::atomic<T>* elements_;
 
-    T do_pop(unsigned tail) noexcept {
+    ATOMIC_QUEUE_INLINE T do_pop(unsigned tail) noexcept {
         std::atomic<T>& q_element = details::map<SHUFFLE_BITS>(elements_, tail & (size_ - 1));
         return Base::template do_pop_atomic<T, NIL>(q_element);
     }
 
-    void do_push(T element, unsigned head) noexcept {
+    ATOMIC_QUEUE_INLINE void do_push(T element, unsigned head) noexcept {
         std::atomic<T>& q_element = details::map<SHUFFLE_BITS>(elements_, head & (size_ - 1));
         Base::template do_push_atomic<T, NIL>(element, q_element);
     }
@@ -543,13 +543,13 @@ class AtomicQueueB2 : private std::allocator_traits<A>::template rebind_alloc<un
     static constexpr auto SHUFFLE_BITS = details::GetCacheLineIndexBits<STATES_PER_CACHE_LINE>::value;
     static_assert(SHUFFLE_BITS, "Unexpected SHUFFLE_BITS.");
 
-    T do_pop(unsigned tail) noexcept {
+    ATOMIC_QUEUE_INLINE T do_pop(unsigned tail) noexcept {
         unsigned index = details::remap_index<SHUFFLE_BITS>(tail & (size_ - 1));
         return Base::do_pop_any(states_[index], elements_[index]);
     }
 
     template<class U>
-    void do_push(U&& element, unsigned head) noexcept {
+    ATOMIC_QUEUE_INLINE void do_push(U&& element, unsigned head) noexcept {
         unsigned index = details::remap_index<SHUFFLE_BITS>(head & (size_ - 1));
         Base::do_push_any(std::forward<U>(element), states_[index], elements_[index]);
     }
@@ -634,12 +634,12 @@ struct RetryDecorator : Queue {
 
     using Queue::Queue;
 
-    void push(T element) noexcept {
+    ATOMIC_QUEUE_INLINE void push(T element) noexcept {
         while(!this->try_push(element))
             spin_loop_pause();
     }
 
-    T pop() noexcept {
+    ATOMIC_QUEUE_INLINE T pop() noexcept {
         T element;
         while(!this->try_pop(element))
             spin_loop_pause();
