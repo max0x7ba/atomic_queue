@@ -26,6 +26,8 @@ void stress() {
     constexpr int PRODUCERS = 3;
     constexpr int CONSUMERS = 3;
     constexpr unsigned N = 1000000;
+    using T = typename Queue::value_type;
+    constexpr T STOP = -1;
 
     Queue q;
     Barrier barrier;
@@ -34,7 +36,7 @@ void stress() {
     for(unsigned i = 0; i < PRODUCERS; ++i)
         producers[i] = std::thread([&q, &barrier, N=N]() {
             barrier.wait();
-            for(unsigned n = N; n; --n)
+            for(T n = N; n; --n)
                 q.push(n);
         });
 
@@ -44,31 +46,27 @@ void stress() {
         consumers[i] = std::thread([&q, &barrier, &r = results[i]]() {
             barrier.wait();
             uint64_t result = 0;
-            for(;;) {
-                unsigned n = q.pop();
+            for(T n; (n = q.pop()) != STOP;)
                 result += n;
-                if(n == 1)
-                    break;
-            }
             r = result;
         });
 
     barrier.release(PRODUCERS + CONSUMERS);
-
     for(auto& t : producers)
         t.join();
+    for(int i = CONSUMERS; i--;)
+        q.push(STOP);
     for(auto& t : consumers)
         t.join();
 
     constexpr uint64_t expected_result = (N + 1) / 2. * N;
-
     uint64_t result = 0;
     for(auto& r : results) {
         BOOST_WARN_GT(r, (expected_result / CONSUMERS) / 10); // Make sure a consumer didn't starve. False positives are possible here.
         result += r;
     }
 
-    int64_t result_diff = result / CONSUMERS - expected_result;
+    int64_t result_diff = result / PRODUCERS - expected_result;
     BOOST_CHECK_EQUAL(result_diff, 0);
 }
 
