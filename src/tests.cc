@@ -59,14 +59,14 @@ void stress() {
     for(auto& t : consumers)
         t.join();
 
-    constexpr uint64_t expected_result = (N + 1) / 2. * N;
+    constexpr uint64_t expected_result = (N + 1) / 2. * N * PRODUCERS;
     uint64_t result = 0;
     for(auto& r : results) {
-        BOOST_WARN_GT(r, (expected_result / CONSUMERS) / 10); // Make sure a consumer didn't starve. False positives are possible here.
+        BOOST_WARN_GT(r, (expected_result / CONSUMERS / 10)); // Make sure a consumer didn't starve. False positives are possible here.
         result += r;
     }
 
-    int64_t result_diff = result / PRODUCERS - expected_result;
+    int64_t result_diff = result - expected_result;
     BOOST_CHECK_EQUAL(result_diff, 0);
 }
 

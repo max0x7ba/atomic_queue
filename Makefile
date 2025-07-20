@@ -165,7 +165,7 @@ run_benchmarks : ${build_dir}/benchmarks
 
 run_tests : ${build_dir}/tests
 	@echo "---- running $< ----"
-	$<
+	$< --log_level=warning
 
 run_% : ${build_dir}/%
 	@echo "---- running $< ----"
