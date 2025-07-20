@@ -20,7 +20,9 @@ C++14 multiple-producer-multiple-consumer *lock-free* queues based on circular b
 
 Designed with a goal to minimize the latency between one thread pushing an element into a queue and another thread popping it from the queue.
 
-It has been developed, tested and benchmarked on Linux, but should support any C++14 platforms which implement `std::atomic`. Reported as compatible with Windows, but the continuous integrations hosted by GitHub are currently set up only for x86_64 platform on Ubuntu-22.04 and Ubuntu-24.04. Pull requests to extend the [continuous integrations][18] to run on other architectures and/or platforms are welcome.
+It has been developed, tested and benchmarked on Linux. Yet, any C++14 platform implementing `std::atomic` is expected to compile the unit-tests and run them without failures just as well.
+
+The unit-tests build and succeed on Windows, but the continuous integrations hosted by GitHub are currently set up only for x86_64 platform on Ubuntu-22.04 and Ubuntu-24.04. Pull requests to extend the [continuous integrations][18] to run on other architectures and/or platforms are welcome.
 
 ## Design Principles
 When minimizing latency a good design is not when there is nothing left to add, but rather when there is nothing left to remove, as these queues exemplify.
