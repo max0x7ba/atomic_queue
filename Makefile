@@ -8,7 +8,7 @@
 #   time make -rC ~/src/atomic_queue -j8 BUILD=debug run_tests
 #   time make -rC ~/src/atomic_queue -j8 BUILD=sanitize TOOLSET=clang run_tests
 #
-# Additional CPPFLAGS, CXXFLAGS, CFLAGS, LDLIBS, LDFLAGS can come from the command line, e.g. make CPPFLAGS='-I<my-include-dir>', or from environment variables.  For example, also produce assembly outputs:
+# Additional CPPFLAGS, CXXFLAGS, LDLIBS, LDFLAGS can come from the command line, e.g. make CPPFLAGS='-I<my-include-dir>', or from environment variables.  For example, also produce assembly outputs:
 #
 #   time make -rC ~/src/atomic_queue -j8 CXXFLAGS="-save-temps=obj -fverbose-asm -masm=intel"
 #
@@ -36,25 +36,22 @@ LD := ${ld.${TOOLSET}}
 AR := ${ar.${TOOLSET}}
 
 cxxflags.gcc.debug := -Og -fstack-protector-all -fno-omit-frame-pointer # -D_GLIBCXX_DEBUG
-cxxflags.gcc.release := -O3 -mtune=native -ffast-math -falign-{functions,loops}=64 -DNDEBUG
+cxxflags.gcc.release := -O3 -mtune=native -falign-{functions,loops}=64 -DNDEBUG
 cxxflags.gcc.sanitize := ${cxxflags.gcc.release} -fsanitize=thread
-cxxflags.gcc := -std=gnu++14 -pthread -march=native -W{all,extra,error,no-{array-bounds,maybe-uninitialized,unused-variable,unused-function,unused-local-typedefs}} -fmessage-length=0 ${cxxflags.gcc.${BUILD}}
+cxxflags.gcc := -f{no-plt,no-math-errno,finite-math-only,message-length=0} -W{all,extra,error,no-{array-bounds,maybe-uninitialized,unused-variable,unused-function,unused-local-typedefs}} ${cxxflags.gcc.${BUILD}}
 ldflags.gcc.sanitize := ${ldflags.gcc.release} -fsanitize=thread
 ldflags.gcc := ${ldflags.gcc.${BUILD}}
 
-cflags.gcc := -pthread -march=native -W{all,extra} -fmessage-length=0 ${cxxflags.gcc.${BUILD}}
-
 cxxflags.clang.debug := -O0 -fstack-protector-all
-cxxflags.clang.release := -O3 -mtune=native -ffast-math -falign-functions=64 -DNDEBUG
+cxxflags.clang.release := -O3 -mtune=native -falign-functions=64 -DNDEBUG
 cxxflags.clang.sanitize := ${cxxflags.clang.release} -fsanitize=thread
-cxxflags.clang := -std=gnu++14 -pthread -march=native -stdlib=libstdc++ -W{all,extra,error,no-{unused-variable,unused-function,unused-local-typedefs}} -fmessage-length=0 ${cxxflags.clang.${BUILD}}
+cxxflags.clang := -stdlib=libstdc++ -f{no-plt,no-math-errno,finite-math-only,message-length=0} -W{all,extra,error,no-{unused-variable,unused-function,unused-local-typedefs}} ${cxxflags.clang.${BUILD}}
 ldflags.clang.sanitize := ${ldflags.clang.release} -fsanitize=thread
-ldflags.clang.debug := -latomic
+ldflags.clang.debug := -latomic # A work-around for clang bug.
 ldflags.clang := -stdlib=libstdc++ ${ldflags.clang.${BUILD}}
 
-# Additional CPPFLAGS, CXXFLAGS, CFLAGS, LDLIBS, LDFLAGS can come from the command line, e.g. make CPPFLAGS='-I<my-include-dir>', or from environment variables.
-cxxflags := ${cxxflags.${TOOLSET}} -g ${CXXFLAGS}
-cflags := ${cflags.${TOOLSET}} -g ${CFLAGS}
+# Additional CPPFLAGS, CXXFLAGS, LDLIBS, LDFLAGS can come from the command line, e.g. make CPPFLAGS='-I<my-include-dir>', or from environment variables.
+cxxflags := -std=c++14 -pthread -g -march=native ${cxxflags.${TOOLSET}} ${CXXFLAGS}
 cppflags := -Iinclude ${CPPFLAGS}
 ldflags := -fuse-ld=gold -pthread -g ${ldflags.${TOOLSET}} ${LDFLAGS}
 ldlibs := -lrt ${LDLIBS}
@@ -66,14 +63,13 @@ cppflags.moodycamel := -I$(abspath ..)
 ldlibs.moodycamel :=
 
 cppflags.xenium := -I${abspath ../xenium}
-cxxflags.xenium := -std=gnu++17
+cxxflags.xenium := -std=c++17
 ldlibs.xenium :=
 
 recompile := ${build_dir}/.make/recompile
 relink := ${build_dir}/.make/relink
 
 COMPILE.CXX = ${CXX} -o $@ -c ${cppflags} ${cxxflags} -MD -MP $(abspath $<)
-COMPILE.C = ${CC} -o $@ -c ${cppflags} ${cflags} -MD -MP $(abspath $<)
 LINK.EXE = ${LD} -o $@ $(ldflags) $(filter-out ${relink},$^) $(ldlibs)
 LINK.SO = ${LD} -o $@ -shared $(ldflags) $(filter-out ${relink},$^) $(ldlibs)
 LINK.A = ${AR} rscT $@ $(filter-out ${relink},$^)
@@ -130,9 +126,6 @@ ${build_dir}/%.a : ${relink} | ${build_dir}
 
 ${build_dir}/%.o : src/%.cc ${recompile} | ${build_dir}
 	$(call strip2,${COMPILE.CXX})
-
-${build_dir}/%.o : src/%.c ${recompile} | ${build_dir}
-	$(call strip2,${COMPILE.C})
 
 ${build_dir}/%.d : ;
 
