@@ -27,7 +27,7 @@ The unit-tests build and succeed on Windows, but the continuous integrations hos
 ## Design Principles
 When minimizing latency a good design is not when there is nothing left to add, but rather when there is nothing left to remove, as these queues exemplify.
 
-Minimizing latency naturally maximizes throughput. Low latency reciprocal is high throuhput, in ideal mathematical and practical engineering sense. Low latency is incompatible with any delays and/or batching, which destroy original (hardware) global time order of events pushed into one queue by different threads. Maximizing throughput, on the other hand, can be done at expense of latency by delaying and batching multiple updates.
+Minimizing latency naturally maximizes throughput. Low latency reciprocal is high throughput, in ideal mathematical and practical engineering sense. Low latency is incompatible with any delays and/or batching, which destroy original (hardware) global time order of events pushed into one queue by different threads. Maximizing throughput, on the other hand, can be done at expense of latency by delaying and batching multiple updates.
 
 The main design principle these queues follow is _minimalism_, which results in such design choices as:
 
@@ -186,7 +186,7 @@ Still, there are a few things one can do to minimize preemption of one's mission
 * Use one same fixed real-time scheduling priority for all threads accessing same queue objects. Real-time threads with different scheduling priorities modifying one queue object may cause priority inversion and deadlocks. Using the default scheduling class `SCHED_OTHER` with its dynamically adjusted priorities defeats the purpose of using these queues.
 * Disable [real-time thread throttling](#real-time-thread-throttling) to prevent `SCHED_FIFO` real-time threads from being throttled.
 * Isolate CPU cores, so that no interrupt handlers or applications ever run on it. Mission critical applications should be explicitly placed on these isolated cores with `taskset`.
-* Pin threads to specific cores, otherwise the task scheduler keeps moving threads to other idle CPU cores to level voltage/heat-induced wear-and-tear accross CPU cores. Keeping a thread running on one same CPU core maximizes CPU cache hit rate. Moving a thread to another CPU core incurs otherwise unnecessary CPU cache thrashing.
+* Pin threads to specific cores, otherwise the task scheduler keeps moving threads to other idle CPU cores to level voltage/heat-induced wear-and-tear across CPU cores. Keeping a thread running on one same CPU core maximizes CPU cache hit rate. Moving a thread to another CPU core incurs otherwise unnecessary CPU cache thrashing.
 
 People often propose limiting busy-waiting with a subsequent call to `std::this_thread::yield()`/`sched_yield`/`pthread_yield`. However, `sched_yield` is a wrong tool for locking because it doesn't communicate to the OS kernel what the thread is waiting for, so that the OS thread scheduler can never schedule the calling thread to resume at the right time when the shared state has changed (unless there are no other threads that can run on this CPU core, so that the caller resumes immediately). See notes section in [`man sched_yield`][19] and [a Linux kernel thread about `sched_yield` and spinlocks][5] for more details.
 
@@ -204,7 +204,7 @@ There are a few OS behaviours that complicate benchmarking:
 * Real-time thread throttling disabled.
 * Adverse address space randomisation may cause extra CPU cache conflicts, as well as other processes running on the system. To minimise effects of that `benchmarks` executable is run at least 33 times. The benchmark charts display average values. The chart tooltip also displays the standard deviation, minimum and maximum values.
 
-Benchmark performance of single-producer-single-consumer queues `boost::lockfree::spsc_queue`, `moodycamel::ReaderWriterQueue` and these queues in single-producer-single-consumer mode should be identical because they implement exactly the same algorithm using exactly the same atomic load and store instructions. `boost::lockfree::spsc_queue` implementation benchmarked at that time had no optimizations for minimizing L1d cache contention, cold branch misprediction or pipeline stalls from subtler issues noticable only in the generated assembly code.
+Benchmark performance of single-producer-single-consumer queues `boost::lockfree::spsc_queue`, `moodycamel::ReaderWriterQueue` and these queues in single-producer-single-consumer mode should be identical because they implement exactly the same algorithm using exactly the same atomic load and store instructions. `boost::lockfree::spsc_queue` implementation benchmarked at that time had no optimizations for minimizing L1d cache contention, cold branch misprediction or pipeline stalls from subtler issues noticeable only in the generated assembly code.
 
 I only have access to a few x86-64 machines. If you have access to different hardware feel free to submit the output file of `scripts/run-benchmarks.sh` and I will include your results into the benchmarks page.
 
