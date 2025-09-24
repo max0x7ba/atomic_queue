@@ -25,3 +25,5 @@ Contributors:
 - Stephan Lachnit (https://github.com/max0x7ba/atomic_queue/pull/80)
 - Stephan Lachnit (https://github.com/max0x7ba/atomic_queue/pull/81)
 - Stephan Lachnit (https://github.com/max0x7ba/atomic_queue/pull/82)
+- Christian Clauss (https://github.com/max0x7ba/atomic_queue/pull/86)
+- Rene Leonhardt (https://github.com/max0x7ba/atomic_queue/pull/87)
