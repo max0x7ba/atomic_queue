@@ -35,15 +35,19 @@ CC := ${cc.${TOOLSET}}
 LD := ${ld.${TOOLSET}}
 AR := ${ar.${TOOLSET}}
 
+uname_m := $(shell uname -m)
+
 cxxflags.gcc.debug := -Og -fstack-protector-all -fno-omit-frame-pointer # -D_GLIBCXX_DEBUG
-cxxflags.gcc.release := -O3 -mtune=native -falign-{functions,loops}=64 -DNDEBUG
+cxxflags.gcc.release.x86_64 := -march=native -mtune=native
+cxxflags.gcc.release := -O3 -falign-{functions,loops}=64 -DNDEBUG ${cxxflags.gcc.release.${uname_m}}
 cxxflags.gcc.sanitize := ${cxxflags.gcc.release} -fsanitize=thread
 cxxflags.gcc := -f{no-plt,no-math-errno,finite-math-only,message-length=0} -W{all,extra,error,no-{array-bounds,maybe-uninitialized,unused-variable,unused-function,unused-local-typedefs}} ${cxxflags.gcc.${BUILD}}
 ldflags.gcc.sanitize := ${ldflags.gcc.release} -fsanitize=thread
 ldflags.gcc := ${ldflags.gcc.${BUILD}}
 
 cxxflags.clang.debug := -O0 -fstack-protector-all
-cxxflags.clang.release := -O3 -mtune=native -falign-functions=64 -DNDEBUG
+cxxflags.clang.release.x86_64 := -march=native -mtune=native
+cxxflags.clang.release := -O3 -falign-functions=64 -DNDEBUG ${cxxflags.clang.release.${uname_m}}
 cxxflags.clang.sanitize := ${cxxflags.clang.release} -fsanitize=thread
 cxxflags.clang := -stdlib=libstdc++ -f{no-plt,no-math-errno,finite-math-only,message-length=0} -W{all,extra,error,no-{unused-variable,unused-function,unused-local-typedefs}} ${cxxflags.clang.${BUILD}}
 ldflags.clang.sanitize := ${ldflags.clang.release} -fsanitize=thread
@@ -51,7 +55,7 @@ ldflags.clang.debug := -latomic # A work-around for clang bug.
 ldflags.clang := -stdlib=libstdc++ ${ldflags.clang.${BUILD}}
 
 # Additional CPPFLAGS, CXXFLAGS, LDLIBS, LDFLAGS can come from the command line, e.g. make CPPFLAGS='-I<my-include-dir>', or from environment variables.
-cxxflags := -std=c++14 -pthread -g -march=native ${cxxflags.${TOOLSET}} ${CXXFLAGS}
+cxxflags := -std=c++14 -pthread -g ${cxxflags.${TOOLSET}} ${CXXFLAGS}
 cppflags := -Iinclude ${CPPFLAGS}
 ldflags := -fuse-ld=gold -pthread -g ${ldflags.${TOOLSET}} ${LDFLAGS}
 ldlibs := -lrt ${LDLIBS}
@@ -175,6 +179,7 @@ versions:
 	${CXX} --version | head -n1
 
 env :
+	uname --all
 	env | sort --ignore-case
 
 .PHONY : update_env_txt env versions rtags run_benchmarks clean all run_%
