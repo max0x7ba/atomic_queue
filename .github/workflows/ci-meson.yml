@@ -11,16 +11,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm]
         cpp_compiler: [g++, clang++]
-        sanitize: [address ,undefined, thread]
+        sanitize: [address, undefined, thread]
 
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install Meson and Boost.Test
-        run: sudo apt-get --quiet --yes install meson libboost-test-dev
+        run: sudo apt-get install --yes -qq meson libboost-test-dev
 
       - name: Setup
         env:
