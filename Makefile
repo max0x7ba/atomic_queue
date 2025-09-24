@@ -37,22 +37,25 @@ AR := ${ar.${TOOLSET}}
 
 uname_m := $(shell uname -m)
 
-cxxflags.gcc.debug := -Og -fstack-protector-all -fno-omit-frame-pointer # -D_GLIBCXX_DEBUG
-cxxflags.gcc.release.x86_64 := -march=native -mtune=native
-cxxflags.gcc.release := -O3 -falign-{functions,loops}=64 -DNDEBUG ${cxxflags.gcc.release.${uname_m}}
+cxxflags.gcc.debug := -Og -march=native -fstack-protector-all -fno-omit-frame-pointer # -D_GLIBCXX_DEBUG
+cxxflags.gcc.release := -O3 -march=native -mtune=native -falign-{functions,loops}=64 -DNDEBUG
 cxxflags.gcc.sanitize := ${cxxflags.gcc.release} -fsanitize=thread
 cxxflags.gcc := -f{no-plt,no-math-errno,finite-math-only,message-length=0} -W{all,extra,error,no-{array-bounds,maybe-uninitialized,unused-variable,unused-function,unused-local-typedefs}} ${cxxflags.gcc.${BUILD}}
 ldflags.gcc.sanitize := ${ldflags.gcc.release} -fsanitize=thread
 ldflags.gcc := ${ldflags.gcc.${BUILD}}
 
-cxxflags.clang.debug := -O0 -fstack-protector-all
-cxxflags.clang.release.x86_64 := -march=native -mtune=native
-cxxflags.clang.release := -O3 -falign-functions=64 -DNDEBUG ${cxxflags.clang.release.${uname_m}}
+cxxflags.clang.debug := -O0 -march=native -fstack-protector-all
+cxxflags.clang.release := -O3 -march=native -mtune=native -falign-functions=64 -DNDEBUG
 cxxflags.clang.sanitize := ${cxxflags.clang.release} -fsanitize=thread
 cxxflags.clang := -stdlib=libstdc++ -f{no-plt,no-math-errno,finite-math-only,message-length=0} -W{all,extra,error,no-{unused-variable,unused-function,unused-local-typedefs}} ${cxxflags.clang.${BUILD}}
 ldflags.clang.sanitize := ${ldflags.clang.release} -fsanitize=thread
 ldflags.clang.debug := -latomic # A work-around for clang bug.
 ldflags.clang := -stdlib=libstdc++ ${ldflags.clang.${BUILD}}
+
+# clang-14 for arm doesn't support -march=native.
+ifneq (,$(and $(findstring clang,${CXX}), $(findstring aarch64,${uname_m}), $(shell ${CXX} -c -xc++ -march=native -o/dev/null /dev/null 2>&1)))
+cxxflags.clang := $(filter-out native,${cxxflags.clang})
+endif
 
 # Additional CPPFLAGS, CXXFLAGS, LDLIBS, LDFLAGS can come from the command line, e.g. make CPPFLAGS='-I<my-include-dir>', or from environment variables.
 cxxflags := -std=c++14 -pthread -g ${cxxflags.${TOOLSET}} ${CXXFLAGS}
