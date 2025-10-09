@@ -3,8 +3,18 @@ name: Makefile Continuous Integrations
 on:
   push:
     branches: [ master ]
+    paths:
+      - '**.h'
+      - '**.cc'
+      - Makefile
+      - .github/workflows/ci.yml
   pull_request:
     branches: [ master ]
+    paths:
+      - '**.h'
+      - '**.cc'
+      - Makefile
+      - .github/workflows/ci.yml
 
 jobs:
   unit-test:
