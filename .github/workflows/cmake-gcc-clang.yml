@@ -5,8 +5,18 @@ name: CMake Continuous Integrations
 on:
   push:
     branches: [ "master", "CMake-support"]
+    paths:
+      - '**.h'
+      - '**.cc'
+      - '**/CMakeLists.txt'
+      - .github/workflows/cmake-gcc-clang.yml
   pull_request:
     branches: [ "master" ]
+    paths:
+      - '**.h'
+      - '**.cc'
+      - '**/CMakeLists.txt'
+      - .github/workflows/cmake-gcc-clang.yml
 
 jobs:
   build:
