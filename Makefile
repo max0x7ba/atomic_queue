@@ -18,7 +18,8 @@ SHELL := /bin/bash
 BUILD := release
 TOOLSET := gcc
 
-build_dir := ${CURDIR}/build/${BUILD}/${TOOLSET}
+BUILD_ROOT := $(or ${BUILD_ROOT},build)
+build_dir := ${BUILD_ROOT}/${BUILD}/${TOOLSET}
 
 cxx.gcc := g++
 cc.gcc := gcc
@@ -68,17 +69,17 @@ ldlibs := -lrt ${LDLIBS}
 cppflags.tbb :=
 ldlibs.tbb := {-L,'-Wl,-rpath='}/usr/local/lib -ltbb
 
-cppflags.moodycamel := -I$(abspath ..)
+cppflags.moodycamel := -I..
 ldlibs.moodycamel :=
 
-cppflags.xenium := -I${abspath ../xenium}
+cppflags.xenium := -I../xenium
 cxxflags.xenium := -std=c++17
 ldlibs.xenium :=
 
 recompile := ${build_dir}/.make/recompile
 relink := ${build_dir}/.make/relink
 
-COMPILE.CXX = ${CXX} -o $@ -c ${cppflags} ${cxxflags} -MD -MP $(abspath $<)
+COMPILE.CXX = ${CXX} -o $@ -c ${cppflags} ${cxxflags} -MD -MP $<
 LINK.EXE = ${LD} -o $@ $(ldflags) $(filter-out ${relink},$^) $(ldlibs)
 LINK.SO = ${LD} -o $@ -shared $(ldflags) $(filter-out ${relink},$^) $(ldlibs)
 LINK.A = ${AR} rscT $@ $(filter-out ${relink},$^)
@@ -124,7 +125,7 @@ ${build_dir}/example : ${example_src:%.cc=${build_dir}/%.o} ${relink} | ${build_
 #
 
 ${exes} : % : ${build_dir}/%
-	ln -sf ${<:${CURDIR}/%=%}
+	ln --relative -fs $<
 
 ${build_dir}/%.so : cxxflags += -fPIC
 ${build_dir}/%.so : ${relink} | ${build_dir}
