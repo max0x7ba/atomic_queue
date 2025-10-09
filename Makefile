@@ -30,34 +30,39 @@ cc.clang := clang
 ld.clang := clang++
 ar.clang := ar
 
-CXX := ${cxx.${TOOLSET}}
-CC := ${cc.${TOOLSET}}
-LD := ${ld.${TOOLSET}}
-AR := ${ar.${TOOLSET}}
+toolset_family := $(or $(findstring gcc,${TOOLSET}),$(findstring clang,${TOOLSET}))
+toolset_suffix := $(subst ${toolset_family},,${TOOLSET})
+toolset_flags = $(or ${${1}.${TOOLSET}},${${1}.${toolset_family}},$(error ${1}.${TOOLSET} is undefined))
+toolset_exe = $(or ${${1}.${TOOLSET}},$(and ${${1}.${toolset_family}},${${1}.${toolset_family}}${toolset_suffix}),${2},$(error ${1}.${TOOLSET} is undefined))
+
+CXX := $(call toolset_exe,cxx)
+CC := $(call toolset_exe,cc)
+LD := $(call toolset_exe,ld)
+AR := $(call toolset_exe,ar,ar)
 
 # uname_m := $(shell uname -m)
 
 cxxflags.gcc.debug := -Og -march=native -fstack-protector-all -fno-omit-frame-pointer # -D_GLIBCXX_DEBUG
 cxxflags.gcc.release := -O3 -march=native -mtune=native -falign-{functions,loops}=64 -DNDEBUG
 cxxflags.gcc.sanitize := ${cxxflags.gcc.release} -fsanitize=thread
-cxxflags.gcc := -f{no-plt,no-math-errno,finite-math-only,message-length=0} -W{all,extra,error,no-{array-bounds,maybe-uninitialized,unused-variable,unused-function,unused-local-typedefs}} ${cxxflags.gcc.${BUILD}}
+cxxflags.gcc := -g -f{no-plt,no-math-errno,finite-math-only,message-length=0} -W{all,extra,error,no-{array-bounds,maybe-uninitialized,unused-variable,unused-function,unused-local-typedefs}} ${cxxflags.gcc.${BUILD}}
 ldflags.gcc.sanitize := ${ldflags.gcc.release} -fsanitize=thread
-ldflags.gcc := ${ldflags.gcc.${BUILD}}
+ldflags.gcc := -g ${ldflags.gcc.${BUILD}}
 
 # clang-14 for arm doesn't support -march=native.
 has_native := $(if $(and $(findstring clang,${CXX}), $(findstring aarch64,$(shell uname -m)), $(shell ${CXX} -march=native -c -xc++ -o/dev/null /dev/null 2>&1)),,1)
 cxxflags.clang.debug := -O0 -fstack-protector-all $(and ${has_native},-march=native)
 cxxflags.clang.release := -O3 -falign-functions=64 -DNDEBUG $(and ${has_native},-march=native -mtune=native)
 cxxflags.clang.sanitize := ${cxxflags.clang.release} -fsanitize=thread
-cxxflags.clang := -stdlib=libstdc++ -f{no-plt,no-math-errno,finite-math-only,message-length=0} -W{all,extra,error,no-{unused-variable,unused-function,unused-local-typedefs}} ${cxxflags.clang.${BUILD}}
+cxxflags.clang := -g -stdlib=libstdc++ -f{no-plt,no-math-errno,finite-math-only,message-length=0} -W{all,extra,error,no-{unused-variable,unused-function,unused-local-typedefs}} ${cxxflags.clang.${BUILD}}
 ldflags.clang.sanitize := ${ldflags.clang.release} -fsanitize=thread
 ldflags.clang.debug := -latomic # A work-around for clang bug.
-ldflags.clang := -stdlib=libstdc++ ${ldflags.clang.${BUILD}}
+ldflags.clang := -g -stdlib=libstdc++ ${ldflags.clang.${BUILD}}
 
 # Additional CPPFLAGS, CXXFLAGS, LDLIBS, LDFLAGS can come from the command line, e.g. make CPPFLAGS='-I<my-include-dir>', or from environment variables.
-cxxflags := -std=c++14 -pthread -g ${cxxflags.${TOOLSET}} ${CXXFLAGS}
+cxxflags := -std=c++14 -pthread $(call toolset_flags,cxxflags) ${CXXFLAGS}
 cppflags := -Iinclude ${CPPFLAGS}
-ldflags := -fuse-ld=gold -pthread -g ${ldflags.${TOOLSET}} ${LDFLAGS}
+ldflags := -fuse-ld=gold -pthread $(call toolset_flags,ldflags) ${LDFLAGS}
 ldlibs := -lrt ${LDLIBS}
 
 cppflags.tbb :=
