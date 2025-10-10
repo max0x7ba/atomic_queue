@@ -120,6 +120,8 @@ all : ${exes:%=${build_dir}/%}
 define EXE_TARGET
 ${build_dir}/${1} : $(patsubst %.cc,${build_dir}/%.o,${${1}_src})
 -include $(patsubst %.cc,${build_dir}/%.d,${${1}_src})
+${1} : ${build_dir}/${1}
+.PHONY : ${1}
 endef
 $(foreach exe,${exes},$(eval $(call EXE_TARGET,${exe})))
 
