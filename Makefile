@@ -92,40 +92,40 @@ else
 strip2 = $(strip ${1})
 endif
 
-#
+all :
+
+################################################################################################################################
 # Build targets definitions begin.
-#
 
-exes := benchmarks tests example
+exes := example tests benchmarks
 
-all : ${exes}
+example_src := example.cc
+
+tests_src := tests.cc
+${build_dir}/tests : cppflags += -DBOOST_TEST_DYN_LINK=1
+${build_dir}/tests : ldlibs += -lboost_unit_test_framework
 
 benchmarks_src := benchmarks.cc cpu_base_frequency.cc huge_pages.cc
 ${build_dir}/benchmarks : cppflags += ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium}
 ${build_dir}/benchmarks : cxxflags += ${cxxflags.tbb} ${cxxflags.moodycamel} ${cxxflags.xenium}
 ${build_dir}/benchmarks : ldlibs += ${ldlibs.tbb} ${ldlibs.moodycamel} ${ldlibs.xenium} -ldl
-${build_dir}/benchmarks : ${benchmarks_src:%.cc=${build_dir}/%.o} ${relink} | ${build_dir}
-	$(call strip2,${LINK.EXE})
--include ${benchmarks_src:%.cc=${build_dir}/%.d}
 
-tests_src := tests.cc
-${build_dir}/tests : cppflags += -DBOOST_TEST_DYN_LINK=1
-${build_dir}/tests : ldlibs += -lboost_unit_test_framework
-${build_dir}/tests : ${tests_src:%.cc=${build_dir}/%.o} ${relink} | ${build_dir}
-	$(call strip2,${LINK.EXE})
--include ${tests_src:%.cc=${build_dir}/%.d}
-
-example_src := example.cc
-${build_dir}/example : ${example_src:%.cc=${build_dir}/%.o} ${relink} | ${build_dir}
-	$(call strip2,${LINK.EXE})
--include ${example_src:%.cc=${build_dir}/%.d}
-
-#
 # Build targets definitions end.
-#
+################################################################################################################################
 
-${exes} : % : ${build_dir}/%
-	ln --relative -fs $<
+all : ${exes:%=${build_dir}/%}
+
+define EXE_TARGET
+${build_dir}/${1} : $(patsubst %.cc,${build_dir}/%.o,${${1}_src})
+-include $(patsubst %.cc,${build_dir}/%.d,${${1}_src})
+endef
+$(foreach exe,${exes},$(eval $(call EXE_TARGET,${exe})))
+
+${exes:%=${build_dir}/%} : ${build_dir}/% : ${relink} | ${build_dir}
+	$(call strip2,${LINK.EXE})
+
+# ${exes} : % : ${build_dir}/%
+# 	ln --relative -fs $@
 
 ${build_dir}/%.so : cxxflags += -fPIC
 ${build_dir}/%.so : ${relink} | ${build_dir}
@@ -161,18 +161,13 @@ ${recompile} ${relink} : ${build_dir}/.make/re% : ${build_dir}/.make/env.%.txt M
 # cd ~/src/atomic_queue; make -r clean; set -x; make -rj8; make -rj8; make -rj8 CPPFLAGS=-DXYZ=1; make -rj8 CPPFLAGS=-DXYZ=1; make -rj8; make -rj8; make -rj8 LDLIBS=-lrt; make -rj8 LDLIBS=-lrt; make -rj8; make -rj8
 
 run_benchmarks : ${build_dir}/benchmarks
-	@echo "---- running $< ----"
-	scripts/benchmark-prologue.sh
-	-sudo chrt -f 50 $<
-	scripts/benchmark-epilogue.sh
+	@echo -n "$@ "; set -x; scripts/benchmark.sh sudo chrt -f 50 $<
 
 run_tests : ${build_dir}/tests
-	@echo "---- running $< ----"
-	$< --log_level=warning
+	@echo -n "$@ "; set -x; $< --log_level=warning
 
 run_% : ${build_dir}/%
-	@echo "---- running $< ----"
-	$<
+	@echo -n "$@ "; set -x; $<
 
 rtags :
 	${MAKE} --always-make --just-print all | { rtags-rc -c -; true; }
