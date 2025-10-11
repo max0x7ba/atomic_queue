@@ -115,21 +115,19 @@ ${build_dir}/benchmarks : ldlibs += ${ldlibs.tbb} ${ldlibs.moodycamel} ${ldlibs.
 # Build targets definitions end.
 ################################################################################################################################
 
-all : ${exes:%=${build_dir}/%}
+all : ${exes}
 
 define EXE_TARGET
 ${build_dir}/${1} : $(patsubst %.cc,${build_dir}/%.o,${${1}_src})
 -include $(patsubst %.cc,${build_dir}/%.d,${${1}_src})
-${1} : ${build_dir}/${1}
-.PHONY : ${1}
 endef
 $(foreach exe,${exes},$(eval $(call EXE_TARGET,${exe})))
+${exes} : % : ${build_dir}/%
+.PHONY : ${exes}
+# for t in gcc gcc clang clang; do make -C ~/src/atomic_queue -rj$(($(nproc)/2)) BUILD=debug TOOLSET=$t; done
 
 ${exes:%=${build_dir}/%} : ${build_dir}/% : ${relink} | ${build_dir}
 	$(call strip2,${LINK.EXE})
-
-# ${exes} : % : ${build_dir}/%
-# 	ln --relative -fs $@
 
 ${build_dir}/%.so : cxxflags += -fPIC
 ${build_dir}/%.so : ${relink} | ${build_dir}
