@@ -258,5 +258,5 @@ Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file L
 [15]: https://www.kernel.org/doc/html/latest/admin-guide/mm/transhuge.html
 [16]: https://en.cppreference.com/w/cpp/atomic/atomic/is_always_lock_free
 [17]: https://en.cppreference.com/w/cpp/atomic/memory_order
-[18]: https://github.com/max0x7ba/atomic_queue/blob/master/.github/workflows/ci.yml
+[18]: https://github.com/max0x7ba/atomic_queue/blob/master/.github/workflows
 [19]: https://man7.org/linux/man-pages/man2/sched_yield.2.html
