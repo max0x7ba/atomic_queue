@@ -105,7 +105,6 @@ jobs:
       if: startsWith(matrix.os, 'windows') && matrix.compiler.cpp == 'cl'
       run: >
         cmake -B ${{ steps.strings.outputs.build-output-dir }}
-        -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
         -DATOMIC_QUEUE_BUILD_TESTS=ON
         -DATOMIC_QUEUE_BUILD_EXAMPLES=ON
         -S ${{ github.workspace }}
