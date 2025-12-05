@@ -37,7 +37,7 @@ int main() {
     // Start the producers.
     std::thread producers[PRODUCERS];
     for(int i = 0; i < PRODUCERS; ++i)
-        producers[i] = std::thread([&q]() {
+        producers[i] = std::thread([&q, N = N]() {
             // Each producer pushes range [1, N] elements into the queue.
             // Ascending order [1, N] requires comparing with N at each loop iteration. Ascending order isn't necessary here.
             // Push elements in descending order, range [N, 1] with step -1, so that CPU decrement instruction sets zero/equal flag

@@ -35,11 +35,30 @@ jobs:
       #
       # To add more build types (Release, Debug, RelWithDebInfo, etc.) customize the build_type list.
       matrix:
-        os: [ubuntu-latest, ubuntu-24.04-arm] # windows-latest
-        build_type: [Release]
-        compiler:
-            - { c: gcc,   cpp: g++ }
-            - { c: clang, cpp: clang++ }
+        include:
+          # --- Linux x64 ---
+          # We define 'compiler' as a dictionary (object) here
+          - os: ubuntu-latest
+            build_type: Release
+            compiler: { c: gcc, cpp: g++ }
+
+          - os: ubuntu-latest
+            build_type: Release
+            compiler: { c: clang, cpp: clang++ }
+
+          # --- Linux ARM ---
+          - os: ubuntu-24.04-arm
+            build_type: Release
+            compiler: { c: gcc, cpp: g++ }
+
+          - os: ubuntu-24.04-arm
+            build_type: Release
+            compiler: { c: clang, cpp: clang++ }
+
+          # --- Windows ---
+          - os: windows-latest
+            build_type: Release
+            compiler: { c: cl, cpp: cl }
 
     steps:
     - uses: actions/checkout@v6
@@ -56,6 +75,19 @@ jobs:
       run: |
         sudo apt-get install --yes -qq libboost-all-dev
 
+    - name: Install Boost via vcpkg (Windows)
+      if: startsWith(matrix.os, 'windows')
+      run: |
+        # 1. Install Boost using the Microsoft Package Manager
+        # windows-latest has vcpkg pre-installed at C:\vcpkg
+        vcpkg install boost-test:x64-windows
+
+        # 2. Inform CMake where to find it
+        echo "BOOST_ROOT=$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows" >> $env:GITHUB_ENV
+
+        # 3. Add vcpkg DLL path to CI before running tests
+        echo "$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\bin" >> $env:GITHUB_PATH
+
     - name: Configure CMake Ubuntu
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
       # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
@@ -64,6 +96,15 @@ jobs:
         cmake -B ${{ steps.strings.outputs.build-output-dir }}
         -DCMAKE_CXX_COMPILER=${{ matrix.compiler.cpp }}
         -DCMAKE_C_COMPILER=${{ matrix.compiler.c }}
+        -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+        -DATOMIC_QUEUE_BUILD_TESTS=ON
+        -DATOMIC_QUEUE_BUILD_EXAMPLES=ON
+        -S ${{ github.workspace }}
+
+    - name: Configure CMake Windows - MSVC
+      if: startsWith(matrix.os, 'windows') && matrix.compiler.cpp == 'cl'
+      run: >
+        cmake -B ${{ steps.strings.outputs.build-output-dir }}
         -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
         -DATOMIC_QUEUE_BUILD_TESTS=ON
         -DATOMIC_QUEUE_BUILD_EXAMPLES=ON

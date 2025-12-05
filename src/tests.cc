@@ -43,7 +43,7 @@ void stress() {
     uint64_t results[CONSUMERS];
     std::thread consumers[CONSUMERS];
     for(unsigned i = 0; i < CONSUMERS; ++i)
-        consumers[i] = std::thread([&q, &barrier, &r = results[i]]() {
+        consumers[i] = std::thread([&q, &barrier, &r = results[i], STOP = STOP]() {
             barrier.wait();
             uint64_t result = 0;
             for(T n; (n = q.pop()) != STOP;)
