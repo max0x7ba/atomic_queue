@@ -28,3 +28,4 @@ Contributors:
 - Christian Clauss (https://github.com/max0x7ba/atomic_queue/pull/86)
 - Rene Leonhardt (https://github.com/max0x7ba/atomic_queue/pull/87)
 - Ionut Tomos (https://github.com/max0x7ba/atomic_queue/pull/91)
+- Ionut Tomos (https://github.com/max0x7ba/atomic_queue/pull/92)
