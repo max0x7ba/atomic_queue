@@ -35,12 +35,9 @@ $(function() {
            "OptimistAtomicQueueB2": ['#FFBFBF', 18]
     };
 
-    // function getSeriesColor(s) {
-    //     const c = s[0];
-    //     return c?.pattern?.color ?? c;
-    // }
+    // function getSeriesColor(c) { return c?.pattern?.color ?? c; }
 
-    function fmt(v) {
+    function prec0(v) {
         return Highcharts.numberFormat(v, 0);
     }
 
@@ -48,11 +45,11 @@ $(function() {
         const modes = [
             {
                 yAxis: { type: 'linear', title: { text: 'throughput, msg/sec (linear scale)' }, max: max_lin, min: 0 },
-                subtitle: {text: 'click on the chart background to switch to logarithmic scale'},
+                subtitle: {text: 'tap the chart background to switch to logarithmic scale'},
             },
             {
                 yAxis: { type: 'logarithmic', title: { text: 'throughput, msg/sec (logarithmic scale)' }, max: max_log, min: 100e3 },
-                subtitle: {text: 'click on the chart background to switch to linear scale'},
+                subtitle: {text: 'tap the chart background to switch to linear scale'},
             }
         ];
         let mode = 0;
@@ -85,7 +82,7 @@ $(function() {
 
             const data = [];
             for(const p of this.points) {
-                const [n_threads, min, max, mean, stdev] = p.series.options.atomic_queue_stats[p.point.index].map(fmt);
+                const [n_threads, min, max, mean, stdev] = p.series.options.atomic_queue_stats[p.point.index].map(prec0);
                 data[p.series.options.index] = {
                     name: p.series.name,
                     color: p.series.color,
@@ -122,7 +119,10 @@ $(function() {
                 title: { text: 'number of producers, number of consumers' },
                 tickInterval: 1
             },
-            tooltip: { formatter: tooltip_formatter },
+            tooltip: {
+                formatter: tooltip_formatter,
+                shared: true,
+            },
         });
     }
 
@@ -139,72 +139,78 @@ $(function() {
         },
         tooltip: {
             formatter: function() {
-                const [min, max, mean, stdev] = this.series.options.atomic_queue_stats.map(fmt);
-                return `<strong>mean: ${mean} stdev: ${stdev}</strong> min: ${min} max: ${max}<br/>`;
+                const s = this.series;
+                const [min, max, mean, stdev] = s.options.atomic_queue_stats.map(prec0);
+                return `<strong style="color: ${s.color}">${s.name}: </strong> mean: ${mean} stdev: ${stdev}</strong> min: ${min} max: ${max}<br/>`;
             }
         },
     };
-    function plot_latency(div_id, results) {
-        function chartData(chartType) {
-            if (chartType === 'boxplot') {
-                const series = [];
-                for(const [name, s] of Object.entries(settings)) {
-                    let stats = results[name];
-                    if(!stats)
-                        continue;
-                    const [color, index] = s;
-                    const [min, max, mean, stdev] = stats;
-                    const q1 = mean - stdev;
-                    const q3 = mean + stdev;
-                    series.push({
-                        name: name,
-                        color: color,
-                        medianColor: color,
-                        type: 'boxplot',
-                        data: [[index, min, q1, mean, q3, max]],
-                        atomic_queue_stats: stats,
-                    });
-                }
-                return {
-                    series: series,
-                    subtitle: { text: 'click on the chart background to switch to bar chart view' },
-                    chart: {
-                        inverted: true,
-                        events: { click: createChart.bind(null, "bar") }
-                    },
-                };
-            } else {
-                const series = [];
-                for(const [name, s] of Object.entries(settings)) {
-                    let stats = results[name];
-                    if(!stats)
-                        continue;
-                    const [color, index] = s;
-                    const mean = stats[2];
-                    const stdev = stats[3];
-                    series.push({
-                        name: name,
-                        color: color,
-                        type: 'bar',
-                        data: [[index, mean]],
-                        atomic_queue_stats: stats,
-                    });
-                    series.push({
-                        name: `${s.name} StdDev`,
-                        type: 'errorbar',
-                        data: [[index, mean - stdev, mean + stdev]],
-                    });
-                }
-                return {
-                    series: series,
-                    subtitle: { text: 'click on the chart background to switch to boxplot view' },
-                    chart: { events: { click: createChart.bind(null, "boxplot") } },
-                };
-            }
-        };
 
+    const latencyViewOptions = {
+        boxplot: function(results, createChartFn) {
+            const series = [];
+            for(const [name, s] of Object.entries(settings)) {
+                let stats = results[name];
+                if(!stats)
+                    continue;
+                const [color, index] = s;
+                // const color2 = getSeriesColor(color);
+                const [min, max, mean, stdev] = stats;
+                const q1 = Math.max(min, mean - stdev);
+                const q3 = Math.min(max, mean + stdev);
+                series.push({
+                    name: name,
+                    color: color,
+                    fillColor: color,
+                    type: 'boxplot',
+                    data: [[index, min, q1, mean, q3, max]],
+                    atomic_queue_stats: stats,
+                });
+            }
+            return {
+                series: series,
+                subtitle: { text: 'tap the chart background to switch to bars' },
+                chart: {
+                    inverted: true,
+                    events: { click: createChartFn.bind(null, "bar") }
+                },
+            };
+        },
+
+        bar: function(results, createChartFn) {
+            const series = [];
+            for(const [name, s] of Object.entries(settings)) {
+                let stats = results[name];
+                if(!stats)
+                    continue;
+                const [color, index] = s;
+                const mean = stats[2];
+                const stdev = stats[3];
+                series.push({
+                    name: name,
+                    color: color,
+                    type: 'bar',
+                    data: [[index, mean]],
+                    atomic_queue_stats: stats,
+                });
+                series.push({
+                    name: `${s.name} StdDev`,
+                    type: 'errorbar',
+                    data: [[index, mean - stdev, mean + stdev]],
+                });
+            }
+            return {
+                series: series,
+                subtitle: { text: 'tap the chart background to switch to boxplots' },
+                chart: { events: { click: createChartFn.bind(null, "boxplot") } },
+            };
+        }
+    };
+
+    function plot_latency(div_id, results) {
         function createChart(chartType) {
-            Highcharts.chart(div_id, $.extend(true, chartData(chartType), latencyChartOptions));
+            const viewOptions = latencyViewOptions[chartType](results, createChart);
+            Highcharts.chart(div_id, $.extend(true, viewOptions, latencyChartOptions));
         };
         createChart("bar");
     };

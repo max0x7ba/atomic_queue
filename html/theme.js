@@ -26,28 +26,34 @@ Highcharts.theme = {
     yAxis: theme_axis,
     tooltip: {
         followPointer: true,
-        shared: true,
         useHTML: true,
-        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
         borderWidth: 1,
-        borderColor: 'white',
+        borderColor: 'rgba(255, 255, 255, 0.5)',
         style: { color: 'white' }
     },
     plotOptions: {
         series: {
             pointPadding: 0.2,
-            groupPadding: 0.1,
+            groupPadding: 0,
             borderWidth: 0,
             animationLimit: Infinity,
-            shadow: true,
+            // inactiveOtherPoints: false,
+            stickyTracking: false,
+            states: {
+                inactive: {
+                    // enabled: true,
+                    opacity: 0.3,
+                },
+            }
         },
         boxplot: {
-            fillColor: 'rgba(0, 0, 0, 0)',
+            medianColor: 'black',
             grouping: false,
-            lineWidth: 2,
-            stemDashStyle: 'solid',
+            lineWidth: 1,
             stemWidth: 1,
             whiskerWidth: 3,
+            borderWidth: 0,
         },
         column: {
             borderWidth: 0
@@ -60,7 +66,6 @@ Highcharts.theme = {
             stemWidth: 1,
             whiskerLength: 3,
             lineWidth: 1,
-            dashStyle: 'Solid',
             enableMouseTracking: false,
             showInLegend: false,
             color: "#aaa",
@@ -68,11 +73,11 @@ Highcharts.theme = {
     },
     legend: {
         layout: 'horizontal',
-        align: 'center',
+        align: 'left',
         verticalAlign: 'bottom',
-        itemStyle: { color: '#ccc' },
+        itemStyle: { color: '#eee' },
         itemHoverStyle: { color: 'white' },
-        itemHiddenStyle: { color: '#606060' }
+        itemHiddenStyle: { color: '#888' }
     },
     lang: { thousandsSep: ',' },
     credits: { enabled: false },
