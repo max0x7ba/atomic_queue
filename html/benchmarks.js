@@ -112,7 +112,7 @@ $(function() {
             plotOptions: {
                 errorbar: {
                     stemWidth: 1,
-                    // whiskerLength: 6,
+                    whiskerLength: 3,
                     lineWidth: 1,
                     dashStyle: 'Solid',
                     enableMouseTracking: false,
@@ -263,7 +263,7 @@ $(function() {
                         series: { stacking: 'normal' },
                         errorbar: {
                             stemWidth: 1,
-                            // whiskerLength: 6,
+                            whiskerLength: 3,
                             lineWidth: 1,
                             dashStyle: 'Solid',
                             enableMouseTracking: false,
