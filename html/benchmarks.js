@@ -36,13 +36,7 @@ $(function() {
     };
 
     function getCleanColor(colorValue) {
-        if (typeof colorValue === 'object' && colorValue.pattern && colorValue.pattern.color) {
-            return colorValue.pattern.color;
-        }
-        if (typeof colorValue === 'string') {
-            return colorValue;
-        }
-        return '#000000';
+        return colorValue?.pattern?.color ?? colorValue;
     }
 
     function plot_scalability(div_id, results, max_lin, max_log) {
