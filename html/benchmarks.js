@@ -35,9 +35,13 @@ $(function() {
            "OptimistAtomicQueueB2": ['#FFBFBF', 18]
     };
 
-    function getSeriesColor(s) {
-        const c = s[0];
-        return c?.pattern?.color ?? c;
+    // function getSeriesColor(s) {
+    //     const c = s[0];
+    //     return c?.pattern?.color ?? c;
+    // }
+
+    function fmt(v) {
+        return Highcharts.numberFormat(v, 0);
     }
 
     function plot_scalability(div_id, results, max_lin, max_log) {
@@ -53,29 +57,24 @@ $(function() {
         ];
         let mode = 0;
 
-        const columnSeries = Object.entries(results).map(entry => {
-            const [name, stats] = entry;
+        const series = [];
+        for(const [name, stats] of Object.entries(results)) {
             const s = settings[name];
-            return {
+            series.push({
                 name: name,
                 color: s[0],
                 index: s[1],
                 type: "column",
                 data: stats.map(a => [a[0], a[3]]),
                 atomic_queue_stats: stats,
-                id: `column-${name}`
-            }
-        });
-
-        const errorBarSeriesStdev = Object.entries(results).map(entry => {
-            const [name, stats] = entry;
-            return {
+            });
+            series.push({
                 name: `${name} StdDev`,
                 type: 'errorbar',
+                index: s[1],
                 data: stats.map(a => [a[0], a[3] - a[4], a[3] + a[4]]),
-                linkedTo: `column-${name}`
-            }
-        });
+            });
+        }
 
         const tooltips = [];
         const tooltip_formatter = function() {
@@ -86,17 +85,17 @@ $(function() {
 
             const data = [];
             for(const p of this.points) {
-                const stats = p.series.options.atomic_queue_stats[p.point.index];
+                const [n_threads, min, max, mean, stdev] = p.series.options.atomic_queue_stats[p.point.index].map(fmt);
                 data[p.series.options.index] = {
                     name: p.series.name,
                     color: p.series.color,
-                    min: Highcharts.numberFormat(stats[1], 0),
-                    max: Highcharts.numberFormat(stats[2], 0),
-                    mean: Highcharts.numberFormat(stats[3], 0),
-                    stdev: Highcharts.numberFormat(stats[4], 0)
+                    min: min,
+                    max: max,
+                    mean: mean,
+                    stdev: stdev,
                 };
             }
-            const tbody = data.reduce((s, d) => d ? s + `<tr><td style="color: ${d.color}">${d.name}: </td><td><strong>${d.mean}</strong></td><td><strong>${d.stdev}</strong></td><td>${d.min}</td><td>${d.max}</td></tr>` : s, "");
+            const tbody = data.map((d) => `<tr><td style="color: ${d.color}">${d.name}: </td><td><strong>${d.mean}</strong></td><td><strong>${d.stdev}</strong></td><td>${d.min}</td><td>${d.max}</td></tr>`).join('\n')
             return tooltips[n_threads] = `
                 <span class="tooltip_scalability_title">${n_threads} producers, ${n_threads} consumers</span>
                 <table class="tooltip_scalability">
@@ -107,19 +106,7 @@ $(function() {
         };
 
         Highcharts.chart(div_id, {
-            title: { text: undefined },
-            series: [...columnSeries, ...errorBarSeriesStdev],
-            plotOptions: {
-                errorbar: {
-                    stemWidth: 1,
-                    whiskerLength: 3,
-                    lineWidth: 1,
-                    dashStyle: 'Solid',
-                    enableMouseTracking: false,
-                    showInLegend: false,
-                    color: "#a0a0a0",
-                }
-            },
+            series: series,
             chart: {
                 events: {
                     click: function() {
@@ -135,163 +122,90 @@ $(function() {
                 title: { text: 'number of producers, number of consumers' },
                 tickInterval: 1
             },
-            tooltip: {
-                followPointer: true,
-                shared: true,
-                useHTML: true,
-                formatter: tooltip_formatter
-            },
+            tooltip: { formatter: tooltip_formatter },
         });
     }
 
+    const latencyChartOptions = {
+        xAxis: {
+            categories: Object.keys(settings),
+            labels: { rotation: 0 }
+        },
+        yAxis: {
+            min: 0,
+            max: 1000,
+            tickInterval: 100,
+            title: { text: 'latency, nanoseconds/round-trip' }
+        },
+        tooltip: {
+            formatter: function() {
+                const [min, max, mean, stdev] = this.series.options.atomic_queue_stats.map(fmt);
+                return `<strong>mean: ${mean} stdev: ${stdev}</strong> min: ${min} max: ${max}<br/>`;
+            }
+        },
+    };
     function plot_latency(div_id, results) {
-        function createChart(chartType) {
-            const chartOptions = {
-                legend: { enabled: true },
-                xAxis: { categories: Object.keys(results) },
-                yAxis: { title: { text: 'latency, nanoseconds/round-trip' } },
-                tooltip: {
-                    followPointer: true,
-                    shared: true,
-                    useHTML: true,
-                },
-            };
-
+        function chartData(chartType) {
             if (chartType === 'boxplot') {
-                const series = Object.entries(results).map(entry => {
-                    const [name, stats] = entry;
-                    const s = settings[name];
-                    const seriesColor = getSeriesColor(s);
-                    const min = stats[0];
-                    const max = stats[1];
-                    const mean = stats[2];
-                    const stdev = stats[3];
+                const series = [];
+                for(const [name, s] of Object.entries(settings)) {
+                    let stats = results[name];
+                    if(!stats)
+                        continue;
+                    const [color, index] = s;
+                    const [min, max, mean, stdev] = stats;
                     const q1 = mean - stdev;
                     const q3 = mean + stdev;
-
-                    return {
+                    series.push({
                         name: name,
-                        color: seriesColor,
-                        index: s[1],
+                        color: color,
+                        medianColor: color,
                         type: 'boxplot',
-                        data: [[min, q1, mean, q3, max]],
+                        data: [[index, min, q1, mean, q3, max]],
                         atomic_queue_stats: stats,
-                        lineColor: seriesColor,
-                        medianColor: seriesColor,
-                        stemColor: seriesColor,
-                        whiskerColor: seriesColor,
-                    };
-                });
-                series.sort((a, b) => a.index - b.index);
-
-                Highcharts.chart(div_id, $.extend(true, {
+                    });
+                }
+                return {
                     series: series,
-                    plotOptions: {
-                        boxplot: {
-                            fillColor: '#000000',
-                            lineWidth: 2,
-                            medianWidth: 3,
-                            stemDashStyle: 'solid',
-                            stemWidth: 1,
-                            // whiskerLength: '50%',
-                            whiskerWidth: 2
-                        }
-                    },
                     subtitle: { text: 'click on the chart background to switch to bar chart view' },
-                    title: { text: undefined },
-                    chart: { events: { click: createChart.bind(null, "bar") } },
-                    xAxis: {
-                        labels: {
-                            enabled: false
-                        }
+                    chart: {
+                        inverted: true,
+                        events: { click: createChart.bind(null, "bar") }
                     },
-                    tooltip: {
-                        formatter: function() {
-                            const data = [];
-                            for (const p of this.points) {
-                                const stats = p.series.options.atomic_queue_stats;
-                                if (!stats) continue;
-                                data[p.series.options.index] = {
-                                    name: p.series.name,
-                                    color: p.series.color,
-                                    min: Highcharts.numberFormat(stats[0], 0),
-                                    max: Highcharts.numberFormat(stats[1], 0),
-                                    mean: Highcharts.numberFormat(stats[2], 0),
-                                    stdev: Highcharts.numberFormat(stats[3], 0)
-                                };
-                            }
-                            const tbody = data.reduce((s, d) => d ? s + `<tr><td style="color: ${d.color}">${d.name}: </td><td><strong>${d.mean}</strong></td><td><strong>${d.stdev}</strong></td><td>${d.min}</td><td>${d.max}</td></tr>` : s, "");
-                            return `
-                                <table class="tooltip_scalability">
-                                <tr><th></th><th>mean</th><th>stdev</th><th>min</th><th>max</th></tr>
-                                ${tbody}
-                                </table>`;
-                        }
-                    },
-                }, chartOptions));
+                };
             } else {
-                const barSeries = Object.entries(results).map(entry => {
-                    const [name, stats] = entry;
-                    const s = settings[name];
-                    return {
-                        name: name,
-                        color: s[0],
-                        index: s[1],
-                        type: 'bar',
-                        data: [[s[1], stats[2]]],
-                        atomic_queue_stats: stats,
-                        id: `bar-${s[1]}`
-                    };
-                });
-                barSeries.sort((a, b) => a.index - b.index);
-
-                const errorBarSeriesStdev = barSeries.map(s => {
-                    const stats = s.atomic_queue_stats;
+                const series = [];
+                for(const [name, s] of Object.entries(settings)) {
+                    let stats = results[name];
+                    if(!stats)
+                        continue;
+                    const [color, index] = s;
                     const mean = stats[2];
                     const stdev = stats[3];
-                    return {
+                    series.push({
+                        name: name,
+                        color: color,
+                        type: 'bar',
+                        data: [[index, mean]],
+                        atomic_queue_stats: stats,
+                    });
+                    series.push({
                         name: `${s.name} StdDev`,
                         type: 'errorbar',
-                        data: [[s.index, mean - stdev, mean + stdev]],
-                        linkedTo: s.id
-                    };
-                });
-
-                Highcharts.chart(div_id, $.extend(true, {
-                    series: [...barSeries, ...errorBarSeriesStdev],
-                    plotOptions: {
-                        series: { stacking: 'normal' },
-                        errorbar: {
-                            stemWidth: 1,
-                            whiskerLength: 3,
-                            lineWidth: 1,
-                            dashStyle: 'Solid',
-                            enableMouseTracking: false,
-                            showInLegend: false,
-                            color: "#a0a0a0",
-                        }
-                    },
-                    title: { text: undefined },
+                        data: [[index, mean - stdev, mean + stdev]],
+                    });
+                }
+                return {
+                    series: series,
                     subtitle: { text: 'click on the chart background to switch to boxplot view' },
                     chart: { events: { click: createChart.bind(null, "boxplot") } },
-                    xAxis: { labels: { rotation: 0 } },
-                    yAxis: {
-                        max: 1000,
-                        tickInterval: 100,
-                    },
-                    tooltip: {
-                        formatter: function() {
-                            const stats = this.series.options.atomic_queue_stats;
-                            const min = Highcharts.numberFormat(stats[0], 0);
-                            const max = Highcharts.numberFormat(stats[1], 0);
-                            const mean = Highcharts.numberFormat(stats[2], 0);
-                            const stdev = Highcharts.numberFormat(stats[3], 0);
-                            return `<strong>mean: ${mean} stdev: ${stdev}</strong> min: ${min} max: ${max}<br/>`;
-                        }
-                    },
-                }, chartOptions));
+                };
             }
-        }
+        };
+
+        function createChart(chartType) {
+            Highcharts.chart(div_id, $.extend(true, chartData(chartType), latencyChartOptions));
+        };
         createChart("bar");
     };
 

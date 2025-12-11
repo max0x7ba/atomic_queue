@@ -11,7 +11,7 @@ h1, h2, h3 {
 }
 
 p, li {
-    color: #A0A0A0;
+    color: #EEE;
     margin-left: 20px;
 }
 
@@ -26,7 +26,7 @@ div.chart {
 }
 
 p.copyright {
-    color: #A0A0A0;
+    color: #EEE;
     font-size: 0.8em;
 }
 
@@ -35,7 +35,7 @@ h1.homepage {
 }
 
 p.homepage {
-    color: #A0A0A0;
+    color: #EEE;
     margin-top: 0em;
     font-weight: bold;
 }
@@ -55,7 +55,7 @@ svg.arrow-down-circle {
     fill: currentColor;
     width: 1em;
     height: 1em;
-    color: #A0A0A0;
+    color: #EEE;
     vertical-align: -.1em;
 }
 
