@@ -35,8 +35,9 @@ $(function() {
            "OptimistAtomicQueueB2": ['#FFBFBF', 18]
     };
 
-    function getCleanColor(colorValue) {
-        return colorValue?.pattern?.color ?? colorValue;
+    function getSeriesColor(s) {
+        const c = s[0];
+        return c?.pattern?.color ?? c;
     }
 
     function plot_scalability(div_id, results, max_lin, max_log) {
@@ -72,28 +73,19 @@ $(function() {
                 name: `${name} StdDev`,
                 type: 'errorbar',
                 data: stats.map(a => [a[0], a[3] - a[4], a[3] + a[4]]),
-                stemWidth: 1,
-                whiskerLength: 6,
-                lineWidth: 1,
-                dashStyle: 'Solid',
-                enableMouseTracking: false,
-                showInLegend: false,
-                color: "#adb5bd",
                 linkedTo: `column-${name}`
             }
         });
 
         const tooltips = [];
         const tooltip_formatter = function() {
-            const threads = this.x;
-            const tooltip = tooltips[threads];
+            const n_threads = this.x;
+            const tooltip = tooltips[n_threads];
             if(tooltip)
                 return tooltip;
 
             const data = [];
             for(const p of this.points) {
-                if (p.series.type === 'errorbar')
-                    continue;
                 const stats = p.series.options.atomic_queue_stats[p.point.index];
                 data[p.series.options.index] = {
                     name: p.series.name,
@@ -105,8 +97,8 @@ $(function() {
                 };
             }
             const tbody = data.reduce((s, d) => d ? s + `<tr><td style="color: ${d.color}">${d.name}: </td><td><strong>${d.mean}</strong></td><td><strong>${d.stdev}</strong></td><td>${d.min}</td><td>${d.max}</td></tr>` : s, "");
-            return tooltips[threads] = `
-                <span class="tooltip_scalability_title">${threads} producers, ${threads} consumers</span>
+            return tooltips[n_threads] = `
+                <span class="tooltip_scalability_title">${n_threads} producers, ${n_threads} consumers</span>
                 <table class="tooltip_scalability">
                 <tr><th></th><th>mean</th><th>stdev</th><th>min</th><th>max</th></tr>
                 ${tbody}
@@ -115,47 +107,49 @@ $(function() {
         };
 
         Highcharts.chart(div_id, {
+            title: { text: undefined },
+            series: [...columnSeries, ...errorBarSeriesStdev],
+            plotOptions: {
+                errorbar: {
+                    stemWidth: 1,
+                    // whiskerLength: 6,
+                    lineWidth: 1,
+                    dashStyle: 'Solid',
+                    enableMouseTracking: false,
+                    showInLegend: false,
+                    color: "#a0a0a0",
+                }
+            },
             chart: {
                 events: {
                     click: function() {
-                        mode ^= 1;
-                        const m = modes[mode];
+                        const m = modes[mode ^= 1];
                         this.yAxis[0].update(m.yAxis);
-                        // this.subtitle.update(m.subtitle);
                         this.subtitle.update(m.subtitle);
                     }
                 }
             },
-
-            title: { text: undefined },
             subtitle: modes[0].subtitle,
+            yAxis: modes[0].yAxis,
             xAxis: {
                 title: { text: 'number of producers, number of consumers' },
                 tickInterval: 1
             },
-            yAxis: modes[0].yAxis,
             tooltip: {
                 followPointer: true,
                 shared: true,
                 useHTML: true,
                 formatter: tooltip_formatter
             },
-            series: [...columnSeries, ...errorBarSeriesStdev],
         });
     }
 
     function plot_latency(div_id, results) {
         function createChart(chartType) {
             const chartOptions = {
-                title: { text: undefined },
                 legend: { enabled: true },
-                title: { text: 'latency, nanoseconds/round-trip' },
-                xAxis: {
-                    categories: Object.keys(results),
-                },
-                yAxis: {
-                    title: { text: 'latency, nanoseconds/round-trip' },
-                },
+                xAxis: { categories: Object.keys(results) },
+                yAxis: { title: { text: 'latency, nanoseconds/round-trip' } },
                 tooltip: {
                     followPointer: true,
                     shared: true,
@@ -167,14 +161,13 @@ $(function() {
                 const series = Object.entries(results).map(entry => {
                     const [name, stats] = entry;
                     const s = settings[name];
-                    const seriesColor = getCleanColor(s[0]);
+                    const seriesColor = getSeriesColor(s);
                     const min = stats[0];
                     const max = stats[1];
                     const mean = stats[2];
                     const stdev = stats[3];
-
-                    const q1 = Math.max(min, mean - 0.675 * stdev);
-                    const q3 = Math.min(max, mean + 0.675 * stdev);
+                    const q1 = mean - stdev;
+                    const q3 = mean + stdev;
 
                     return {
                         name: name,
@@ -183,31 +176,30 @@ $(function() {
                         type: 'boxplot',
                         data: [[min, q1, mean, q3, max]],
                         atomic_queue_stats: stats,
-                        fillColor: '#000000',
-                        lineWidth: 2,
                         lineColor: seriesColor,
                         medianColor: seriesColor,
-                        medianWidth: 3,
                         stemColor: seriesColor,
-                        stemDashStyle: 'solid',
-                        stemWidth: 1,
                         whiskerColor: seriesColor,
-                        whiskerLength: '50%',
-                        whiskerWidth: 2
                     };
                 });
                 series.sort((a, b) => a.index - b.index);
 
                 Highcharts.chart(div_id, $.extend(true, {
                     series: series,
-                    subtitle: { text: 'click on the chart background to switch to bar chart view' },
-                    chart: {
-                        events: {
-                            click: function () {
-                                createChart("bar");
-                            }
+                    plotOptions: {
+                        boxplot: {
+                            fillColor: '#000000',
+                            lineWidth: 2,
+                            medianWidth: 3,
+                            stemDashStyle: 'solid',
+                            stemWidth: 1,
+                            // whiskerLength: '50%',
+                            whiskerWidth: 2
                         }
                     },
+                    subtitle: { text: 'click on the chart background to switch to bar chart view' },
+                    title: { text: undefined },
+                    chart: { events: { click: createChart.bind(null, "bar") } },
                     xAxis: {
                         labels: {
                             enabled: false
@@ -261,36 +253,28 @@ $(function() {
                         name: `${s.name} StdDev`,
                         type: 'errorbar',
                         data: [[s.index, mean - stdev, mean + stdev]],
-                        stemWidth: 1,
-                        whiskerLength: 6,
-                        lineWidth: 1,
-                        dashStyle: 'Solid',
-                        enableMouseTracking: false,
-                        showInLegend: false,
-                        color: "#adb5bd",
                         linkedTo: s.id
                     };
                 });
 
                 Highcharts.chart(div_id, $.extend(true, {
                     series: [...barSeries, ...errorBarSeriesStdev],
-
-                    subtitle: { text: 'click on the chart background to switch to boxplot view' },
-                    chart: {
-                        events: {
-                            click: function () {
-                                createChart("boxplot");
-                            }
-                        }
-                    },
-                    xAxis: {
-                        labels: {
-                            rotation: 0
-                        }
-                    },
                     plotOptions: {
-                        series: { stacking: 'normal' }
+                        series: { stacking: 'normal' },
+                        errorbar: {
+                            stemWidth: 1,
+                            // whiskerLength: 6,
+                            lineWidth: 1,
+                            dashStyle: 'Solid',
+                            enableMouseTracking: false,
+                            showInLegend: false,
+                            color: "#a0a0a0",
+                        }
                     },
+                    title: { text: undefined },
+                    subtitle: { text: 'click on the chart background to switch to boxplot view' },
+                    chart: { events: { click: createChart.bind(null, "boxplot") } },
+                    xAxis: { labels: { rotation: 0 } },
                     yAxis: {
                         max: 1000,
                         tickInterval: 100,
@@ -298,8 +282,6 @@ $(function() {
                     tooltip: {
                         formatter: function() {
                             const stats = this.series.options.atomic_queue_stats;
-                            if (!stats)
-                                return;
                             const min = Highcharts.numberFormat(stats[0], 0);
                             const max = Highcharts.numberFormat(stats[1], 0);
                             const mean = Highcharts.numberFormat(stats[2], 0);
