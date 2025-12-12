@@ -22,7 +22,7 @@ Designed with a goal to minimize the latency between one thread pushing an eleme
 
 It has been developed, tested and benchmarked on Linux. Yet, any C++14 platform implementing `std::atomic` is expected to compile the unit-tests and run them without failures just as well.
 
-Continuous integrations running the unit-tests on GitHub are set up for x86_64 and arm64 platforms, Ubuntu-22.04, Ubuntu-24.04 and Windows. Pull requests to extend the [continuous integrations][18] to run on other architectures and/or platforms are welcome.
+Continuous integrations running the unit-tests on GitHub are set up for x86_64 and arm64 platforms, Ubuntu-22.04, Ubuntu-24.04 and Windows. Pull requests to extend the [continuous integrations][18] to run the unit-tests on other architectures/platforms are most welcome.
 
 ## Design Principles
 When minimizing latency a good design is not when there is nothing left to add, but rather when there is nothing left to remove, as these queues exemplify.
