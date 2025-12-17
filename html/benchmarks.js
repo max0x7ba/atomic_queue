@@ -57,47 +57,40 @@ $(function() {
         const series = [];
         for(const [name, stats] of Object.entries(results)) {
             const s = settings[name];
+            const [color, index] = s;
             series.push({
                 name: name,
-                color: s[0],
-                index: s[1],
+                color: color,
+                index: index,
                 type: "column",
-                data: stats.map(a => [a[0], a[3]]),
-                atomic_queue_stats: stats,
+                data: stats.map((a) => {
+                    const [min, max, mean, stdev] = a.slice(1).map(prec0);
+                    return {
+                        x: a[0],
+                        y: a[3],
+                        tooltip_row: `<tr><td style="color: ${color}">${name}: </td><td><strong>${mean}</strong></td><td><strong>${stdev}</strong></td><td>${min}</td><td>${max}</td></tr>`
+                    };
+                }),
             });
             series.push({
                 name: `${name} StdDev`,
                 type: 'errorbar',
-                index: s[1],
+                index: index,
                 data: stats.map(a => [a[0], a[3] - a[4], a[3] + a[4]]),
             });
         }
 
-        const tooltips = [];
         const tooltip_formatter = function() {
-            const n_threads = this.x;
-            const tooltip = tooltips[n_threads];
-            if(tooltip)
-                return tooltip;
+            const { x: n_threads, points } = this;
+            const rows = points
+                .map(point => point.options.tooltip_row)
+                .join('\n');
 
-            const data = [];
-            for(const p of this.points) {
-                const [n_threads, min, max, mean, stdev] = p.series.options.atomic_queue_stats[p.point.index].map(prec0);
-                data[p.series.options.index] = {
-                    name: p.series.name,
-                    color: p.series.color,
-                    min: min,
-                    max: max,
-                    mean: mean,
-                    stdev: stdev,
-                };
-            }
-            const tbody = data.map((d) => `<tr><td style="color: ${d.color}">${d.name}: </td><td><strong>${d.mean}</strong></td><td><strong>${d.stdev}</strong></td><td>${d.min}</td><td>${d.max}</td></tr>`).join('\n')
-            return tooltips[n_threads] = `
+            return `
                 <span class="tooltip_scalability_title">${n_threads} producers, ${n_threads} consumers</span>
                 <table class="tooltip_scalability">
                 <tr><th></th><th>mean</th><th>stdev</th><th>min</th><th>max</th></tr>
-                ${tbody}
+                ${rows}
                 </table>
                 `;
         };
