@@ -8,11 +8,13 @@
 [![CMake Continuous Integrations](https://github.com/max0x7ba/atomic_queue/actions/workflows/cmake-gcc-clang.yml/badge.svg)](https://github.com/max0x7ba/atomic_queue/actions/workflows/cmake-gcc-clang.yml)
 [![Meson Continuous Integrations](https://github.com/max0x7ba/atomic_queue/actions/workflows/ci-meson.yml/badge.svg)](https://github.com/max0x7ba/atomic_queue/actions/workflows/ci-meson.yml)
 <br>
-![platform Linux x86_64](https://img.shields.io/badge/platform-Linux%20x86_64--bit-yellow)
-![platform Linux ARM](https://img.shields.io/badge/platform-Linux%20ARM-yellow)
-![platform Linux RISC-V](https://img.shields.io/badge/platform-Linux%20RISC--V-yellow)
-![platform Linux PowerPC](https://img.shields.io/badge/platform-Linux%20PowerPC-yellow)
-![platform Linux IBM System/390](https://img.shields.io/badge/platform-Linux%20IBM%20System/390-yellow)
+![platform Linux x86_64](https://img.shields.io/badge/platform-Linux%20x86_64--bit-gold)
+![platform Linux ARM](https://img.shields.io/badge/platform-Linux%20ARM-gold)
+![platform Linux RISC-V](https://img.shields.io/badge/platform-Linux%20RISC--V-gold)
+![platform Linux PowerPC](https://img.shields.io/badge/platform-Linux%20PowerPC-gold)
+![platform Linux IBM System/390](https://img.shields.io/badge/platform-Linux%20IBM%20System/390-gold)
+![platform Linux LoongArch](https://img.shields.io/badge/platform-Linux%20LoongArch-gold)
+![platform Windows x86_64](https://img.shields.io/badge/platform-Windows%20x86_64--bit-gold)
 
 # atomic_queue
 C++14 multiple-producer-multiple-consumer *lock-free* queues based on circular buffers and [`std::atomic`][3].
