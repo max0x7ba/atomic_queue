@@ -193,6 +193,8 @@ People often propose limiting busy-waiting with a subsequent call to `std::this_
 
 [In Linux, there is mutex type `PTHREAD_MUTEX_ADAPTIVE_NP`][9] which busy-waits a locked mutex for a number of iterations and then makes a blocking syscall into the kernel to deschedule the waiting thread. In the benchmarks it was the worst performer and I couldn't find a way to make it perform better, and that's the reason it is not included in the benchmarks.
 
+C++20 introduced blocking `std::atomic::wait` which uses Linux futex for atomic compare-and-block operation, similar to `PTHREAD_MUTEX_ADAPTIVE_NP`, with hard-coded spin-count limits. And `thread_yield` calls, which Linus Torvalds above explains is only applicable for real-time threads with a single run-queue for them. A queue implemenation with `std::atomic::wait` is due to be benchmarked, with its performance expected to be similar to that of `PTHREAD_MUTEX_ADAPTIVE_NP`, but I'd love to be pleasantly surpised.
+
 On Intel CPUs one could use [the 4 debug control registers][6] to monitor the spinlock memory region for write access and wait on it using `select` (and its friends) or `sigwait` (see [`perf_event_open`][7] and [`uapi/linux/hw_breakpoint.h`][8] for more details). A spinlock waiter could suspend itself with `select` or `sigwait` until the spinlock state has been updated. But there are only 4 of these registers, so that such a solution wouldn't scale.
 
 # Benchmarks
