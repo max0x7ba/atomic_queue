@@ -6,7 +6,8 @@
 #   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) BUILD=debug run_tests
 #   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) all run_tests
 #   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) run_benchmarks
-#   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=clang-19 BUILD=debug run_tests
+#   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TAGS
+#   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=clang-20 BUILD=debug run_tests
 #   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=clang BUILD=sanitize run_tests
 #   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=clang run_benchmarks
 #
@@ -17,10 +18,10 @@
 
 SHELL := /bin/bash
 
-BUILD := release
-TOOLSET := gcc
+export BUILD := release
+export TOOLSET := gcc
 
-BUILD_ROOT := $(or ${BUILD_ROOT},build)
+export BUILD_ROOT := $(or ${BUILD_ROOT},build)
 build_dir := ${BUILD_ROOT}/${BUILD}/${TOOLSET}
 
 cxx.gcc := g++
@@ -172,11 +173,11 @@ run_benchmarks : ${build_dir}/benchmarks
 run_tests : ${build_dir}/tests
 	@echo -n "$@ "; set -x; $< --log_level=warning
 
-run_% : ${build_dir}/%
+run_% : ${build_dir}/% force
 	@echo -n "$@ "; set -x; $<
 
-rtags :
-	${MAKE} --always-make --just-print all | { rtags-rc -c -; true; }
+compile_commands compile_commands.json TAGS :
+	bear -- ${MAKE} --always-make --no-print-directory all
 
 clean :
 	rm -rf ${exes} ${build_dir}
@@ -189,7 +190,11 @@ env :
 	uname --all
 	env | sort --ignore-case
 
-.PHONY : update_env_txt env versions rtags run_benchmarks clean all run_%
+# Prerequisites of .PHONY are always interpreted as literal target names, never as patterns (even if they contain ‘%’ characters). To always rebuild a pattern rule consider using a "force target".
+# If a rule has no prerequisites or recipe, and the target of the rule is a nonexistent file, then make imagines this target to have been updated whenever its rule is run. This implies that all targets depending on this one will always have their recipe run.
+force :
+
+.PHONY : update_env_txt env versions run_benchmarks clean all compile_commands compile_commands.json TAGS run_tests
 .DELETE_ON_ERROR:
 .SECONDARY:
 .SUFFIXES:
