@@ -2,7 +2,6 @@
 
 // Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file LICENSE.
 
-
 const theme_axis = {
     gridLineColor: '#444',
     labels: { style: { color: '#eee' } },
@@ -12,6 +11,7 @@ const theme_axis = {
 Highcharts.theme = {
     chart: {
         backgroundColor: 'black',
+        spacingBottom: 40,
         style: { fontFamily: "'Roboto Slab', sans-serif" }
     },
     title: {
@@ -75,9 +75,20 @@ Highcharts.theme = {
         layout: 'horizontal',
         align: 'left',
         verticalAlign: 'bottom',
-        itemStyle: { color: '#eee' },
+        itemStyle: { color: '#aaa' },
         itemHoverStyle: { color: 'white' },
         itemHiddenStyle: { color: '#888' }
+    },
+    caption: {
+        align: "center",
+        text: undefined,
+        style: {
+            color: 'white',
+            fontSize: '1em',
+            fontFamily: "PT Serif",
+            fontWeight: 400,
+            fontStyle: 'italic',
+        }
     },
     lang: { thousandsSep: ',' },
     credits: { enabled: false },

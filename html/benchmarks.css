@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=PT+Serif:ital,wght@0,400;0,700;1,400;1,700&display=swap');
+
 body {
     visibility: hidden;
     background-color: black;
@@ -21,8 +23,7 @@ ul {
 }
 
 div.chart {
-    height: 500px;
-    margin-bottom: 1em;
+    height: 580px;
 }
 
 p.copyright {
@@ -42,13 +43,7 @@ p.homepage {
 
 .view-toggle {
     cursor: pointer;
-    margin-bottom: 0em;
     user-select: none;
-}
-
-h3.view-toggle {
-    margin-left: 24px;
-    margin-top: 0em;
 }
 
 svg.arrow-down-circle {
@@ -66,4 +61,9 @@ span.tooltip_scalability_title {
 
 table.tooltip_scalability {
     text-align: right;
+}
+
+span.highcharts-caption {
+    text-wrap: balance;
+    overflow: visible;
 }

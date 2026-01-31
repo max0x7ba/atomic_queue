@@ -41,15 +41,24 @@ $(function() {
         return Highcharts.numberFormat(v, 0);
     }
 
+    function get_caption(div_id) {
+        const div = $('#' + div_id)
+        const caption = div.data("caption");
+        return {
+            text: caption,
+            useHTML: true,
+        };
+    }
+
     function plot_scalability(div_id, results, max_lin, max_log) {
         const modes = [
             {
                 yAxis: { type: 'linear', title: { text: 'throughput, msg/sec (linear scale)' }, max: max_lin, min: 0 },
-                subtitle: {text: 'tap the chart background to switch to logarithmic scale'},
+                // subtitle: {text: 'tap the chart background to switch to logarithmic scale'},
             },
             {
                 yAxis: { type: 'logarithmic', title: { text: 'throughput, msg/sec (logarithmic scale)' }, max: max_log, min: 100e3 },
-                subtitle: {text: 'tap the chart background to switch to linear scale'},
+                // subtitle: {text: 'tap the chart background to switch to linear scale'},
             }
         ];
         let mode = 0;
@@ -109,11 +118,11 @@ $(function() {
                     click: function() {
                         const m = modes[mode ^= 1];
                         this.yAxis[0].update(m.yAxis);
-                        this.subtitle.update(m.subtitle);
+                        // this.subtitle.update(m.subtitle);
                     }
                 }
             },
-            subtitle: modes[0].subtitle,
+            // subtitle: modes[0].subtitle,
             yAxis: modes[0].yAxis,
             xAxis: {
                 title: { text: 'number of producers, number of consumers' },
@@ -123,6 +132,7 @@ $(function() {
                 formatter: tooltip_formatter,
                 shared: true,
             },
+            caption: get_caption(div_id),
         });
     }
 
@@ -169,7 +179,7 @@ $(function() {
             }
             return {
                 series: series,
-                subtitle: { text: 'tap the chart background to switch to bars' },
+                // subtitle: { text: 'tap the chart background to switch to bars' },
                 chart: {
                     inverted: true,
                     events: { click: createChartFn.bind(null, "bar") }
@@ -201,7 +211,7 @@ $(function() {
             }
             return {
                 series: series,
-                subtitle: { text: 'tap the chart background to switch to boxplots' },
+                // subtitle: { text: 'tap the chart background to switch to boxplots' },
                 chart: { events: { click: createChartFn.bind(null, "boxplot") } },
             };
         }
@@ -210,7 +220,7 @@ $(function() {
     function plot_latency(div_id, results) {
         function createChart(chartType) {
             const viewOptions = latencyViewOptions[chartType](results, createChart);
-            Highcharts.chart(div_id, $.extend(true, viewOptions, latencyChartOptions));
+            Highcharts.chart(div_id, $.extend({caption: get_caption(div_id)}, viewOptions, latencyChartOptions));
         };
         createChart("bar");
     };
@@ -228,7 +238,7 @@ $(function() {
         .html((index, html) => `<svg class="arrow-down-circle" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M1 8a7 7 0 1 0 14 0A7 7 0 0 0 1 8zm15 0A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM8.5 4.5a.5.5 0 0 0-1 0v5.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V4.5z"/></svg> ${html}`)
         .on("click", function() {
             const toggle = $(this);
-            toggle.next().slideToggle();
+            toggle.next().slideToggle("slow");
             toggle.children("svg.arrow-down-circle").each(function() {
                 $(this).animate(
                     { hidden: this.hidden ^ 1 },
