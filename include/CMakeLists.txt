@@ -1,17 +1,25 @@
 CMAKE_MINIMUM_REQUIRED( VERSION 3.25 )
 
-add_library(
-    atomic_queue
-    INTERFACE
-    ${CMAKE_CURRENT_SOURCE_DIR}/atomic_queue/atomic_queue.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/atomic_queue/atomic_queue_mutex.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/atomic_queue/barrier.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/atomic_queue/defs.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/atomic_queue/spinlock.h
+include(GNUInstallDirs)
+
+add_library(atomic_queue INTERFACE)
+target_include_directories(atomic_queue INTERFACE
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>"
+    "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
 )
 
-target_include_directories(
-    atomic_queue
-    INTERFACE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-)
+add_library(max0x7ba::atomic_queue ALIAS atomic_queue)
+
+if ( ATOMIC_QUEUE_ENABLE_INSTALL )
+    install(TARGETS atomic_queue EXPORT atomic_queue)
+    install(
+        DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/atomic_queue"
+        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+    )
+    install(
+        EXPORT atomic_queue
+        FILE atomic_queue-config.cmake
+        DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/atomic_queue"
+        NAMESPACE max0x7ba::
+    )
+endif ()
