@@ -10,6 +10,8 @@
 #   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=clang-20 BUILD=debug run_tests
 #   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=clang BUILD=sanitize run_tests
 #   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=clang run_benchmarks
+#   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=gcc-14 run_benchmarks
+#   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=gcc-14 ASM=1
 #
 # Additional CPPFLAGS, CXXFLAGS, LDLIBS, LDFLAGS can come from the command line, e.g. make CPPFLAGS='-I<my-include-dir>', or from environment variables.  For example, also produce assembly outputs:
 #
@@ -45,14 +47,17 @@ LD := $(call toolset_exe,ld)
 AR := $(call toolset_exe,ar,ar)
 
 # uname_m := $(shell uname -m)
+export ASM := 0
 
+cxxflags.gcc.asm.1 := -save-temps=obj -fverbose-asm -masm=intel -fcf-protection=none -fno-{stack-protector,stack-clash-protection}
 cxxflags.gcc.debug := -Og -f{stack-protector-all,no-omit-frame-pointer} # -D_GLIBCXX_DEBUG
-cxxflags.gcc.release := -O3 -mtune=native -falign-{functions,loops}=64 -DNDEBUG
+cxxflags.gcc.release := -O3 -mtune=native -falign-{functions,loops}=64 -DNDEBUG ${cxxflags.gcc.asm.${ASM}}
 cxxflags.gcc.sanitize := ${cxxflags.gcc.debug} -fsanitize=thread
 cxxflags.gcc.sanitize2 := ${cxxflags.gcc.debug} -fsanitize=undefined,address
 cxxflags.gcc := -march=native -f{no-plt,no-math-errno,finite-math-only,message-length=0} -W{all,extra,error,no-{array-bounds,maybe-uninitialized,unused-variable,unused-function,unused-local-typedefs}} ${cxxflags.gcc.${BUILD}}
 ldflags.gcc.sanitize := ${ldflags.gcc.debug} -fsanitize=thread
 ldflags.gcc.sanitize2 := ${ldflags.gcc.debug} -fsanitize=undefined,address
+# ldflags.gcc := -fuse-ld=${use-ld.gcc} -Wl,--compress-debug-sections=zstd,-O2,--gc-sections ${ldflags.gcc.${BUILD}}
 ldflags.gcc := -fuse-ld=gold ${ldflags.gcc.${BUILD}}
 
 # clang-14 for arm doesn't support -march=native.
