@@ -8,7 +8,7 @@ target_include_directories(atomic_queue INTERFACE
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
 )
 
-add_library(max0x7ba::atomic_queue ALIAS atomic_queue)
+add_library(atomic_queue::atomic_queue ALIAS atomic_queue)
 
 if ( ATOMIC_QUEUE_ENABLE_INSTALL )
     install(TARGETS atomic_queue EXPORT atomic_queue)
@@ -20,6 +20,6 @@ if ( ATOMIC_QUEUE_ENABLE_INSTALL )
         EXPORT atomic_queue
         FILE atomic_queue-config.cmake
         DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/atomic_queue"
-        NAMESPACE max0x7ba::
+        NAMESPACE atomic_queue::
     )
 endif ()
