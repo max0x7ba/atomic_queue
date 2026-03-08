@@ -125,7 +125,7 @@ constexpr T nil() noexcept {
 }
 
 template<class T>
-ATOMIC_QUEUE_INLINE static void destroy_n(T* p, unsigned n) noexcept {
+ATOMIC_QUEUE_INLINE static void destroy_n(T* ATOMIC_QUEUE_RESTRICT p, unsigned n) noexcept {
     for(auto q = p + n; p != q;)
         (p++)->~T();
 }
@@ -387,7 +387,7 @@ public:
 
     AtomicQueue() noexcept {
         assert(std::atomic<T>{NIL}.is_lock_free()); // Queue element type T is not atomic. Use AtomicQueue2/AtomicQueueB2 for such element types.
-        for(auto p = elements_, q = elements_ + size_; p != q; ++p)
+        for(auto* ATOMIC_QUEUE_RESTRICT p = elements_, q = elements_ + size_; p != q; ++p)
             p->store(NIL, X);
     }
 
@@ -453,7 +453,7 @@ class AtomicQueueB : private std::allocator_traits<A>::template rebind_alloc<std
     // AtomicQueueCommon members are stored into by readers and writers.
     // Allocate these immutable members on another cache line which never gets invalidated by stores.
     alignas(CACHE_LINE_SIZE) unsigned size_;
-    std::atomic<T>* elements_;
+    std::atomic<T>* ATOMIC_QUEUE_RESTRICT elements_;
 
     ATOMIC_QUEUE_INLINE T do_pop(unsigned tail) noexcept {
         std::atomic<T>& q_element = details::map<SHUFFLE_BITS>(elements_, tail & (size_ - 1));
@@ -534,8 +534,8 @@ class AtomicQueueB2 : private std::allocator_traits<A>::template rebind_alloc<un
     // AtomicQueueCommon members are stored into by readers and writers.
     // Allocate these immutable members on another cache line which never gets invalidated by stores.
     alignas(CACHE_LINE_SIZE) unsigned size_;
-    AtomicState* states_;
-    T* elements_;
+    AtomicState* ATOMIC_QUEUE_RESTRICT states_;
+    T* ATOMIC_QUEUE_RESTRICT elements_;
 
     static constexpr auto STATES_PER_CACHE_LINE = CACHE_LINE_SIZE / sizeof(AtomicState);
     static_assert(STATES_PER_CACHE_LINE, "Unexpected STATES_PER_CACHE_LINE.");
@@ -580,7 +580,7 @@ public:
         std::uninitialized_fill_n(states_, size_, Base::EMPTY);
         A a = get_allocator();
         assert(a == allocator); // The standard requires the original and rebound allocators to manage the same state.
-        for(auto p = elements_, q = elements_ + size_; p < q; ++p)
+        for(auto* ATOMIC_QUEUE_RESTRICT p = elements_, q = elements_ + size_; p < q; ++p)
             std::allocator_traits<A>::construct(a, p);
     }
 
@@ -600,7 +600,7 @@ public:
     ~AtomicQueueB2() noexcept {
         if(elements_) {
             A a = get_allocator();
-            for(auto p = elements_, q = elements_ + size_; p < q; ++p)
+        for(auto* ATOMIC_QUEUE_RESTRICT p = elements_, q = elements_ + size_; p < q; ++p)
                 std::allocator_traits<A>::destroy(a, p);
             deallocate_(elements_);
             details::destroy_n(states_, size_);
