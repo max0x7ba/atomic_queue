@@ -76,6 +76,19 @@ add_subdirectory(atomic_queue)
 target_link_libraries(main PRIVATE atomic_queue::atomic_queue)
 ```
 
+## Using cmake FetchContent
+Since `v1.7.2`, you can also use cmake FetchContent.
+```cmake
+include(FetchContent)
+FetchContent_Declare(
+        atomic_queue
+        GIT_REPOSITORY https://github.com/max0x7ba/atomic_queue
+        GIT_TAG v1.7.2
+)
+FetchContent_MakeAvailable(atomic_queue)
+target_link_libraries(main PRIVATE atomic_queue::atomic_queue)
+```
+
 ## Install using vcpkg
 ```
 vcpkg install atomic-queue
