@@ -70,10 +70,20 @@ git clone https://github.com/max0x7ba/atomic_queue.git
 ```
 2. Add `atomic_queue/include` directory (use full path) to the include paths of your build system.
 3. `#include <atomic_queue/atomic_queue.h>` in your C++ source.
+If you use CMake, these can be simplified as follows:
+```cmake
+add_subdirectory(atomic_queue)
+target_link_libraries(main PRIVATE atomic_queue::atomic_queue)
+```
 
 ## Install using vcpkg
 ```
 vcpkg install atomic-queue
+```
+It provides CMake targets:
+```cmake
+find_package(atomic_queue CONFIG REQUIRED)
+target_link_libraries(main PRIVATE atomic_queue::atomic_queue)
 ```
 
 ## Install using conan
