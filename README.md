@@ -77,13 +77,13 @@ target_link_libraries(main PRIVATE atomic_queue::atomic_queue)
 ```
 
 ## Using cmake FetchContent
-Since `v1.7.2`, you can also use cmake FetchContent.
+You can also use CMake's FetchContent.
 ```cmake
 include(FetchContent)
 FetchContent_Declare(
         atomic_queue
-        GIT_REPOSITORY https://github.com/max0x7ba/atomic_queue
-        GIT_TAG v1.7.2
+        GIT_REPOSITORY https://github.com/max0x7ba/atomic_queue.git
+        GIT_TAG master
 )
 FetchContent_MakeAvailable(atomic_queue)
 target_link_libraries(main PRIVATE atomic_queue::atomic_queue)
