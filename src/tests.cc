@@ -262,7 +262,7 @@ BOOST_AUTO_TEST_CASE(move_constructor_assignment) {
     p = std::move(p2);
 }
 
-BOOST_AUTO_TEST_CASE(try_push) {
+BOOST_AUTO_TEST_CASE(try_push_pop) {
     using Queue = atomic_queue::AtomicQueueB2<
       /* T = */ float,
       /* A = */ std::allocator<float>,
@@ -275,19 +275,41 @@ BOOST_AUTO_TEST_CASE(try_push) {
     Queue q(CAPACITY);
     BOOST_CHECK_EQUAL(q.capacity(), CAPACITY);
     BOOST_CHECK(q.was_empty());
+    BOOST_CHECK(!q.was_full());
     BOOST_CHECK_EQUAL(q.was_size(), 0u);
+
+    // try_pop on empty queue must fail.
+    float v = -1;
+    BOOST_CHECK(!q.try_pop(v));
+    BOOST_CHECK_EQUAL(v, -1);
 
     for(unsigned i = 1; i <= CAPACITY; ++i)
         BOOST_CHECK(q.try_push(i));
 
     BOOST_CHECK(!q.was_empty());
+    BOOST_CHECK(q.was_full());
     BOOST_CHECK_EQUAL(q.was_size(), CAPACITY);
 
     for(unsigned i = 1; i <= CAPACITY; ++i)
         BOOST_CHECK(!q.try_push(i));
 
     BOOST_CHECK(!q.was_empty());
+    BOOST_CHECK(q.was_full());
     BOOST_CHECK_EQUAL(q.was_size(), CAPACITY);
+
+    for(unsigned i = 1; i <= CAPACITY; ++i) {
+        BOOST_CHECK(q.try_pop(v));
+        BOOST_CHECK_EQUAL(v, static_cast<float>(i));
+    }
+
+    BOOST_CHECK(q.was_empty());
+    BOOST_CHECK(!q.was_full());
+    BOOST_CHECK_EQUAL(q.was_size(), 0u);
+
+    // try_pop on empty queue must fail again.
+    v = -1;
+    BOOST_CHECK(!q.try_pop(v));
+    BOOST_CHECK_EQUAL(v, -1);
 }
 
 BOOST_AUTO_TEST_CASE(size) {
