@@ -21,10 +21,8 @@ namespace {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Check that all push'es are ever pop'ed once with multiple producer and multiple consumers.
-template<class Queue>
+template<class Queue, int PRODUCERS = 3, int CONSUMERS = 3>
 void stress() {
-    constexpr int PRODUCERS = 3;
-    constexpr int CONSUMERS = 3;
     constexpr unsigned N = 1000000;
     using T = typename Queue::value_type;
     constexpr T STOP = -1;
@@ -162,7 +160,7 @@ BOOST_AUTO_TEST_CASE(stress_AtomicQueue) {
     stress<RetryDecorator<AtomicQueue<unsigned, CAPACITY>>>();
 }
 
-BOOST_AUTO_TEST_CASE(stress_BlockingAtomicQueue) {
+BOOST_AUTO_TEST_CASE(stress_OptimistAtomicQueue) {
     stress<AtomicQueue<unsigned, CAPACITY>>();
 }
 
@@ -170,9 +168,26 @@ BOOST_AUTO_TEST_CASE(stress_AtomicQueue2) {
     stress<RetryDecorator<AtomicQueue2<unsigned, CAPACITY>>>();
 }
 
-BOOST_AUTO_TEST_CASE(stress_BlockingAtomicQueue2) {
+BOOST_AUTO_TEST_CASE(stress_OptimistAtomicQueue2) {
     stress<AtomicQueue2<unsigned, CAPACITY>>();
 }
+
+BOOST_AUTO_TEST_CASE(spsc_stress_AtomicQueue) {
+    stress<RetryDecorator<AtomicQueue<unsigned, CAPACITY, 0u, true, true, false, true>>, 1, 1>();
+}
+
+BOOST_AUTO_TEST_CASE(spsc_stress_OptimistAtomicQueue) {
+    stress<AtomicQueue<unsigned, CAPACITY, 0u, true, true, false, true>, 1, 1>();
+}
+
+BOOST_AUTO_TEST_CASE(spsc_stress_AtomicQueue2) {
+    stress<RetryDecorator<AtomicQueue2<unsigned, CAPACITY, true, true, false, true>>, 1, 1>();
+}
+
+BOOST_AUTO_TEST_CASE(spsc_stress_OptimistAtomicQueue2) {
+    stress<AtomicQueue2<unsigned, CAPACITY, true, true, false, true>, 1, 1>();
+}
+
 
 BOOST_AUTO_TEST_CASE(move_only_2) {
     AtomicQueue2<std::unique_ptr<int>, 2> q;
