@@ -32,4 +32,4 @@ Contributors:
 - Anton Egorushkin (https://github.com/max0x7ba/atomic_queue/pull/93)
 - Ionut Tomos (https://github.com/max0x7ba/atomic_queue/pull/96)
 - Weihang Ding (https://github.com/max0x7ba/atomic_queue/pull/97)
-
+- Weihang Ding (https://github.com/max0x7ba/atomic_queue/pull/98)
