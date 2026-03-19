@@ -32,7 +32,9 @@ jobs:
     - uses: actions/checkout@v6
 
     - name: Install Boost.Test
-      run: sudo apt-get install --yes -qq libboost-test-dev
+      run: |
+        sudo apt-get update
+        sudo apt-get install --yes -qq libboost-test-dev
 
     - name: Environment variables
       run: make -r TOOLSET=${{ matrix.toolset }} env
