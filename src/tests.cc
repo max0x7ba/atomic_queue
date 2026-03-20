@@ -189,35 +189,35 @@ BOOST_AUTO_TEST_CASE(spsc_stress_OptimistAtomicQueue2) {
 }
 
 BOOST_AUTO_TEST_CASE(stress_AtomicQueueB) {
-    stress<RetryDecorator<CapacityArgDecorator<AtomicQueueB<unsigned>, CAPACITY>>>();
+    stress<RetryDecorator<CapacityArgAdaptor<AtomicQueueB<unsigned>, CAPACITY>>>();
 }
 
 BOOST_AUTO_TEST_CASE(stress_OptimistAtomicQueueB) {
-    stress<CapacityArgDecorator<AtomicQueueB<unsigned>, CAPACITY>>();
+    stress<CapacityArgAdaptor<AtomicQueueB<unsigned>, CAPACITY>>();
 }
 
 BOOST_AUTO_TEST_CASE(stress_AtomicQueueB2) {
-    stress<RetryDecorator<CapacityArgDecorator<AtomicQueueB2<unsigned>, CAPACITY>>>();
+    stress<RetryDecorator<CapacityArgAdaptor<AtomicQueueB2<unsigned>, CAPACITY>>>();
 }
 
 BOOST_AUTO_TEST_CASE(stress_OptimistAtomicQueueB2) {
-    stress<CapacityArgDecorator<AtomicQueueB2<unsigned>, CAPACITY>>();
+    stress<CapacityArgAdaptor<AtomicQueueB2<unsigned>, CAPACITY>>();
 }
 
 BOOST_AUTO_TEST_CASE(spsc_stress_AtomicQueueB) {
-    stress<RetryDecorator<CapacityArgDecorator<AtomicQueueB<unsigned, std::allocator<unsigned>, 0u, true, false, true>, CAPACITY>>, 1, 1>();
+    stress<RetryDecorator<CapacityArgAdaptor<AtomicQueueB<unsigned, std::allocator<unsigned>, 0u, true, false, true>, CAPACITY>>, 1, 1>();
 }
 
 BOOST_AUTO_TEST_CASE(spsc_stress_OptimistAtomicQueueB) {
-    stress<CapacityArgDecorator<AtomicQueueB<unsigned, std::allocator<unsigned>, 0u, true, false, true>, CAPACITY>, 1, 1>();
+    stress<CapacityArgAdaptor<AtomicQueueB<unsigned, std::allocator<unsigned>, 0u, true, false, true>, CAPACITY>, 1, 1>();
 }
 
 BOOST_AUTO_TEST_CASE(spsc_stress_AtomicQueueB2) {
-    stress<RetryDecorator<CapacityArgDecorator<AtomicQueueB2<unsigned, std::allocator<unsigned>, true, false, true>, CAPACITY>>, 1, 1>();
+    stress<RetryDecorator<CapacityArgAdaptor<AtomicQueueB2<unsigned, std::allocator<unsigned>, true, false, true>, CAPACITY>>, 1, 1>();
 }
 
 BOOST_AUTO_TEST_CASE(spsc_stress_OptimistAtomicQueueB2) {
-    stress<CapacityArgDecorator<AtomicQueueB2<unsigned, std::allocator<unsigned>, true, false, true>, CAPACITY>, 1, 1>();
+    stress<CapacityArgAdaptor<AtomicQueueB2<unsigned, std::allocator<unsigned>, true, false, true>, CAPACITY>, 1, 1>();
 }
 
 BOOST_AUTO_TEST_CASE(move_only_2) {

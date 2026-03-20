@@ -650,8 +650,8 @@ struct RetryDecorator : Queue {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<class Queue, size_t Capacity>
-struct CapacityArgDecorator : Queue {
-    CapacityArgDecorator()
+struct CapacityArgAdaptor : Queue {
+    CapacityArgAdaptor()
         : Queue(Capacity)
     {}
 };

@@ -6,7 +6,7 @@
 #   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) BUILD=debug run_tests
 #   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) all run_tests
 #   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) run_benchmarks
-#   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TAGS
+#   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=clang-20 BUILD=debug TAGS
 #   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=clang-20 BUILD=debug run_tests
 #   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=clang BUILD=sanitize run_tests
 #   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=clang run_benchmarks
