@@ -2,7 +2,7 @@
 [![MIT license](https://img.shields.io/github/license/max0x7ba/atomic_queue)](https://github.com/max0x7ba/atomic_queue/blob/master/LICENSE)
 [![Latest release](https://img.shields.io/github/v/tag/max0x7ba/atomic_queue?label=latest%20release)](https://github.com/max0x7ba/atomic_queue/releases/tag/v1.7.3)
 [![Conan Center](https://img.shields.io/conan/v/atomic_queue)](https://conan.io/center/recipes/atomic_queue)
-![Vcpkg Version](https://img.shields.io/vcpkg/v/atomic-queue)
+[![Vcpkg Version](https://img.shields.io/vcpkg/v/atomic-queue)](https://vcpkg.io/en/package/atomic-queue)
 <br>
 [![Makefile Continuous Integrations](https://github.com/max0x7ba/atomic_queue/actions/workflows/ci.yml/badge.svg)](https://github.com/max0x7ba/atomic_queue/actions/workflows/ci.yml)
 [![CMake Continuous Integrations](https://github.com/max0x7ba/atomic_queue/actions/workflows/cmake-gcc-clang.yml/badge.svg)](https://github.com/max0x7ba/atomic_queue/actions/workflows/cmake-gcc-clang.yml)
