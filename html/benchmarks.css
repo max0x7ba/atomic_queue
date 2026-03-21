@@ -65,3 +65,7 @@ span.highcharts-caption {
     text-wrap: balance;
     overflow: visible;
 }
+
+.highcharts-tooltip {
+    z-index: 100;
+}
