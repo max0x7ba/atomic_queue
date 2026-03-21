@@ -204,7 +204,7 @@ $(function() {
                     atomic_queue_stats: stats,
                 });
                 series.push({
-                    name: `${s.name} StdDev`,
+                    name: `${name} StdDev`,
                     type: 'errorbar',
                     data: [[index, mean - stdev, mean + stdev]],
                 });
