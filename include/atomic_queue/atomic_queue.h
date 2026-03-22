@@ -125,7 +125,7 @@ constexpr T nil() noexcept {
 }
 
 template<class T>
-ATOMIC_QUEUE_INLINE static void destroy_n(T* p, unsigned n) noexcept {
+ATOMIC_QUEUE_INLINE static void destroy_n(T* ATOMIC_QUEUE_RESTRICT p, unsigned n) noexcept {
     for(auto q = p + n; p != q;)
         (p++)->~T();
 }
@@ -452,8 +452,14 @@ class AtomicQueueB : private std::allocator_traits<A>::template rebind_alloc<std
 
     // AtomicQueueCommon members are stored into by readers and writers.
     // Allocate these immutable members on another cache line which never gets invalidated by stores.
-    alignas(CACHE_LINE_SIZE) unsigned size_;
-    std::atomic<T>* elements_;
+    alignas(CACHE_LINE_SIZE)
+    unsigned size_;
+
+    // The C++ strict aliasing rules assume that pointers to the same decayed type may alias.
+    // The C++ strict aliasing rules assume that pointers to any char type may alias anything and everything.
+    // A dynamically allocated array may not alias anything else by construction.
+    // Explicitly annotate the circular buffer array pointer as not aliasing anything else with restrict keyword.
+    std::atomic<T>* ATOMIC_QUEUE_RESTRICT elements_;
 
     ATOMIC_QUEUE_INLINE T do_pop(unsigned tail) noexcept {
         std::atomic<T>& q_element = details::map<SHUFFLE_BITS>(elements_, tail & (size_ - 1));
@@ -533,9 +539,15 @@ class AtomicQueueB2 : private std::allocator_traits<A>::template rebind_alloc<un
 
     // AtomicQueueCommon members are stored into by readers and writers.
     // Allocate these immutable members on another cache line which never gets invalidated by stores.
-    alignas(CACHE_LINE_SIZE) unsigned size_;
-    AtomicState* states_;
-    T* elements_;
+    alignas(CACHE_LINE_SIZE)
+    unsigned size_;
+
+    // The C++ strict aliasing rules assume that pointers to the same decayed type may alias.
+    // The C++ strict aliasing rules assume that pointers to any char type may alias anything and everything.
+    // A dynamically allocated array may not alias anything else by construction.
+    // Explicitly annotate the circular buffer array pointers as not aliasing anything else with restrict keyword.
+    AtomicState* ATOMIC_QUEUE_RESTRICT states_;
+    T* ATOMIC_QUEUE_RESTRICT elements_;
 
     static constexpr auto STATES_PER_CACHE_LINE = CACHE_LINE_SIZE / sizeof(AtomicState);
     static_assert(STATES_PER_CACHE_LINE, "Unexpected STATES_PER_CACHE_LINE.");

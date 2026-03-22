@@ -80,18 +80,6 @@ static inline void spin_loop_pause() noexcept {}
 
 namespace atomic_queue {
 
-#if defined(__GNUC__) || defined(__clang__)
-#define ATOMIC_QUEUE_LIKELY(expr) __builtin_expect(static_cast<bool>(expr), 1)
-#define ATOMIC_QUEUE_UNLIKELY(expr) __builtin_expect(static_cast<bool>(expr), 0)
-#define ATOMIC_QUEUE_NOINLINE __attribute__((noinline))
-#define ATOMIC_QUEUE_INLINE inline __attribute__((always_inline))
-#else
-#define ATOMIC_QUEUE_LIKELY(expr) (expr)
-#define ATOMIC_QUEUE_UNLIKELY(expr) (expr)
-#define ATOMIC_QUEUE_NOINLINE
-#define ATOMIC_QUEUE_INLINE inline
-#endif
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 auto constexpr A = std::memory_order_acquire;
@@ -103,6 +91,26 @@ auto constexpr AR = std::memory_order_acq_rel;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 } // namespace atomic_queue
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#if defined(__GNUC__) || defined(__clang__)
+#define ATOMIC_QUEUE_LIKELY(expr) __builtin_expect(static_cast<bool>(expr), 1)
+#define ATOMIC_QUEUE_UNLIKELY(expr) __builtin_expect(static_cast<bool>(expr), 0)
+#define ATOMIC_QUEUE_NOINLINE __attribute__((noinline))
+#define ATOMIC_QUEUE_INLINE inline __attribute__((always_inline))
+#define ATOMIC_QUEUE_RESTRICT __restrict__
+#else
+#define ATOMIC_QUEUE_LIKELY(expr) (expr)
+#define ATOMIC_QUEUE_UNLIKELY(expr) (expr)
+#define ATOMIC_QUEUE_NOINLINE
+#define ATOMIC_QUEUE_INLINE inline
+#ifdef _MSC_VER
+#define ATOMIC_QUEUE_RESTRICT __restrict
+#else
+#define ATOMIC_QUEUE_RESTRICT
+#endif
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
