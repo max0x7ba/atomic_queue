@@ -24,6 +24,18 @@ static inline void spin_loop_pause() noexcept {
 }
 
 #elif defined(__arm__) || defined(__aarch64__) || defined(_M_ARM64)
+/*
+TODO:
+
+"asm volatile" is adequate and sufficient to prevent the asm statements from being reordered by a compiler relative to any and all preceding and following statements.
+
+The "memory" clobber in an asm statement invalidates all memory and all registers loaded from memory prior to the asm statement, forcing compilers to emit otherwise unnecessary machine code to reload registers from memory. "memory" clobbers is one of the worst performance killers -- a key motivation for inventing std::memory_order. std::memory_order is the extreme opposite of asm "memory" clobbers enabling fine-grained control of non-atomic instruction reordering relative to atomic instructions, obviating the need to ever use the most detrimental and undesirable asm "memory" clobbers.
+
+The asm "memory" clobbers defeat and undo any and all positive effects of the precise weakest and cheapest possible std::memory_order arguments this library calls std::atomic member functions with. The benchmarks built for ARM are unlikely to perform anywhere near/similar to the x86_64 benchmark levels of performance with the asm "memory" clobber.
+
+The effects of asm "memory" clobber have only recently become intuitively familiar to me and I don't have access to a multi-core ARM workstation to benchmark the performance boost of removing the asm "memory" clobber. Which I expect to be significant, based on my experience of relaxing std::memory_orders on x86_64 platform. Hence, benchmarking on multi-core ARM hardware is required to validate/justify removing the "memory" clobber.
+*/
+
 constexpr int CACHE_LINE_SIZE = 64;
 static inline void spin_loop_pause() noexcept {
 #if (defined(__ARM_ARCH_6K__) || \
@@ -46,13 +58,13 @@ static inline void spin_loop_pause() noexcept {
 }
 
 #elif defined(__ppc64__) || defined(__powerpc64__)
-constexpr int CACHE_LINE_SIZE = 128; // TODO: Review that this is the correct value.
+constexpr int CACHE_LINE_SIZE = 128;
 static inline void spin_loop_pause() noexcept {
-    asm volatile("or 31,31,31 # very low priority"); // TODO: Review and benchmark that this is the right instruction.
+    asm volatile("or 31,31,31 # very low priority");
 }
 
 #elif defined(__s390x__)
-constexpr int CACHE_LINE_SIZE = 256; // TODO: Review that this is the correct value.
+constexpr int CACHE_LINE_SIZE = 256;
 static inline void spin_loop_pause() noexcept {} // TODO: Find the right instruction to use here, if any.
 
 #elif defined(__riscv)
