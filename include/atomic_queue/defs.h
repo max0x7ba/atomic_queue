@@ -6,16 +6,24 @@
 
 #include <atomic>
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Define a CPU-specific spin_loop_pause function.
+// "static inline" documentation: https://gcc.gnu.org/onlinedocs/gcc/Inline.html
+
 #if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
 #include <emmintrin.h>
+#endif
+
 namespace atomic_queue {
+
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
 constexpr int CACHE_LINE_SIZE = 64;
 static inline void spin_loop_pause() noexcept {
     _mm_pause();
 }
-} // namespace atomic_queue
+
 #elif defined(__arm__) || defined(__aarch64__) || defined(_M_ARM64)
-namespace atomic_queue {
 constexpr int CACHE_LINE_SIZE = 64;
 static inline void spin_loop_pause() noexcept {
 #if (defined(__ARM_ARCH_6K__) || \
@@ -36,49 +44,39 @@ static inline void spin_loop_pause() noexcept {
     asm volatile ("nop" ::: "memory");
 #endif
 }
-} // namespace atomic_queue
+
 #elif defined(__ppc64__) || defined(__powerpc64__)
-namespace atomic_queue {
 constexpr int CACHE_LINE_SIZE = 128; // TODO: Review that this is the correct value.
 static inline void spin_loop_pause() noexcept {
     asm volatile("or 31,31,31 # very low priority"); // TODO: Review and benchmark that this is the right instruction.
 }
-} // namespace atomic_queue
+
 #elif defined(__s390x__)
-namespace atomic_queue {
 constexpr int CACHE_LINE_SIZE = 256; // TODO: Review that this is the correct value.
 static inline void spin_loop_pause() noexcept {} // TODO: Find the right instruction to use here, if any.
-} // namespace atomic_queue
+
 #elif defined(__riscv)
-namespace atomic_queue {
 constexpr int CACHE_LINE_SIZE = 64;
 static inline void spin_loop_pause() noexcept {
     asm volatile (".insn i 0x0F, 0, x0, x0, 0x010");
 }
-} // namespace atomic_queue
+
 #elif defined(__loongarch__)
-namespace atomic_queue {
 constexpr int CACHE_LINE_SIZE = 64;
-static inline void spin_loop_pause() noexcept
-{
+static inline void spin_loop_pause() noexcept {
     asm volatile("nop \n nop \n nop \n nop \n nop \n nop \n nop \n nop");
 }
-} // namespace atomic_queue
+
 #else
 #ifdef _MSC_VER
 #pragma message("Unknown CPU architecture. Using L1 cache line size of 64 bytes and no spinloop pause instruction.")
 #else
 #warning "Unknown CPU architecture. Using L1 cache line size of 64 bytes and no spinloop pause instruction."
 #endif
-namespace atomic_queue {
+
 constexpr int CACHE_LINE_SIZE = 64; // TODO: Review that this is the correct value.
 static inline void spin_loop_pause() noexcept {}
-} // namespace atomic_queue
 #endif
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-namespace atomic_queue {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
