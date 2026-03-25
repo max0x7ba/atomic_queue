@@ -132,7 +132,7 @@ $(function() {
                 formatter: tooltip_formatter,
                 shared: true,
             },
-            caption: get_caption(div_id),
+            // caption: get_caption(div_id),
         });
     }
 
@@ -220,7 +220,8 @@ $(function() {
     function plot_latency(div_id, results) {
         function createChart(chartType) {
             const viewOptions = latencyViewOptions[chartType](results, createChart);
-            Highcharts.chart(div_id, $.extend({caption: get_caption(div_id)}, viewOptions, latencyChartOptions));
+            // Highcharts.chart(div_id, $.extend({caption: get_caption(div_id)}, viewOptions, latencyChartOptions));
+            Highcharts.chart(div_id, $.extend(true, viewOptions, latencyChartOptions));
         };
         createChart("bar");
     };
