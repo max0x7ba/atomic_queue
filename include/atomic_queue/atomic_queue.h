@@ -68,7 +68,7 @@ ATOMIC_QUEUE_INLINE constexpr unsigned remap_index<0>(unsigned index) noexcept {
 }
 
 template<int BITS, class T>
-ATOMIC_QUEUE_INLINE static constexpr T& map(T* elements, unsigned index) noexcept {
+ATOMIC_QUEUE_INLINE static constexpr T& map(T* ATOMIC_QUEUE_RESTRICT elements, unsigned index) noexcept {
     return elements[remap_index<BITS>(index)];
 }
 
