@@ -19,6 +19,7 @@
 #
 
 SHELL := /bin/bash
+.SHELLFLAGS := --norc -o pipefail -c
 
 export BUILD := release
 export TOOLSET := gcc
