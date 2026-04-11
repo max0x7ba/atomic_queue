@@ -10,6 +10,7 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <memory>
 #include <utility>
 
@@ -292,6 +293,33 @@ public:
         return true;
     }
 
+    template<class InputIt>
+    ATOMIC_QUEUE_INLINE InputIt try_push(InputIt first, InputIt const last) noexcept {
+        int pushes = static_cast<int>(std::distance(first, last));
+        auto head = head_.load(X);
+        if(Derived::spsc_) {
+            int const slots = static_cast<int>(tail_.load(X) + static_cast<Derived&>(*this).size_ - head);
+            pushes = std::min(slots, pushes);
+            if (pushes > 0)
+                head_.store(head + static_cast<unsigned>(pushes), X);
+        }
+        else {
+            int const length = pushes;
+            do {
+                int const slots = static_cast<int>(tail_.load(X) + static_cast<Derived&>(*this).size_ - head);
+                pushes = std::min(slots, length);
+                if (pushes <= 0)
+                    break;
+            } while(ATOMIC_QUEUE_UNLIKELY(!head_.compare_exchange_weak(head, head + static_cast<unsigned>(pushes), X, X))); // This loop is not FIFO.
+        }
+
+        int const end = head + pushes;
+        while (head < end) {
+            static_cast<Derived&>(*this).do_push(*first++, head++);
+        }
+        return first;
+    }
+
     template<class T>
     ATOMIC_QUEUE_INLINE bool try_pop(T& element) noexcept {
         auto tail = tail_.load(X);
@@ -323,6 +351,23 @@ public:
             head = head_.fetch_add(1, memory_order); // FIFO and total order on Intel regardless, as of 2019.
         }
         static_cast<Derived&>(*this).do_push(std::forward<T>(element), head);
+    }
+
+    template<class InputIt>
+    ATOMIC_QUEUE_INLINE void push(InputIt first, InputIt const last) noexcept {
+        unsigned const length = static_cast<unsigned>(std::distance(first, last));
+        unsigned head;
+        if(Derived::spsc_) {
+            head = head_.load(X);
+            head_.store(head + length, X);
+        }
+        else {
+            constexpr auto memory_order = Derived::total_order_ ? std::memory_order_seq_cst : std::memory_order_relaxed;
+            head = head_.fetch_add(length, memory_order); // FIFO and total order on Intel regardless, as of 2019.
+        }
+        while (first != last) {
+            static_cast<Derived&>(*this).do_push(*first++, head++);
+        }
     }
 
     ATOMIC_QUEUE_INLINE auto pop() noexcept {
