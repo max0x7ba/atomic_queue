@@ -21,7 +21,7 @@ namespace {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Check that all push'es are ever pop'ed once with multiple producer and multiple consumers.
-template<class Queue, int PRODUCERS = 3, int CONSUMERS = 3>
+template<class Queue, int PRODUCERS = 3, int CONSUMERS = 3, int BATCH = 1>
 void stress() {
     constexpr unsigned N = 1000000;
     using T = typename Queue::value_type;
@@ -34,8 +34,19 @@ void stress() {
     for(unsigned i = 0; i < PRODUCERS; ++i)
         producers[i] = std::thread([&q, &barrier, N=N]() {
             barrier.wait();
-            for(T n = N; n; --n)
-                q.push(n);
+            for(T n = N; n;) {
+                if (BATCH <= 1) {
+                    q.push(n--);
+                }
+                else {
+                    T buffer[BATCH];
+                    unsigned j = 0;
+                    while (j < BATCH && n) {
+                        buffer[j++] = n--;
+                    }
+                    q.push(buffer, buffer + j);
+                }
+            }
         });
 
     uint64_t results[CONSUMERS];
@@ -160,64 +171,128 @@ BOOST_AUTO_TEST_CASE(stress_AtomicQueue) {
     stress<RetryDecorator<AtomicQueue<unsigned, CAPACITY>>>();
 }
 
+BOOST_AUTO_TEST_CASE(stress_AtomicQueue_batch) {
+    stress<RetryDecorator<AtomicQueue<unsigned, CAPACITY>>, 3, 3, 12>();
+}
+
 BOOST_AUTO_TEST_CASE(stress_OptimistAtomicQueue) {
     stress<AtomicQueue<unsigned, CAPACITY>>();
+}
+
+BOOST_AUTO_TEST_CASE(stress_OptimistAtomicQueue_batch) {
+    stress<AtomicQueue<unsigned, CAPACITY>, 3, 3, 12>();
 }
 
 BOOST_AUTO_TEST_CASE(stress_AtomicQueue2) {
     stress<RetryDecorator<AtomicQueue2<unsigned, CAPACITY>>>();
 }
 
+BOOST_AUTO_TEST_CASE(stress_AtomicQueue2_batch) {
+    stress<RetryDecorator<AtomicQueue2<unsigned, CAPACITY>>, 3, 3, 12>();
+}
+
 BOOST_AUTO_TEST_CASE(stress_OptimistAtomicQueue2) {
     stress<AtomicQueue2<unsigned, CAPACITY>>();
+}
+
+BOOST_AUTO_TEST_CASE(stress_OptimistAtomicQueue2_batch) {
+    stress<AtomicQueue2<unsigned, CAPACITY>, 3, 3, 12>();
 }
 
 BOOST_AUTO_TEST_CASE(spsc_stress_AtomicQueue) {
     stress<RetryDecorator<AtomicQueue<unsigned, CAPACITY, 0u, true, true, false, true>>, 1, 1>();
 }
 
+BOOST_AUTO_TEST_CASE(spsc_stress_AtomicQueue_batch) {
+    stress<RetryDecorator<AtomicQueue<unsigned, CAPACITY, 0u, true, true, false, true>>, 1, 1, 12>();
+}
+
 BOOST_AUTO_TEST_CASE(spsc_stress_OptimistAtomicQueue) {
     stress<AtomicQueue<unsigned, CAPACITY, 0u, true, true, false, true>, 1, 1>();
+}
+
+BOOST_AUTO_TEST_CASE(spsc_stress_OptimistAtomicQueue_batch) {
+    stress<AtomicQueue<unsigned, CAPACITY, 0u, true, true, false, true>, 1, 1, 12>();
 }
 
 BOOST_AUTO_TEST_CASE(spsc_stress_AtomicQueue2) {
     stress<RetryDecorator<AtomicQueue2<unsigned, CAPACITY, true, true, false, true>>, 1, 1>();
 }
 
+BOOST_AUTO_TEST_CASE(spsc_stress_AtomicQueue2_batch) {
+    stress<RetryDecorator<AtomicQueue2<unsigned, CAPACITY, true, true, false, true>>, 1, 1, 12>();
+}
+
 BOOST_AUTO_TEST_CASE(spsc_stress_OptimistAtomicQueue2) {
     stress<AtomicQueue2<unsigned, CAPACITY, true, true, false, true>, 1, 1>();
+}
+
+BOOST_AUTO_TEST_CASE(spsc_stress_OptimistAtomicQueue2_batch) {
+    stress<AtomicQueue2<unsigned, CAPACITY, true, true, false, true>, 1, 1, 12>();
 }
 
 BOOST_AUTO_TEST_CASE(stress_AtomicQueueB) {
     stress<RetryDecorator<CapacityArgAdaptor<AtomicQueueB<unsigned>, CAPACITY>>>();
 }
 
+BOOST_AUTO_TEST_CASE(stress_AtomicQueueB_batch) {
+    stress<RetryDecorator<CapacityArgAdaptor<AtomicQueueB<unsigned>, CAPACITY>>, 3, 3, 12>();
+}
+
 BOOST_AUTO_TEST_CASE(stress_OptimistAtomicQueueB) {
     stress<CapacityArgAdaptor<AtomicQueueB<unsigned>, CAPACITY>>();
+}
+
+BOOST_AUTO_TEST_CASE(stress_OptimistAtomicQueueB_batch) {
+    stress<CapacityArgAdaptor<AtomicQueueB<unsigned>, CAPACITY>, 3, 3, 12>();
 }
 
 BOOST_AUTO_TEST_CASE(stress_AtomicQueueB2) {
     stress<RetryDecorator<CapacityArgAdaptor<AtomicQueueB2<unsigned>, CAPACITY>>>();
 }
 
+BOOST_AUTO_TEST_CASE(stress_AtomicQueueB2_batch) {
+    stress<RetryDecorator<CapacityArgAdaptor<AtomicQueueB2<unsigned>, CAPACITY>>, 3, 3, 12>();
+}
+
 BOOST_AUTO_TEST_CASE(stress_OptimistAtomicQueueB2) {
     stress<CapacityArgAdaptor<AtomicQueueB2<unsigned>, CAPACITY>>();
+}
+
+BOOST_AUTO_TEST_CASE(stress_OptimistAtomicQueueB2_batch) {
+    stress<CapacityArgAdaptor<AtomicQueueB2<unsigned>, CAPACITY>, 3, 3, 12>();
 }
 
 BOOST_AUTO_TEST_CASE(spsc_stress_AtomicQueueB) {
     stress<RetryDecorator<CapacityArgAdaptor<AtomicQueueB<unsigned, std::allocator<unsigned>, 0u, true, false, true>, CAPACITY>>, 1, 1>();
 }
 
+BOOST_AUTO_TEST_CASE(spsc_stress_AtomicQueueB_batch) {
+    stress<RetryDecorator<CapacityArgAdaptor<AtomicQueueB<unsigned, std::allocator<unsigned>, 0u, true, false, true>, CAPACITY>>, 1, 1, 12>();
+}
+
 BOOST_AUTO_TEST_CASE(spsc_stress_OptimistAtomicQueueB) {
     stress<CapacityArgAdaptor<AtomicQueueB<unsigned, std::allocator<unsigned>, 0u, true, false, true>, CAPACITY>, 1, 1>();
+}
+
+BOOST_AUTO_TEST_CASE(spsc_stress_OptimistAtomicQueueB_batch) {
+    stress<CapacityArgAdaptor<AtomicQueueB<unsigned, std::allocator<unsigned>, 0u, true, false, true>, CAPACITY>, 1, 1, 12>();
 }
 
 BOOST_AUTO_TEST_CASE(spsc_stress_AtomicQueueB2) {
     stress<RetryDecorator<CapacityArgAdaptor<AtomicQueueB2<unsigned, std::allocator<unsigned>, true, false, true>, CAPACITY>>, 1, 1>();
 }
 
+BOOST_AUTO_TEST_CASE(spsc_stress_AtomicQueueB2_batch) {
+    stress<RetryDecorator<CapacityArgAdaptor<AtomicQueueB2<unsigned, std::allocator<unsigned>, true, false, true>, CAPACITY>>, 1, 1, 12>();
+}
+
 BOOST_AUTO_TEST_CASE(spsc_stress_OptimistAtomicQueueB2) {
     stress<CapacityArgAdaptor<AtomicQueueB2<unsigned, std::allocator<unsigned>, true, false, true>, CAPACITY>, 1, 1>();
+}
+
+BOOST_AUTO_TEST_CASE(spsc_stress_OptimistAtomicQueueB2_batch) {
+    stress<CapacityArgAdaptor<AtomicQueueB2<unsigned, std::allocator<unsigned>, true, false, true>, CAPACITY>, 1, 1, 12>();
 }
 
 BOOST_AUTO_TEST_CASE(move_only_2) {

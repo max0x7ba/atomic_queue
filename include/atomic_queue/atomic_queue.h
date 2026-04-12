@@ -294,12 +294,13 @@ public:
     }
 
     template<class T>
-    ATOMIC_QUEUE_INLINE unsigned try_push(T* ATOMIC_QUEUE_RESTRICT p, unsigned n) noexcept {
+    ATOMIC_QUEUE_INLINE T* try_push(T* ATOMIC_QUEUE_RESTRICT first, T* const last) noexcept {
+        unsigned n = static_cast<unsigned> (last - first);
         auto head = head_.load(X);
         if(Derived::spsc_) {
             int const slots = static_cast<int>(tail_.load(X) + static_cast<Derived&>(*this).size_ - head);
             if (slots <= 0)
-                return 0;
+                return first;
             n = std::min(n, static_cast<unsigned>(slots));
             head_.store(head + n, X);
         }
@@ -308,15 +309,15 @@ public:
             do {
                 int const slots = static_cast<int>(tail_.load(X) + static_cast<Derived&>(*this).size_ - head);
                 if (slots <= 0)
-                    return 0;
+                    return first;
                 n = std::min(length, static_cast<unsigned>(slots));
             } while(ATOMIC_QUEUE_UNLIKELY(!head_.compare_exchange_weak(head, head + n, X, X))); // This loop is not FIFO.
         }
 
-        for (T* q = p + n; p != q;) {
-            static_cast<Derived&>(*this).do_push(*p++, head++);
+        while (n--) {
+            static_cast<Derived&>(*this).do_push(*first++, head++);
         }
-        return n;
+        return first;
     }
 
     template<class T>
@@ -353,7 +354,8 @@ public:
     }
 
     template<class T>
-    ATOMIC_QUEUE_INLINE void push(T* ATOMIC_QUEUE_RESTRICT p, unsigned n) noexcept {
+    ATOMIC_QUEUE_INLINE void push(T* ATOMIC_QUEUE_RESTRICT first, T* const last) noexcept {
+        unsigned n = static_cast<unsigned>(last - first);
         unsigned head;
         if(Derived::spsc_) {
             head = head_.load(X);
@@ -363,8 +365,8 @@ public:
             constexpr auto memory_order = Derived::total_order_ ? std::memory_order_seq_cst : std::memory_order_relaxed;
             head = head_.fetch_add(n, memory_order); // FIFO and total order on Intel regardless, as of 2019.
         }
-        for (T* q = p + n; p != q;) {
-            static_cast<Derived&>(*this).do_push(*p++, head++);
+        while (n--) {
+            static_cast<Derived&>(*this).do_push(*first++, head++);
         }
     }
 
@@ -692,6 +694,12 @@ struct RetryDecorator : Queue {
     ATOMIC_QUEUE_INLINE void push(T element) noexcept {
         while(!this->try_push(element))
             spin_loop_pause();
+    }
+
+    ATOMIC_QUEUE_INLINE void push(T* first, T* const last) noexcept {
+        while(last != (first = this->try_push(first, last))) {
+            spin_loop_pause();
+        }
     }
 
     ATOMIC_QUEUE_INLINE T pop() noexcept {
