@@ -313,7 +313,7 @@ public:
             } while(ATOMIC_QUEUE_UNLIKELY(!head_.compare_exchange_weak(head, head + n, X, X))); // This loop is not FIFO.
         }
 
-        for (T* q = p + n; p != q;)
+        for (T* q = p + n; p != q;) {
             static_cast<Derived&>(*this).do_push(*p++, head++);
         }
         return n;
@@ -363,7 +363,7 @@ public:
             constexpr auto memory_order = Derived::total_order_ ? std::memory_order_seq_cst : std::memory_order_relaxed;
             head = head_.fetch_add(n, memory_order); // FIFO and total order on Intel regardless, as of 2019.
         }
-        for (T* q = p + n; p != q;)
+        for (T* q = p + n; p != q;) {
             static_cast<Derived&>(*this).do_push(*p++, head++);
         }
     }
