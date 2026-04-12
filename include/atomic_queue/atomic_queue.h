@@ -10,7 +10,6 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
-#include <iterator>
 #include <memory>
 #include <utility>
 
@@ -295,28 +294,28 @@ public:
 
     template<class T>
     ATOMIC_QUEUE_INLINE T* try_push(T* ATOMIC_QUEUE_RESTRICT first, T* const last) noexcept {
-        unsigned n = static_cast<unsigned> (last - first);
+        int n = static_cast<int>(last - first);
         auto head = head_.load(X);
         if(Derived::spsc_) {
             int const slots = static_cast<int>(tail_.load(X) + static_cast<Derived&>(*this).size_ - head);
-            if (slots <= 0)
+            n = std::min(n, slots);
+            if (n <= 0)
                 return first;
-            n = std::min(n, static_cast<unsigned>(slots));
-            head_.store(head + n, X);
+            head_.store(head + static_cast<unsigned>(n), X);
         }
         else {
-            unsigned const length = n;
+            int const length = n;
             do {
                 int const slots = static_cast<int>(tail_.load(X) + static_cast<Derived&>(*this).size_ - head);
-                if (slots <= 0)
+                n = std::min(length, slots);
+                if (n <= 0)
                     return first;
-                n = std::min(length, static_cast<unsigned>(slots));
-            } while(ATOMIC_QUEUE_UNLIKELY(!head_.compare_exchange_weak(head, head + n, X, X))); // This loop is not FIFO.
+            } while(ATOMIC_QUEUE_UNLIKELY(!head_.compare_exchange_weak(head, head + static_cast<unsigned>(n), X, X))); // This loop is not FIFO.
         }
 
-        while (n--) {
+        do {
             static_cast<Derived&>(*this).do_push(*first++, head++);
-        }
+        } while (--n);
         return first;
     }
 
