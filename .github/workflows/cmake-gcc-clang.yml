@@ -78,7 +78,7 @@ jobs:
 
     - name: Install boost on windows
       if: startsWith(matrix.os, 'windows') && matrix.compiler.cpp == 'cl'
-      uses: MarkusJx/install-boost@v2.5.1
+      uses: MarkusJx/install-boost@v2.6.0
       id: install-boost-windows
       with:
         boost_version: 1.89.0
