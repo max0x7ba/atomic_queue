@@ -37,6 +37,8 @@ cc.clang := clang
 ld.clang := clang++
 ar.clang := ar
 
+head1 := awk 'FNR<2'
+
 toolset_family := $(or $(findstring gcc,${TOOLSET}),$(findstring clang,${TOOLSET}))
 toolset_suffix := $(subst ${toolset_family},,${TOOLSET})
 toolset_flags = $(or ${${1}.${TOOLSET}},${${1}.${toolset_family}},$(error ${1}.${TOOLSET} is undefined))
@@ -47,15 +49,17 @@ CC := $(call toolset_exe,cc)
 LD := $(call toolset_exe,ld)
 AR := $(call toolset_exe,ar,ar)
 
-# uname_m := $(shell uname -m)
 export ASM := 0
 
-cxxflags.gcc.asm.1 := -save-temps=obj -fverbose-asm -masm=intel -fcf-protection=none -fno-{stack-protector,stack-clash-protection}
+uname_m := $(shell uname -m)
+cxxflags.x86_64 := -fcf-protection=none -masm=intel
+
+cxxflags.gcc.asm.1 := -save-temps=obj -fverbose-asm -fno-{stack-protector,stack-clash-protection}
 cxxflags.gcc.debug := -Og -f{stack-protector-all,no-omit-frame-pointer} # -D_GLIBCXX_DEBUG
 cxxflags.gcc.release := -O3 -mtune=native -falign-{functions,loops}=64 -DNDEBUG ${cxxflags.gcc.asm.${ASM}}
 cxxflags.gcc.sanitize := ${cxxflags.gcc.debug} -fsanitize=thread
 cxxflags.gcc.sanitize2 := ${cxxflags.gcc.debug} -fsanitize=undefined,address
-cxxflags.gcc := -march=native -f{no-plt,no-math-errno,finite-math-only,message-length=0} -W{all,extra,error,no-{array-bounds,maybe-uninitialized,unused-variable,unused-function,unused-local-typedefs}} ${cxxflags.gcc.${BUILD}}
+cxxflags.gcc := -march=native -f{no-plt,no-math-errno,finite-math-only,message-length=0} -W{all,extra,error,no-{array-bounds,maybe-uninitialized,unused-variable,unused-function,unused-local-typedefs}} ${cxxflags.gcc.${BUILD}} -pipe
 ldflags.gcc.sanitize := ${ldflags.gcc.debug} -fsanitize=thread
 ldflags.gcc.sanitize2 := ${ldflags.gcc.debug} -fsanitize=undefined,address
 # ldflags.gcc := -fuse-ld=${use-ld.gcc} -Wl,--compress-debug-sections=zstd,-O2,--gc-sections ${ldflags.gcc.${BUILD}}
@@ -74,7 +78,7 @@ ldflags.clang.sanitize2 := ${ldflags.clang.debug} -fsanitize=undefined,address
 ldflags.clang := -stdlib=libstdc++ ${ldflags.clang.${BUILD}}
 
 # Additional CPPFLAGS, CXXFLAGS, LDLIBS, LDFLAGS can come from the command line, e.g. make CPPFLAGS='-I<my-include-dir>', or from environment variables.
-cxxflags := -std=c++14 -pthread -g $(call toolset_flags,cxxflags) ${CXXFLAGS}
+cxxflags := -std=c++14 -pthread -g $(call toolset_flags,cxxflags) ${cxxflags.${uname_m}} ${CXXFLAGS}
 cppflags := -Iinclude ${CPPFLAGS}
 ldflags := -pthread -g $(call toolset_flags,ldflags) ${LDFLAGS}
 ldlibs := -lrt ${LDLIBS}
@@ -156,7 +160,7 @@ ${build_dir}/.make : | ${build_dir}
 ${build_dir} ${build_dir}/.make:
 	mkdir -p $@
 
-ver = "$(shell ${1} --version | head -n1)"
+ver = "$(shell ${1} --version | ${head1})"
 # Trigger recompilation when compiler environment change.
 env.compile := $(call ver,${CXX}) ${cppflags} ${cxxflags} ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium} ${cxxflags.tbb} ${cxxflags.moodycamel} ${cxxflags.xenium}
 # Trigger relink when linker environment change.
@@ -189,8 +193,8 @@ clean :
 	rm -rf ${exes} ${build_dir}
 
 versions:
-	${MAKE} --version | awk 'FNR<2'
-	${CXX} --version | head -n1
+	${MAKE} --version | ${head1}
+	${CXX} --version | ${head1}
 
 env :
 	uname --all
