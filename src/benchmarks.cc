@@ -35,6 +35,7 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 using std::uint64_t;
+using std::int64_t;
 
 using namespace ::atomic_queue;
 
@@ -46,15 +47,18 @@ template<class T>
 using Type = std::common_type<T>; // Similar to boost::type<>.
 
 using sum_t = long long;
-using cycles_t = decltype(__builtin_ia32_rdtsc());
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+using cycles_t = decltype(__builtin_ia32_rdtsc());
+static_assert(std::is_unsigned<cycles_t>::value);
+using icycles_t = std::make_signed<cycles_t>::type; // Signed integers convert into double with one AVX instruction, unlike unsigned.
+cycles_t constexpr CYCLES_MAX = -1;
+
 double const TSC_TO_SECONDS = 1e-9 / cpu_base_frequency();
 
-template<class T>
-inline double to_seconds(T tsc) {
-    return tsc * TSC_TO_SECONDS;
+ATOMIC_QUEUE_INLINE double to_seconds(icycles_t cycles) noexcept {
+    return cycles * TSC_TO_SECONDS;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -63,12 +67,12 @@ template<class Queue>
 struct BoostSpScAdapter : Queue {
     using T = typename Queue::value_type;
 
-    void push(T element) {
+    ATOMIC_QUEUE_INLINE void push(T element) {
         while(!this->Queue::push(element))
             spin_loop_pause();
     }
 
-    T pop() {
+    ATOMIC_QUEUE_INLINE T pop() {
         T element;
         while(!this->Queue::pop(element))
             spin_loop_pause();
@@ -80,7 +84,7 @@ template<class Queue>
 struct BoostQueueAdapter : BoostSpScAdapter<Queue> {
     using T = typename Queue::value_type;
 
-    void push(T element) {
+    ATOMIC_QUEUE_INLINE void push(T element) {
         while(!this->Queue::bounded_push(element))
             spin_loop_pause();
     }
@@ -94,7 +98,7 @@ template<class Queue>
 struct XeniumQueueAdapter : Queue {
     using T = typename Queue::value_type;
 
-    T pop() {
+    ATOMIC_QUEUE_INLINE T pop() {
         T element;
         while(!this->Queue::try_pop(element))
             spin_loop_pause();
@@ -122,7 +126,7 @@ using region_guard_t = typename region_guard_traits<T>::region_guard;
 
 template<class Queue, size_t Capacity>
 struct TbbAdapter : RetryDecorator<Queue> {
-    TbbAdapter() {
+    ATOMIC_QUEUE_INLINE TbbAdapter() {
         this->set_capacity(Capacity);
     }
 };
@@ -261,7 +265,7 @@ void run_throughput_benchmark(char const* name, HugePages& hp, std::vector<unsig
         double const expected_sum_inv = 1. / expected_sum;
 
         for(bool alternative_placement : {false, true}) {
-            cycles_t min_time = std::numeric_limits<cycles_t>::max();
+            cycles_t min_time = CYCLES_MAX;
 
             for(unsigned run = RUNS; run--;) {
                 cycles_t time = benchmark_throughput<Queue>(hp, hw_thread_ids, N, threads, alternative_placement, consumer_sums.data());
@@ -444,16 +448,18 @@ void run_ping_pong_benchmark(char const* name, HugePages& hp, std::vector<unsign
     int constexpr N_PING_PONG_MESSAGES = 100000;
     int constexpr RUNS = 10;
 
-    unsigned const cpus[2] = {hw_thread_ids[0], hw_thread_ids[1]};
+    // Select the best times of RUNS runs.
+    std::array<cycles_t, 2> best_times = {CYCLES_MAX, CYCLES_MAX};
+    // for(bool alternative_placement : {false, true}) {
+    for(bool alternative_placement : {false}) {
+        unsigned const cpus[2] = {hw_thread_ids[0], hw_thread_ids[1 + alternative_placement]};
+        for(unsigned run = RUNS; run--;) {
+            auto times = ping_pong_benchmark<Queue>(N_PING_PONG_MESSAGES, hp, cpus);
+            if(best_times[0] + best_times[1] > times[0] + times[1])
+                best_times = times;
 
-    // select the best of RUNS runs.
-    std::array<cycles_t, 2> best_times = {std::numeric_limits<int64_t>::max(), std::numeric_limits<int64_t>::max()};
-    for(unsigned run = RUNS; run--;) {
-        auto times = ping_pong_benchmark<Queue>(N_PING_PONG_MESSAGES, hp, cpus);
-        if(best_times[0] + best_times[1] > times[0] + times[1])
-            best_times = times;
-
-        check_huge_pages_leaks(name, hp);
+            check_huge_pages_leaks(name, hp);
+        }
     }
 
     auto avg_time = to_seconds((best_times[0] + best_times[1]) / 2);
