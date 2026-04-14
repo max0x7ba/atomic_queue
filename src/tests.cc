@@ -7,6 +7,7 @@
 
 #include "atomic_queue/atomic_queue.h"
 #include "atomic_queue/barrier.h"
+#include "benchmarks.h"
 
 #include <cstdint>
 #include <thread>

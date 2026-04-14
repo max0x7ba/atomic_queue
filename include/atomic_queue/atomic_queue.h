@@ -19,7 +19,6 @@ namespace atomic_queue {
 
 using std::uint32_t;
 using std::uint64_t;
-using std::uint8_t;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -517,7 +516,7 @@ public:
         swap(elements_, b.elements_);
     }
 
-    friend void swap(AtomicQueueB& a, AtomicQueueB& b) noexcept {
+    ATOMIC_QUEUE_INLINE friend void swap(AtomicQueueB& a, AtomicQueueB& b) noexcept {
         a.swap(b);
     }
 };
@@ -633,13 +632,14 @@ public:
         swap(elements_, b.elements_);
     }
 
-    friend void swap(AtomicQueueB2& a, AtomicQueueB2& b) noexcept {
+    ATOMIC_QUEUE_INLINE friend void swap(AtomicQueueB2& a, AtomicQueueB2& b) noexcept {
         a.swap(b);
     }
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: An implementation detail to be moved elsewhere.
 template<class Queue>
 struct RetryDecorator : Queue {
     using T = typename Queue::value_type;
@@ -657,15 +657,6 @@ struct RetryDecorator : Queue {
             spin_loop_pause();
         return element;
     }
-};
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-template<class Queue, size_t Capacity>
-struct CapacityArgAdaptor : Queue {
-    CapacityArgAdaptor()
-        : Queue(Capacity)
-    {}
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
