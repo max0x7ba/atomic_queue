@@ -58,11 +58,19 @@ template<int BITS>
 ATOMIC_QUEUE_INLINE static unsigned remap_index(unsigned index) noexcept {
 #if defined(__BMI2__)
     // More efficient bit swapping with BMI instructions.
-    unsigned mask{~(((1u << BITS) - 1) << BITS)};
-    asm("":"+r"(mask):"r"(index)); // Force andn for (index & ~mask).
-    unsigned const cache_line_idx{_pext_u32(index, mask) << BITS};
-    unsigned const elem_idx{(index & ~mask) >> BITS};
-    return elem_idx | cache_line_idx;
+    unsigned mask;
+    // Disable constant propagation for mask to force andn for (index & ~mask).
+    // Dependency on index to prevent allocating/hogging a register for mask too early.
+    asm(".intel_syntax noprefix\n\t"
+        "mov %[mask], %c[m]" // 1 inst: mov.
+        : [mask]"=r"(mask)
+        : [m]"i"(~(((1u << BITS) - 1) << BITS)), "r"(index)
+        );
+    // Compute the new element and cache line indexes independently in parallel.
+    unsigned const cache_line_idx{_pext_u32(index, mask) << BITS}; // 2 instr: pext, shl.
+    unsigned const elem_idx{(index & ~mask) >> BITS}; // 2 instr: andn, shr.
+    // Merge the new indexes at the very end.
+    return elem_idx | cache_line_idx; // 1 instr: or.
 #else
     unsigned constexpr mix_mask{(1u << BITS) - 1};
     unsigned const mix{(index ^ (index >> BITS)) & mix_mask};
