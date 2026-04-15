@@ -33,9 +33,9 @@ Minimizing latency naturally maximizes throughput. Low latency reciprocal is hig
 The main design principle these queues follow is _minimalism_, which results in such design choices as:
 
 * Bare minimum of atomic instructions. Inlinable by default push and pop functions can hardly be any cheaper in terms of CPU instruction number / L1i cache pressure.
-* Explicit contention/false-sharing avoidance for queue and its elements.
+* Explicit contention/false-sharing avoidance for queue data members and its elements.
 * Linear fixed size ring-buffer array. No heap memory allocations after a queue object has constructed. It doesn't get any more CPU L1d or TLB cache friendly than that.
-* Value semantics. Meaning that the queues make a copy/move upon `push`/`pop`, no reference/pointer to elements in the queue can be obtained.
+* Value semantics. Meaning that the queues make a copy/move upon `push`/`pop` and keep no references/pointers to its function arguments after returning, and that no reference/pointer to elements in the queue ring-buffer can be obtained. Simplest to use, hard to misuse, best machine code due to no pointer aliasing possible.
 
 The impact of each of these small design choices on their own is barely measurable, but their total impact is much greater than a simple sum of the constituents' impacts, aka super-scalar compounding or synergy. The synergy emerging from combining multiple of these small design choices together is what allows CPUs to perform at their peak capacities least impeded.
 
