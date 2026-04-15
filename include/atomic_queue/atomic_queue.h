@@ -55,10 +55,19 @@ struct GetIndexShuffleBits<false, array_size, elements_per_cache_line> {
 // the element within the cache line) with the next N bits (which are the index of the cache line)
 // of the element index.
 template<int BITS>
-ATOMIC_QUEUE_INLINE static constexpr unsigned remap_index(unsigned index) noexcept {
+ATOMIC_QUEUE_INLINE static unsigned remap_index(unsigned index) noexcept {
+#if defined(__BMI2__)
+    // More efficient bit swapping with BMI instructions.
+    unsigned mask{~(((1u << BITS) - 1) << BITS)};
+    asm("":"+r"(mask):"r"(index)); // Force andn for (index & ~mask).
+    unsigned const cache_line_idx{_pext_u32(index, mask) << BITS};
+    unsigned const elem_idx{(index & ~mask) >> BITS};
+    return elem_idx | cache_line_idx;
+#else
     unsigned constexpr mix_mask{(1u << BITS) - 1};
     unsigned const mix{(index ^ (index >> BITS)) & mix_mask};
     return index ^ mix ^ (mix << BITS);
+#endif
 }
 
 template<>
