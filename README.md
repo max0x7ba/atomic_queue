@@ -139,7 +139,7 @@ The benchmark also requires Intel TBB library to be available. It assumes that i
 
 These containers maintain their ring-buffers as array data members with size specified at compile-time and have no pointer data members. That makes them position-independent, allows allocating them into process-shared memory with a plain C++ placement new statement, and mapping at arbitrary addresses in different processes using the same queue objects in shared memory. The queue elements must be position-independent too to support this particular use-case (unlike classes with process-position-dependent pointers such as `std::unique_ptr`, `std::string` and all the C++ standard containers with default allocators).
 
-There are corresponding `B` variants (`AtomicQueueB`, `OptimistAtomicQueueB`, `AtomicQueueB2`, `OptimistAtomicQueueB2`) that use `std::allocator` or user-specified (stateful) allocator for allocating the ring-bufferes, where the buffer size is specified as an argument to the constructor at run-time.
+There are corresponding `B` variants (`AtomicQueueB`, `OptimistAtomicQueueB`, `AtomicQueueB2`, `OptimistAtomicQueueB2`) that use `std::allocator` or user-specified (stateful) allocator for allocating the ring-buffers, where the buffer size is specified as an argument to the constructor at run-time.
 
 Totally ordered mode is supported. In this mode consumers receive messages in the same FIFO order the messages were posted. This mode is supported for `push` and `pop` functions, but not for the `try_` versions. On Intel x86 the totally ordered mode has 0 cost, as of 2019.
 
@@ -206,6 +206,10 @@ While the atomic queues can be used with any moveable element types (including `
 2. Atomically store/load the element into/from the slot. Producer storing into a slot changes its state to be non-`NIL`, consumer loading from a slot changes its state to be `NIL`. The slot is a spinlock for its one producer and one consumer threads.
 
 These queues anticipate that a thread doing `push` or `pop` may complete step 1 and then be preempted before completing step 2.
+
+When a thread completes step 1 and terminates (for any reason) without completing step 2, the queue slot remains locked and deadlocks the next thread attempting to `try_pop`/`try_push`/`pop`/`push` from/into that slot. A thread can be terminated by the OS (e.g., oomkiller), or throw/crash in the user-defined copy/move constructor/assignment of queue element (if any). Should that happen, the game is over, and the best course of action is to terminate as soon as possible and address the root cause of one's threads crashing.
+
+Once constructed/allocated, queue objects maintain their invariants and never throw exceptions, provided queue elements copy/move constructor/assignment never throw, and threads don't terminate half-way through `push`/`pop`.
 
 An algorithm is *lock-free* if there is guaranteed system-wide progress. These queues guarantee system-wide progress by the following properties:
 
