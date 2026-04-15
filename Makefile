@@ -19,7 +19,7 @@
 #
 
 SHELL := /bin/bash
-.SHELLFLAGS := --norc -o pipefail -c
+.SHELLFLAGS := --norc -o pipefail -e -c
 
 export BUILD := release
 export TOOLSET := gcc
@@ -37,7 +37,8 @@ cc.clang := clang
 ld.clang := clang++
 ar.clang := ar
 
-head1 := awk 'FNR<2'
+head1 := /bin/awk 'FNR<2'
+lb := /bin/stdbuf -oL
 
 toolset_family := $(or $(findstring gcc,${TOOLSET}),$(findstring clang,${TOOLSET}))
 toolset_suffix := $(subst ${toolset_family},,${TOOLSET})
@@ -141,24 +142,30 @@ ${exes} : % : ${build_dir}/%
 .PHONY : ${exes}
 # for t in gcc gcc clang clang; do make -C ~/src/atomic_queue -rj$(($(nproc)/2)) BUILD=debug TOOLSET=$t; done
 
-${exes:%=${build_dir}/%} : ${build_dir}/% : ${relink} | ${build_dir}
+.SECONDEXPANSION:
+
+${exes:%=${build_dir}/%} : ${build_dir}/% : ${relink} | $$(dir $$@)
 	$(call strip2,${LINK.EXE})
 
 ${build_dir}/%.so : cxxflags += -fPIC
-${build_dir}/%.so : ${relink} | ${build_dir}
+${build_dir}/%.so : ${relink} | $$(dir $$@)
 	$(call strip2,${LINK.SO})
 
-${build_dir}/%.a : ${relink} | ${build_dir}
+${build_dir}/%.a : ${relink} | $$(dir $$@)
 	$(call strip2,${LINK.A})
 
-${build_dir}/%.o : src/%.cc ${recompile} | ${build_dir}
+${build_dir}/%.o : src/%.cc ${recompile} | $$(dir $$@)
 	$(call strip2,${COMPILE.CXX})
 
-${build_dir}/%.d : ;
+src/%.cc :;
+${build_dir}/%.d :;
+Makefile :;
 
-${build_dir}/.make : | ${build_dir}
-${build_dir} ${build_dir}/.make:
+${build_dir}/.make ${build_dir}/.make/ perf/ results/ :
 	mkdir -p $@
+
+${BUILD_ROOT}/ ${build_dir} ${build_dir}/ : | ${build_dir}/.make ;
+
 
 ver = "$(shell ${1} --version | ${head1})"
 # Trigger recompilation when compiler environment change.
@@ -167,18 +174,38 @@ env.compile := $(call ver,${CXX}) ${cppflags} ${cxxflags} ${cppflags.tbb} ${cppf
 env.link := $(call ver,${LD}) ${ldflags} ${ldlibs} ${ldlibs.tbb} ${ldlibs.moodycamel} ${ldlibs.xenium}
 
 define env_txt_rule
-${build_dir}/.make/env.${1}.txt : $(shell cmp --quiet ${build_dir}/.make/env.${1}.txt <(printf "%s\n" ${env.${1}}) || echo update_env_txt) Makefile | ${build_dir}/.make
+${build_dir}/.make/env.${1}.txt : $(shell cmp --quiet ${build_dir}/.make/env.${1}.txt <(printf "%s\n" ${env.${1}}) || echo update_env_txt) | $$(dir $$@)
 	@printf "%s\n" ${env.${1}} >$$@
 endef
 $(eval $(call env_txt_rule,compile))
 $(eval $(call env_txt_rule,link))
-${recompile} ${relink} : ${build_dir}/.make/re% : ${build_dir}/.make/env.%.txt Makefile
+${recompile} ${relink} : ${build_dir}/.make/re% : ${build_dir}/.make/env.%.txt # Makefile
 	@[[ ! -f $@ ]] || { u="$?"; echo "Re-$* is triggered by changes in $${u// /, }."; }
 	touch $@
 # cd ~/src/atomic_queue; make -r clean; set -x; make -rj8; make -rj8; make -rj8 CPPFLAGS=-DXYZ=1; make -rj8 CPPFLAGS=-DXYZ=1; make -rj8; make -rj8; make -rj8 LDLIBS=-lrt; make -rj8 LDLIBS=-lrt; make -rj8; make -rj8
 
+include ${BUILD_ROOT}/chrt.mk
+${BUILD_ROOT}/chrt.mk : Makefile | $$(dir $$@)
+	echo "chrt_fifo := $$(chrt -f 50 printf 'chrt' || printf 'sudo chrt') -f 50" > $@
+	echo "n_cpus := $$(nproc)" >> $@
+
+N := 1
+TAG := results
+
+results/%.txt : ${build_dir}/benchmarks | $$(dir $$@)
+	{ for((i=1;i<=${N};++i)); do printf "%(%F %T)T [$$i/${N}] "; ${chrt_fifo} ${lb} /bin/time -v $<; done; } |& tee -i $@
+
+perf/%.txt : ${build_dir}/benchmarks | $$(dir $$@)
+	{ printf "%(%F %T)T "; ${chrt_fifo} ${lb} perf stat -dd $< ; } |& tee -i $@
+
+run_benchmarks_n : results/$$(shell echo ${TAG}.$$$$(date +%Y%m%dT%H%M%S).${TOOLSET}.${n_cpus}.${N}.txt)
+	@printf "%(%F %T)T $@ saved \e[32m$(abspath $<)\e[0m\n\n"
+
+run_benchmarks_perf : perf/$$(shell echo ${TAG}.$$$$(date +%Y%m%dT%H%M%S).${TOOLSET}.${n_cpus}.${N}.txt)
+	@printf "%(%F %T)T $@ saved \e[32m$(abspath $<)\e[0m\n\n"
+
 run_benchmarks : ${build_dir}/benchmarks
-	@echo -n "$@ "; set -x; scripts/benchmark.sh sudo chrt -f 50 $<
+	@echo -n "$@ "; set -x; scripts/benchmark.sh ${chrt_fifo} $<
 
 run_tests : ${build_dir}/tests
 	@echo -n "$@ "; set -x; $< --log_level=warning
@@ -204,7 +231,7 @@ env :
 # If a rule has no prerequisites or recipe, and the target of the rule is a nonexistent file, then make imagines this target to have been updated whenever its rule is run. This implies that all targets depending on this one will always have their recipe run.
 force :
 
-.PHONY : update_env_txt env versions run_benchmarks clean all compile_commands compile_commands.json TAGS run_tests
+.PHONY : update_env_txt env versions run_benchmarks clean all compile_commands compile_commands.json TAGS run_tests run_benchmarks_n run_benchmarks_perf
 .DELETE_ON_ERROR:
 .SECONDARY:
 .SUFFIXES:
