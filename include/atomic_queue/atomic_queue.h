@@ -10,6 +10,7 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <memory>
 #include <utility>
 
@@ -292,9 +293,9 @@ public:
         return true;
     }
 
-    template<class T>
-    ATOMIC_QUEUE_INLINE T* try_push(T* ATOMIC_QUEUE_RESTRICT first, T* const last) noexcept {
-        int n = static_cast<int>(last - first);
+    template<class InputIt>
+    ATOMIC_QUEUE_INLINE InputIt try_push(InputIt first, InputIt const last) noexcept {
+        int n = static_cast<int>(std::distance(first, last));
         auto head = head_.load(X);
         if(Derived::spsc_) {
             int const slots = static_cast<int>(tail_.load(X) + static_cast<Derived&>(*this).size_ - head);
@@ -352,9 +353,9 @@ public:
         static_cast<Derived&>(*this).do_push(std::forward<T>(element), head);
     }
 
-    template<class T>
-    ATOMIC_QUEUE_INLINE void push(T* ATOMIC_QUEUE_RESTRICT first, T* const last) noexcept {
-        unsigned n = static_cast<unsigned>(last - first);
+    template<class InputIt>
+    ATOMIC_QUEUE_INLINE void push(InputIt first, InputIt const last) noexcept {
+        unsigned n = static_cast<unsigned>(std::distance(first, last));
         unsigned head;
         if(Derived::spsc_) {
             head = head_.load(X);
@@ -695,7 +696,8 @@ struct RetryDecorator : Queue {
             spin_loop_pause();
     }
 
-    ATOMIC_QUEUE_INLINE void push(T* first, T* const last) noexcept {
+    template<class InputIt>
+    ATOMIC_QUEUE_INLINE void push(InputIt first, InputIt const last) noexcept {
         while(last != (first = this->try_push(first, last))) {
             spin_loop_pause();
         }

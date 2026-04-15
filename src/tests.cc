@@ -8,6 +8,7 @@
 #include "atomic_queue/atomic_queue.h"
 #include "atomic_queue/barrier.h"
 
+#include <array>
 #include <cstdint>
 #include <thread>
 #include <string>
@@ -39,12 +40,12 @@ void stress() {
                     q.push(n--);
                 }
                 else {
-                    T buffer[BATCH];
-                    unsigned j = 0;
-                    while (j < BATCH && n) {
-                        buffer[j++] = n--;
+                    std::array<T, BATCH> buffer;
+                    typename std::array<T, BATCH>::iterator it = buffer.begin();
+                    while (it != buffer.end() && n) {
+                        *it++ = n--;
                     }
-                    q.push(buffer, buffer + j);
+                    q.push(buffer.begin(), it);
                 }
             }
         });
