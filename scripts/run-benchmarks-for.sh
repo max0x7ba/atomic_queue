@@ -12,6 +12,8 @@ now=$(date --utc +%Y%m%dT%H%M%S)
 cpucount=$(grep -c ^processor /proc/cpuinfo)
 exe="$(dirname "$0")/../benchmarks"
 
+source "$(dirname "$0")/benchmark.sh"
+
 function benchmark() {
     i=0
     while((1)); do
@@ -23,6 +25,6 @@ function benchmark() {
     done
 }
 
-$(dirname "$0")/benchmark-prologue.sh
+prologue
 benchmark | tee results-${cpucount}.${now}.txt
-$(dirname "$0")/benchmark-epilogue.sh
+epilogue
