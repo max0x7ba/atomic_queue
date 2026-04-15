@@ -339,6 +339,33 @@ public:
         return true;
     }
 
+    template<class OutputIt>
+    ATOMIC_QUEUE_INLINE OutputIt try_pop(OutputIt first, int& remaining_requested_pops) noexcept {
+        auto tail = tail_.load(X);
+        int num_pops;
+        if(Derived::spsc_) {
+            int const num_elements = static_cast<int>(head_.load(X) - tail);
+            num_pops = std::min(remaining_requested_pops, num_elements);
+            if(num_pops <= 0)
+                return first;
+            tail_.store(tail + static_cast<unsigned>(num_pops), X);
+        }
+        else {
+            do {
+                int const num_elements = static_cast<int>(head_.load(X) - tail);
+                num_pops = std::min(remaining_requested_pops, num_elements);
+                if(num_pops <= 0)
+                    return first;
+            } while(ATOMIC_QUEUE_UNLIKELY(!tail_.compare_exchange_weak(tail, tail + static_cast<unsigned>(num_pops), X, X))); // This loop is not FIFO.
+        }
+
+        remaining_requested_pops -= num_pops;
+        do {
+            *first++ = static_cast<Derived&>(*this).do_pop(tail++);
+        } while (--num_pops);
+        return first;
+    }
+
     template<class T>
     ATOMIC_QUEUE_INLINE void push(T&& element) noexcept {
         unsigned head;
@@ -382,6 +409,23 @@ public:
             tail = tail_.fetch_add(1, memory_order); // FIFO and total order on Intel regardless, as of 2019.
         }
         return static_cast<Derived&>(*this).do_pop(tail);
+    }
+
+    template<class OutputIt>
+    ATOMIC_QUEUE_INLINE OutputIt pop(OutputIt first, unsigned n) noexcept {
+        unsigned tail;
+        if(Derived::spsc_) {
+            tail = tail_.load(X);
+            tail_.store(tail + n, X);
+        }
+        else {
+            constexpr auto memory_order = Derived::total_order_ ? std::memory_order_seq_cst : std::memory_order_relaxed;
+            tail = tail_.fetch_add(n, memory_order); // FIFO and total order on Intel regardless, as of 2019.
+        }
+        while(n--) {
+            *first++ = static_cast<Derived&>(*this).do_pop(tail++);
+        }
+        return first;
     }
 
     ATOMIC_QUEUE_INLINE bool was_empty() const noexcept {
@@ -710,6 +754,15 @@ struct RetryDecorator : Queue {
         while(!this->try_pop(element))
             spin_loop_pause();
         return element;
+    }
+
+    template<class OutputIt>
+    ATOMIC_QUEUE_INLINE OutputIt pop(OutputIt first, int n) noexcept {
+        while(n > 0) {
+            first = this->try_pop(first, n);
+            spin_loop_pause();
+        }
+        return first;
     }
 };
 

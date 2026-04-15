@@ -56,15 +56,32 @@ void stress() {
         consumers[i] = std::thread([&q, &barrier, &r = results[i], STOP = STOP]() {
             barrier.wait();
             uint64_t result = 0;
-            for(T n; (n = q.pop()) != STOP;)
-                result += n;
+            if (BATCH <= 1) {
+                for(T n; (n = q.pop()) != STOP;)
+                    result += n;
+            }
+            else {
+                bool continue_pops = true;
+                while (continue_pops) {
+                    std::array<T, BATCH> buffer;
+                    typename std::array<T, BATCH>::iterator end_it = q.pop(buffer.begin(), BATCH);
+                    for (typename std::array<T, BATCH>::iterator it = buffer.begin(); it != end_it; ++it) {
+                        if (*it != STOP) {
+                            result += *it;
+                        }
+                        else {
+                            continue_pops = false;
+                        }
+                    }
+                }
+            }
             r = result;
         });
 
     barrier.release(PRODUCERS + CONSUMERS);
     for(auto& t : producers)
         t.join();
-    for(int i = CONSUMERS; i--;)
+    for(int i = CONSUMERS * std::max(1, BATCH); i--;)
         q.push(STOP);
     for(auto& t : consumers)
         t.join();
