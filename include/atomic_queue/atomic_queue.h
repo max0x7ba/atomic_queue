@@ -354,7 +354,7 @@ public:
     }
 
     template<class InputIt>
-    ATOMIC_QUEUE_INLINE void push(InputIt first, InputIt const last) noexcept {
+    ATOMIC_QUEUE_INLINE InputIt push(InputIt first, InputIt const last) noexcept {
         unsigned n = static_cast<unsigned>(std::distance(first, last));
         unsigned head;
         if(Derived::spsc_) {
@@ -368,6 +368,7 @@ public:
         while (n--) {
             static_cast<Derived&>(*this).do_push(*first++, head++);
         }
+        return first;
     }
 
     ATOMIC_QUEUE_INLINE auto pop() noexcept {
@@ -697,10 +698,11 @@ struct RetryDecorator : Queue {
     }
 
     template<class InputIt>
-    ATOMIC_QUEUE_INLINE void push(InputIt first, InputIt const last) noexcept {
+    ATOMIC_QUEUE_INLINE InputIt push(InputIt first, InputIt const last) noexcept {
         while(last != (first = this->try_push(first, last))) {
             spin_loop_pause();
         }
+        return first;
     }
 
     ATOMIC_QUEUE_INLINE T pop() noexcept {
