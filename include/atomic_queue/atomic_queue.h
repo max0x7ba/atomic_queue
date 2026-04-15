@@ -61,8 +61,8 @@ ATOMIC_QUEUE_INLINE static unsigned remap_index(unsigned index) noexcept {
     unsigned mask;
     // Disable constant propagation for mask to force andn for (index & ~mask).
     // Dependency on index to prevent allocating/hogging a register for mask too early.
-    asm(".intel_syntax noprefix\n\t"
-        "mov %[mask], %c[m]" // 1 inst: mov.
+    // -masm=intel compiler option is required.
+    asm("mov %[mask], %c[m]" // 1 instr: mov.
         : [mask]"=r"(mask)
         : [m]"i"(~(((1u << BITS) - 1) << BITS)), "r"(index)
         );
