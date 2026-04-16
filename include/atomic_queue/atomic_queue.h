@@ -340,30 +340,30 @@ public:
     }
 
     template<class OutputIt>
-    ATOMIC_QUEUE_INLINE OutputIt try_pop(OutputIt first, int& remaining_requested_pops) noexcept {
+    ATOMIC_QUEUE_INLINE int try_pop(OutputIt& first, int n) noexcept {
         auto tail = tail_.load(X);
-        int num_pops;
         if(Derived::spsc_) {
             int const num_elements = static_cast<int>(head_.load(X) - tail);
-            num_pops = std::min(remaining_requested_pops, num_elements);
-            if(num_pops <= 0)
-                return first;
-            tail_.store(tail + static_cast<unsigned>(num_pops), X);
+            n = std::min(n, num_elements);
+            if(n <= 0)
+                return 0;
+            tail_.store(tail + static_cast<unsigned>(n), X);
         }
         else {
+            int const desired_pops = n;
             do {
                 int const num_elements = static_cast<int>(head_.load(X) - tail);
-                num_pops = std::min(remaining_requested_pops, num_elements);
-                if(num_pops <= 0)
-                    return first;
-            } while(ATOMIC_QUEUE_UNLIKELY(!tail_.compare_exchange_weak(tail, tail + static_cast<unsigned>(num_pops), X, X))); // This loop is not FIFO.
+                n = std::min(desired_pops, num_elements);
+                if(n <= 0)
+                    return 0;
+            } while(ATOMIC_QUEUE_UNLIKELY(!tail_.compare_exchange_weak(tail, tail + static_cast<unsigned>(n), X, X))); // This loop is not FIFO.
         }
 
-        remaining_requested_pops -= num_pops;
+        int i = n;
         do {
             *first++ = static_cast<Derived&>(*this).do_pop(tail++);
-        } while (--num_pops);
-        return first;
+        } while (--i);
+        return n;
     }
 
     template<class T>
@@ -758,8 +758,7 @@ struct RetryDecorator : Queue {
 
     template<class OutputIt>
     ATOMIC_QUEUE_INLINE OutputIt pop(OutputIt first, int n) noexcept {
-        while(n > 0) {
-            first = this->try_pop(first, n);
+        while (n -= this->try_pop(first, n)) {
             spin_loop_pause();
         }
         return first;

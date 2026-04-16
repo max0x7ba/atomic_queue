@@ -64,8 +64,8 @@ void stress() {
                 bool continue_pops = true;
                 while (continue_pops) {
                     std::array<T, BATCH> buffer;
-                    typename std::array<T, BATCH>::iterator end_it = q.pop(buffer.begin(), BATCH);
-                    for (typename std::array<T, BATCH>::iterator it = buffer.begin(); it != end_it; ++it) {
+                    typename std::array<T, BATCH>::iterator out_it = q.pop(buffer.begin(), BATCH);
+                    for (typename std::array<T, BATCH>::iterator it = buffer.begin(); it != out_it; ++it) {
                         if (*it != STOP) {
                             result += *it;
                         }
