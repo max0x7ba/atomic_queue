@@ -21,31 +21,31 @@ namespace {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+enum { N_STRESS_MSG = 1000000 };
+enum { STOP_MSG = -1 };
+
 // Check that all push'es are ever pop'ed once with multiple producer and multiple consumers.
 template<class Queue, int PRODUCERS = 3, int CONSUMERS = 3>
 void stress() {
-    constexpr unsigned N = 1000000;
     using T = typename Queue::value_type;
-    constexpr T STOP = -1;
-
     Queue q;
     Barrier barrier;
 
     std::thread producers[PRODUCERS];
     for(unsigned i = 0; i < PRODUCERS; ++i)
-        producers[i] = std::thread([&q, &barrier, N=N]() {
+        producers[i] = std::thread([&q, &barrier]() {
             barrier.wait();
-            for(T n = N; n; --n)
+            for(T n = N_STRESS_MSG; n; --n)
                 q.push(n);
         });
 
     uint64_t results[CONSUMERS];
     std::thread consumers[CONSUMERS];
     for(unsigned i = 0; i < CONSUMERS; ++i)
-        consumers[i] = std::thread([&q, &barrier, &r = results[i], STOP = STOP]() {
+        consumers[i] = std::thread([&q, &barrier, &r = results[i]]() {
             barrier.wait();
             uint64_t result = 0;
-            for(T n; (n = q.pop()) != STOP;)
+            for(T n; (n = q.pop()) != static_cast<T>(STOP_MSG);)
                 result += n;
             r = result;
         });
@@ -54,17 +54,17 @@ void stress() {
     for(auto& t : producers)
         t.join();
     for(int i = CONSUMERS; i--;)
-        q.push(STOP);
+        q.push(STOP_MSG);
     for(auto& t : consumers)
         t.join();
 
-    constexpr uint64_t expected_result = (N + 1) / 2. * N * PRODUCERS;
+    constexpr uint64_t expected_result = (N_STRESS_MSG + 1) / 2. * N_STRESS_MSG * PRODUCERS;
+    constexpr uint64_t consumer_result_min = expected_result / CONSUMERS / 10;
     uint64_t result = 0;
     for(auto& r : results) {
-        BOOST_WARN_GT(r, (expected_result / CONSUMERS / 10)); // Make sure a consumer didn't starve. False positives are possible here.
+        BOOST_WARN_GT(r, consumer_result_min); // Make sure a consumer didn't starve. False positives are possible here.
         result += r;
     }
-
     int64_t result_diff = result - expected_result;
     BOOST_CHECK_EQUAL(result_diff, 0);
 }
