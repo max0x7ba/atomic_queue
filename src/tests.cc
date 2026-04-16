@@ -9,6 +9,8 @@
 #include "atomic_queue/barrier.h"
 #include "benchmarks.h"
 
+#include <boost/mpl/list.hpp>
+#include <bitset>
 #include <cstdint>
 #include <thread>
 #include <string>
@@ -320,6 +322,8 @@ BOOST_AUTO_TEST_CASE(size) {
     BOOST_CHECK(!q.was_full());
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 BOOST_AUTO_TEST_CASE(power_of_2) {
     using atomic_queue::details::round_up_to_power_of_2;
     static_assert(round_up_to_power_of_2(0u) == 0u, "");
@@ -332,6 +336,78 @@ BOOST_AUTO_TEST_CASE(power_of_2) {
     static_assert(round_up_to_power_of_2(0x40000000u - 1) == 0x40000000u, "");
     static_assert(round_up_to_power_of_2(0x40000000u    ) == 0x40000000u, "");
     static_assert(round_up_to_power_of_2(0x40000000u + 1) == 0x80000000u, "");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+template<int BITS>
+using Bits = std::integral_constant<int, BITS>;
+
+auto const bits0 = Bits<0>{};
+auto const bits1 = Bits<1>{};
+auto const bits2 = Bits<2>{};
+auto const bits3 = Bits<3>{};
+auto const bits4 = Bits<4>{};
+
+struct remap_index_fn {
+    template<int BITS>
+    auto operator()(Bits<BITS>, unsigned index) const noexcept { return atomic_queue::details::remap_index<BITS>(index); }
+};
+
+#ifdef __BMI2__
+struct remap_index_bmi_fn {
+    template<int BITS>
+    auto operator()(Bits<BITS>, unsigned index) const noexcept { return atomic_queue::details::remap_index_bmi<BITS>(index); }
+};
+
+using remap_index_fns = boost::mpl::list<remap_index_fn, remap_index_bmi_fn>;
+#else
+using remap_index_fns = boost::mpl::list<remap_index_fn>;
+#endif
+
+BOOST_AUTO_TEST_CASE_TEMPLATE(remap_index, Remap, remap_index_fns) {
+    Remap remap;
+
+    // BITS=0 does no remapping.
+    for(unsigned i = 256; i--;)
+        BOOST_CHECK_EQUAL(remap(bits0, i), i);
+
+    // Swap bit 0 with bit 1.
+    BOOST_CHECK_EQUAL(remap(bits1, 0b00u), 0b00u);
+    BOOST_CHECK_EQUAL(remap(bits1, 0b01u), 0b10u);
+    BOOST_CHECK_EQUAL(remap(bits1, 0b10u), 0b01u);
+    BOOST_CHECK_EQUAL(remap(bits1, 0b11u), 0b11u);
+    // High bits are preserved.
+    BOOST_CHECK_EQUAL(remap(bits1, 0b100u), 0b100u);
+    BOOST_CHECK_EQUAL(remap(bits1, 0b101u), 0b110u);
+
+    // Swap bits [0:1] with bits [2:3].
+    BOOST_CHECK_EQUAL(remap(bits2, 0b0001u), 0b0100u);
+    BOOST_CHECK_EQUAL(remap(bits2, 0b0100u), 0b0001u);
+    BOOST_CHECK_EQUAL(remap(bits2, 0b0110u), 0b1001u);
+    BOOST_CHECK_EQUAL(remap(bits2, 0b1111u), 0b1111u);
+
+    // Swap bits [0:2] with bits [3:5].
+    BOOST_CHECK_EQUAL(remap(bits3, 0b000'001u), 0b001'000u);
+    BOOST_CHECK_EQUAL(remap(bits3, 0b001'000u), 0b000'001u);
+
+    // remap_index is its own inverse: Applying it twice yields the original index.
+    for(unsigned i = 1024; i--;) {
+        BOOST_CHECK_EQUAL(remap(bits1, remap(bits1, i)), i);
+        BOOST_CHECK_EQUAL(remap(bits2, remap(bits2, i)), i);
+        BOOST_CHECK_EQUAL(remap(bits3, remap(bits3, i)), i);
+        BOOST_CHECK_EQUAL(remap(bits4, remap(bits4, i)), i);
+    }
+
+    // remap_index is a bijection over any power-of-2 range that covers the swapped bits.
+    constexpr unsigned N = 256; // 8-bit index.
+    std::bitset<N> seen;
+    for(unsigned i = N; i--;) {
+        auto j = remap(bits3, i); // Swap bits [0:2] with bits [3:5].in the 8-bit index.
+        BOOST_CHECK_LT(j, N);
+        seen.set(j);
+    }
+    BOOST_CHECK_EQUAL(seen.count(), N);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
