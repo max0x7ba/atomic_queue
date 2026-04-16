@@ -351,13 +351,13 @@ auto const bits4 = Bits<4>{};
 
 struct remap_index_fn {
     template<int BITS>
-    auto operator()(Bits<BITS>, unsigned index) const noexcept { return atomic_queue::details::remap_index<BITS>(index); }
+    auto operator()(Bits<BITS>, unsigned index) const noexcept { return atomic_queue::details::remap_index_xor::remap_index<BITS>(index); }
 };
 
 #ifdef __BMI2__
 struct remap_index_bmi_fn {
     template<int BITS>
-    auto operator()(Bits<BITS>, unsigned index) const noexcept { return atomic_queue::details::remap_index_bmi<BITS>(index); }
+    auto operator()(Bits<BITS>, unsigned index) const noexcept { return atomic_queue::details::remap_index_bmi::remap_index<BITS>(index); }
 };
 
 using remap_index_fns = boost::mpl::list<remap_index_fn, remap_index_bmi_fn>;

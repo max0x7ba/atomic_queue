@@ -48,12 +48,16 @@ struct GetIndexShuffleBits<false, array_size, elements_per_cache_line> {
     static int constexpr value = 0;
 };
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Multiple writers/readers contend on the same cache line when storing/loading elements at
 // subsequent indexes, aka false sharing. For power of 2 ring buffer size it is possible to re-map
 // the index in such a way that each subsequent element resides on another cache line, which
 // minimizes contention. This is done by swapping the lowest order N bits (which are the index of
 // the element within the cache line) with the next N bits (which are the index of the cache line)
 // of the element index.
+
+namespace remap_index_xor {
+
 template<int BITS>
 ATOMIC_QUEUE_INLINE static unsigned remap_index(unsigned index) noexcept {
     unsigned constexpr mix_mask{(1u << BITS) - 1};
@@ -66,12 +70,15 @@ ATOMIC_QUEUE_INLINE constexpr unsigned remap_index<0>(unsigned index) noexcept {
     return index;
 }
 
+} // remap_index_xor
+
 #ifdef __BMI2__
+namespace remap_index_bmi {
 // Shorter and faster machine code for swapping bits with BMI instructions, if available.
 // BMI instructions store the result into another 3rd register, without loading the first operand into the result register.
 // +1% faster throughput benchmark with BMI instructions.
 template<int BITS>
-ATOMIC_QUEUE_INLINE static unsigned remap_index_bmi(unsigned index) noexcept {
+ATOMIC_QUEUE_INLINE static unsigned remap_index(unsigned index) noexcept {
     static_assert(2 * BITS <= 8 * sizeof index, "Invalid BITS value.");
     // Load mask into call-clobbered edx register for shortest bytecode.
     // Disable constant propagation for mask to force BMI andn instruction for (index & ~mask).
@@ -88,18 +95,19 @@ ATOMIC_QUEUE_INLINE static unsigned remap_index_bmi(unsigned index) noexcept {
 }
 
 template<>
-ATOMIC_QUEUE_INLINE constexpr unsigned remap_index_bmi<0>(unsigned index) noexcept {
+ATOMIC_QUEUE_INLINE constexpr unsigned remap_index<0>(unsigned index) noexcept {
     return index;
 }
+
+} // remap_index_bmi
+using namespace remap_index_bmi;
+#else
+using namespace remap_index_xor;
 #endif
 
 template<int BITS, class T>
 ATOMIC_QUEUE_INLINE static constexpr T& map(T* ATOMIC_QUEUE_RESTRICT elements, unsigned index) noexcept {
-#ifdef __BMI2__
-    return elements[remap_index_bmi<BITS>(index)];
-#else
     return elements[remap_index<BITS>(index)];
-#endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
