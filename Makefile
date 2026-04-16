@@ -5,12 +5,12 @@
 #   time make -rC ~/src/atomic_queue -j$(($(nproc)/2))
 #   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) BUILD=debug run_tests
 #   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) all run_tests
-#   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) run_benchmarks
+#   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) run_benchmarks_n
 #   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=clang-20 BUILD=debug TAGS
 #   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=clang-20 BUILD=debug run_tests
 #   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=clang BUILD=sanitize run_tests
-#   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=clang run_benchmarks
-#   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=gcc-14 run_benchmarks
+#   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=clang run_benchmarks_n
+#   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=gcc-14 run_benchmarks_n
 #   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=gcc-14 ASM=1
 #
 # Additional CPPFLAGS, CXXFLAGS, LDLIBS, LDFLAGS can come from the command line, e.g. make CPPFLAGS='-I<my-include-dir>', or from environment variables.  For example, also produce assembly outputs:

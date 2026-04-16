@@ -157,7 +157,7 @@ bool operator!=(const test_stateful_allocator<T1, State>& lhs, const test_statef
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-constexpr unsigned CAPACITY = 1024;
+constexpr unsigned CAPACITY = 4096;
 
 BOOST_AUTO_TEST_CASE(stress_AtomicQueue) {
     stress<RetryDecorator<AtomicQueue<unsigned, CAPACITY>>>();
@@ -224,7 +224,7 @@ BOOST_AUTO_TEST_CASE(spsc_stress_OptimistAtomicQueueB2) {
 }
 
 BOOST_AUTO_TEST_CASE(move_only_2) {
-    AtomicQueue2<std::unique_ptr<int>, 2> q;
+    AtomicQueue2<std::unique_ptr<int>, CAPACITY> q;
     test_unique_ptr_int(q);
 }
 

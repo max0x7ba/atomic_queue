@@ -80,11 +80,7 @@ namespace remap_index_bmi {
 template<int BITS>
 ATOMIC_QUEUE_INLINE static unsigned remap_index(unsigned index) noexcept {
     static_assert(2 * BITS <= 8 * sizeof index, "Invalid BITS value.");
-    // Load mask into call-clobbered edx register for shortest bytecode.
-    // Disable constant propagation for mask to force BMI andn instruction for (index & ~mask).
-    // Mask should be treated as an immediate operand. Dependency on index to prevent allocating/hogging a register for mask.
-    register unsigned mask asm("edx") = ~(((1u << BITS) - 1) << BITS); // 1 instr: mov.
-    asm("": "+r"(mask) : "r"(index));
+    unsigned constexpr mask = ~(((1u << BITS) - 1) << BITS); // 1 instr: mov.
 
     // Compute the new element and cache line indexes independently in parallel.
     unsigned const cache_line_idx{_pext_u32(index, mask) << BITS}; // 2 instr: pext, shl.
@@ -104,9 +100,10 @@ using namespace remap_index_bmi;
 #else
 using namespace remap_index_xor;
 #endif
+// using namespace remap_index_xor;
 
 template<int BITS, class T>
-ATOMIC_QUEUE_INLINE static constexpr T& map(T* ATOMIC_QUEUE_RESTRICT elements, unsigned index) noexcept {
+ATOMIC_QUEUE_INLINE static constexpr T& remap(T* ATOMIC_QUEUE_RESTRICT elements, unsigned index) noexcept {
     return elements[remap_index<BITS>(index)];
 }
 
@@ -411,12 +408,12 @@ class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL, MINIMIZE_
     alignas(CACHE_LINE_SIZE) std::atomic<T> elements_[size_];
 
     ATOMIC_QUEUE_INLINE T do_pop(unsigned tail) noexcept {
-        std::atomic<T>& q_element = details::map<SHUFFLE_BITS>(elements_, tail % size_);
+        std::atomic<T>& q_element = details::remap<SHUFFLE_BITS>(elements_, tail % size_);
         return Base::template do_pop_atomic<T, NIL>(q_element);
     }
 
     ATOMIC_QUEUE_INLINE void do_push(T element, unsigned head) noexcept {
-        std::atomic<T>& q_element = details::map<SHUFFLE_BITS>(elements_, head % size_);
+        std::atomic<T>& q_element = details::remap<SHUFFLE_BITS>(elements_, head % size_);
         Base::template do_push_atomic<T, NIL>(element, q_element);
     }
 
@@ -443,6 +440,10 @@ class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE, MINIMIZE_CON
 
     static constexpr unsigned size_ = MINIMIZE_CONTENTION ? details::round_up_to_power_of_2(SIZE) : SIZE;
     static constexpr int SHUFFLE_BITS = details::GetIndexShuffleBits<MINIMIZE_CONTENTION, size_, CACHE_LINE_SIZE / sizeof(State)>::value;
+    static constexpr int SHUFFLE_BITS_ELEM = details::GetIndexShuffleBits<MINIMIZE_CONTENTION, size_, CACHE_LINE_SIZE / sizeof(T)>::value;
+    static_assert(SHUFFLE_BITS || !MINIMIZE_CONTENTION, "Unexpected SHUFFLE_BITS_STATE, SIZE is too small for MINIMIZE_CONTENTION.");
+    static_assert(SHUFFLE_BITS_ELEM || !MINIMIZE_CONTENTION, "Unexpected SHUFFLE_BITS, SIZE is too small for MINIMIZE_CONTENTION.");
+
     static constexpr bool total_order_ = TOTAL_ORDER;
     static constexpr bool spsc_ = SPSC;
     static constexpr bool maximize_throughput_ = MAXIMIZE_THROUGHPUT;
@@ -451,14 +452,14 @@ class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE, MINIMIZE_CON
     alignas(CACHE_LINE_SIZE) T elements_[size_] = {};
 
     ATOMIC_QUEUE_INLINE T do_pop(unsigned tail) noexcept {
-        unsigned index = details::remap_index<SHUFFLE_BITS>(tail % size_);
-        return Base::do_pop_any(states_[index], elements_[index]);
+        unsigned index = tail % size_;
+        return Base::do_pop_any(details::remap<SHUFFLE_BITS>(states_, index), details::remap<SHUFFLE_BITS_ELEM>(elements_, index));
     }
 
     template<class U>
     ATOMIC_QUEUE_INLINE void do_push(U&& element, unsigned head) noexcept {
-        unsigned index = details::remap_index<SHUFFLE_BITS>(head % size_);
-        Base::do_push_any(std::forward<U>(element), states_[index], elements_[index]);
+        unsigned index = head % size_;
+        Base::do_push_any(std::forward<U>(element), details::remap<SHUFFLE_BITS>(states_, index), details::remap<SHUFFLE_BITS_ELEM>(elements_, index));
     }
 
 public:
@@ -500,12 +501,12 @@ class AtomicQueueB : private std::allocator_traits<A>::template rebind_alloc<std
     std::atomic<T>* ATOMIC_QUEUE_RESTRICT elements_;
 
     ATOMIC_QUEUE_INLINE T do_pop(unsigned tail) noexcept {
-        std::atomic<T>& q_element = details::map<SHUFFLE_BITS>(elements_, tail & (size_ - 1));
+        std::atomic<T>& q_element = details::remap<SHUFFLE_BITS>(elements_, tail & (size_ - 1));
         return Base::template do_pop_atomic<T, NIL>(q_element);
     }
 
     ATOMIC_QUEUE_INLINE void do_push(T element, unsigned head) noexcept {
-        std::atomic<T>& q_element = details::map<SHUFFLE_BITS>(elements_, head & (size_ - 1));
+        std::atomic<T>& q_element = details::remap<SHUFFLE_BITS>(elements_, head & (size_ - 1));
         Base::template do_push_atomic<T, NIL>(element, q_element);
     }
 
@@ -590,18 +591,20 @@ class AtomicQueueB2 : private std::allocator_traits<A>::template rebind_alloc<un
     static constexpr auto STATES_PER_CACHE_LINE = CACHE_LINE_SIZE / sizeof(AtomicState);
     static_assert(STATES_PER_CACHE_LINE, "Unexpected STATES_PER_CACHE_LINE.");
 
-    static constexpr auto SHUFFLE_BITS = details::GetCacheLineIndexBits<STATES_PER_CACHE_LINE>::value;
-    static_assert(SHUFFLE_BITS, "Unexpected SHUFFLE_BITS.");
+    static constexpr int SHUFFLE_BITS = details::GetCacheLineIndexBits<STATES_PER_CACHE_LINE>::value;
+    static constexpr int SHUFFLE_BITS_ELEM = details::GetCacheLineIndexBits<CACHE_LINE_SIZE / sizeof(T)>::value;
+    static_assert(SHUFFLE_BITS, "Unexpected SHUFFLE_BITS_STATE.");
+    static_assert(SHUFFLE_BITS_ELEM, "Unexpected SHUFFLE_BITS.");
 
     ATOMIC_QUEUE_INLINE T do_pop(unsigned tail) noexcept {
-        unsigned index = details::remap_index<SHUFFLE_BITS>(tail & (size_ - 1));
-        return Base::do_pop_any(states_[index], elements_[index]);
+        unsigned index = tail & (size_ - 1);
+        return Base::do_pop_any(details::remap<SHUFFLE_BITS>(states_, index), details::remap<SHUFFLE_BITS_ELEM>(elements_, index));
     }
 
     template<class U>
     ATOMIC_QUEUE_INLINE void do_push(U&& element, unsigned head) noexcept {
-        unsigned index = details::remap_index<SHUFFLE_BITS>(head & (size_ - 1));
-        Base::do_push_any(std::forward<U>(element), states_[index], elements_[index]);
+        unsigned index = head & (size_ - 1);
+        return Base::do_push_any(std::forward<U>(element), details::remap<SHUFFLE_BITS>(states_, index), details::remap<SHUFFLE_BITS_ELEM>(elements_, index));
     }
 
     template<class U>
