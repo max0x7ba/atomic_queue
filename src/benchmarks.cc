@@ -55,7 +55,7 @@ static_assert(std::is_unsigned<cycles_t>::value);
 using icycles_t = std::make_signed<cycles_t>::type; // Signed integers convert into double with one AVX instruction, unlike unsigned.
 cycles_t constexpr CYCLES_MAX = -1;
 
-double const TSC_TO_SECONDS = 1e-9 / cpu_base_frequency();
+double TSC_TO_SECONDS = 0; // Set in main.
 
 ATOMIC_QUEUE_INLINE double to_seconds(icycles_t cycles) noexcept {
     return cycles * TSC_TO_SECONDS;
@@ -321,8 +321,7 @@ void run_throughput_spsc_benchmark(char const* name, HugePages& hp, std::vector<
 
 void run_throughput_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const& cpu_topology) {
     auto hw_thread_ids = hw_thread_id(cpu_topology); // Sorted by hw_thread_id: avoid HT, same socket.
-
-    std::printf("---- Running throughput benchmarks (higher is better) ----\n");
+    std::printf("---- Running throughput benchmarks with up to %zu CPUs (higher is better) ----\n", hw_thread_ids.size() & -2);
 
     int constexpr SIZE = 65536;
 
@@ -472,7 +471,7 @@ void run_ping_pong_benchmark(char const* name, HugePages& hp, std::vector<unsign
 void run_ping_pong_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const& cpu_topology) {
     auto hw_thread_ids = hw_thread_id(cpu_topology); // Sorted by hw_thread_id: avoid HT, same socket.
 
-    std::printf("---- Running ping-pong benchmarks (lower is better) ----\n");
+    std::printf("---- Running ping-pong benchmarks with 2 CPUs (lower is better) ----\n");
 
     // This benchmark doesn't require queue capacity greater than 1, however, capacity of 1 elides
     // some instructions completely because of (x % 1) is always 0. Use something greater than 1 to
@@ -530,6 +529,18 @@ void advise_hugeadm_2MB() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+void log_available_cpus(std::vector<CpuTopologyInfo> const& cpu_topology) {
+    std::printf("Using %zu available CPUs: ", cpu_topology.size());
+    char sep = '[';
+    for(auto& cpu : cpu_topology) {
+        std::printf("%c%u", sep, cpu.hw_thread_id);
+        sep = ',';
+    }
+    std::printf("].\n");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 } // namespace
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -537,7 +548,10 @@ void advise_hugeadm_2MB() {
 int main() {
     std::setlocale(LC_NUMERIC, ""); // Enable thousand separator, if set in user's locale.
 
-    auto cpu_topology = get_cpu_topology_info();
+    TSC_TO_SECONDS = 1e-9 / cpu_base_frequency();
+
+    auto cpu_topology = get_available_cpu_topology_info();
+    log_available_cpus(cpu_topology);
     if(cpu_topology.size() < 2)
         throw std::runtime_error("A CPU with at least 2 hardware threads is required.");
 

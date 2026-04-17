@@ -113,6 +113,7 @@ Building is necessary to run the tests and benchmarks. The tests require the Boo
 ```bash
 git clone https://github.com/max0x7ba/atomic_queue.git
 cd atomic_queue
+
 make -r -j4 BUILD=debug run_tests
 ```
 
@@ -125,7 +126,14 @@ git clone https://github.com/cameron314/readerwriterqueue.git
 git clone https://github.com/mpoeter/xenium.git
 git clone https://github.com/max0x7ba/atomic_queue.git
 cd atomic_queue
-make -r -j4 run_benchmarks
+
+make -r -j4 run_benchmarks_n       # Build and run the benchmarks once.
+make -r -j4 run_benchmarks_n N=3   # Build and run the benchmarks 3 times.
+
+make -r -j4 TOOLSET=gcc-14 run_benchmarks_n    # Build with gcc-14 and run the benchmarks.
+make -r -j4 TOOLSET=clang-20 run_benchmarks_n  # Build with clang-20 and run the benchmarks.
+
+taskset --cpu-list 0,1,14,15 make -r -j4 TOOLSET=gcc-14 run_benchmarks_n  # Use only cpus [0,1,14,15] to build with gcc-14 and run the benchmarks 3 times.
 ```
 
 The benchmark also requires Intel TBB library to be available. It assumes that it is installed in `/usr/local/include` and `/usr/local/lib`. If it is installed elsewhere you may like to modify `cppflags.tbb` and `ldlibs.tbb` in `Makefile`.
@@ -270,6 +278,19 @@ N producer threads push a 4-byte integer into one same queue, N consumer threads
 
 ### Ping-pong benchmark
 One thread posts an integer to another thread through one queue and waits for a reply from another queue (2 queues in total). The benchmarks measures the total time of 100,000 ping-pongs, best of 10 runs. Contention is minimal here (1-producer-1-consumer, 1 element in the queue) to be able to achieve and measure the lowest latency. Reports the average round-trip time.
+
+### Observations
+The latency of cross-thread communication of 2 (SMT) threads running in the same CPU core is the lowest. Communicating to another core adds latency. Communicating to another CCX/CPU-socket adds more latency.
+
+In the ping-pong benchmark, all benchmarked queues demonstrate the lowest latency only when the 2 threads run in the same CPU core. When the 2 threads run in different CPU cores, the latency increases 3× or worse. E.g. `boost::lockfree::spsc_queue` round-trip latency is 111 and 332 nanoseconds correspondingly.
+
+In the throughput benchmark, all queues demonstrate 1.5× lower or worse throughput when all producer and consumer threads run in different cores. The 3× longer latency of cross-core communications snowballs with the number of atomic instructions. Cross-core throughput is inversely proportional to the number and complexity of atomic instructions, it seems. Except the following 3 queues.
+
+`boost::lockfree::spsc_queue` uses the cheapest atomic load and store instructions, Its cross-core throughput doesn't get worse than its with-in core throughput, but doesn't get any better.
+
+Only `OptimistAtomicQueue`/`OptimistAtomicQueueB` (atomic elements, statically/dynamically allocated buffers) demonstrate 1.5× or better cross-core throughput relative to its within-core throughput, in 1-producer-1-consumer (SPSC) mode only. These use the same algorithm with the same cheapest atomic load and store instructions as `boost::lockfree::spsc_queue` does, but demonstrate 10× greater throughput for that only because of higher implementation quality.
+
+Everything else bottlenecks cross-core throughput by using more and/or more expensive atomic instructions. E.g. it takes ~17 seconds to run the benchmarks using 4 CPUs in 2 cores, and ~25 seconds using 4 CPUs in 4 cores.
 
 ## Contributing
 Contributions are more than welcome. `.editorconfig` and `.clang-format` can be used to automatically match code formatting.

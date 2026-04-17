@@ -8,6 +8,8 @@
 #   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=clang-20 BUILD=debug run_tests
 #   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=gcc-14 run_benchmarks_n
 #   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=clang-20 run_benchmarks_n
+#   taskset -c 0,1,2,3 time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=gcc-14 run_benchmarks_n N=2
+#   taskset -c 0,2,4,6 time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=gcc-14 run_benchmarks_n N=2
 #   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=gcc-14 ASM=1
 #   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=clang-20 BUILD=debug TAGS
 #   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=clang BUILD=sanitize run_tests
@@ -200,10 +202,10 @@ TAG := results
 new_filename = $(shell date "+${TAG}.%Y%m%dT%H%M%S.${TOOLSET}.${n_cpus}")
 
 results/%.txt : ${build_dir}/benchmarks | $$(dir $$@)
-	{ for((i=1;i<=${N};++i)); do printf "%(%F %T)T [$$i/${N}] "; ${chrt_fifo} ${lb} /bin/time -v $<; done; } |& tee -i $@
+	{ for((i=1;i<=${N};++i)); do printf "\n%(%F %T)T [$$i/${N}] "; ${chrt_fifo} ${lb} /bin/time -v $<; echo; done; } |& tee -i $@
 
 perf/%.txt : ${build_dir}/benchmarks | $$(dir $$@)
-	{ printf "%(%F %T)T "; ${chrt_fifo} ${lb} perf stat -dd $< ; } |& tee -i $@
+	{ printf "\n%(%F %T)T "; ${chrt_fifo} ${lb} perf stat -dd $< ; echo; } |& tee -i $@
 
 .PRECIOUS : perf/%.txt results/%.txt # Don't delete these on error.
 
