@@ -48,7 +48,7 @@ public:
     bool try_push(U&& element) noexcept {
         ScopedLock lock(mutex_);
         if(ATOMIC_QUEUE_LIKELY(head_ - tail_ < size_)) {
-            q_[details::remap_index<SHUFFLE_BITS>(head_ % size_)] = std::forward<U>(element);
+            details::remap<SHUFFLE_BITS>(q_, head_ % size_) = std::forward<U>(element);
             ++head_;
             return true;
         }
@@ -58,7 +58,7 @@ public:
     bool try_pop(T& element) noexcept {
         ScopedLock lock(mutex_);
         if(ATOMIC_QUEUE_LIKELY(head_ != tail_)) {
-            element = std::move(q_[details::remap_index<SHUFFLE_BITS>(tail_ % size_)]);
+            element = std::move(details::remap<SHUFFLE_BITS>(q_, tail_ % size_));
             ++tail_;
             return true;
         }

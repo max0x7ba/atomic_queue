@@ -296,29 +296,22 @@ BOOST_AUTO_TEST_CASE(power_of_2) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<int BITS>
-using Bits = std::integral_constant<int, BITS>;
+auto const bits0 = details::Bits<0>{};
+auto const bits1 = details::Bits<1>{};
+auto const bits2 = details::Bits<2>{};
+auto const bits3 = details::Bits<3>{};
+auto const bits4 = details::Bits<4>{};
 
-auto const bits0 = Bits<0>{};
-auto const bits1 = Bits<1>{};
-auto const bits2 = Bits<2>{};
-auto const bits3 = Bits<3>{};
-auto const bits4 = Bits<4>{};
-
-struct remap_index_fn {
-    template<int BITS>
-    auto operator()(Bits<BITS>, unsigned index) const noexcept { return atomic_queue::details::remap_index_xor::remap_index<BITS>(index); }
-};
-
-struct remap_index_and_fn {
-    template<int BITS>
-    auto operator()(Bits<BITS>, unsigned index) const noexcept { return atomic_queue::details::remap_index_and::remap_index<BITS>(index); }
-};
-
-using remap_index_fns = boost::mpl::list<remap_index_fn, remap_index_and_fn>;
+using remap_index_fns = boost::mpl::list<
+    details::RemapXor,
+#ifdef __BMI__
+    details::RemapBmi,
+#endif
+    details::RemapAnd
+>;
 
 BOOST_AUTO_TEST_CASE_TEMPLATE(remap_index, Remap, remap_index_fns) {
-    Remap remap;
+    details::Remap0<Remap> remap;
 
     // BITS=0 does no remapping.
     for(unsigned i = 256; i--;)
