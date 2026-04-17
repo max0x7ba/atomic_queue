@@ -3,15 +3,14 @@
 # Usage examples (assuming this directory is ~/src/atomic_queue):
 #
 #   time make -rC ~/src/atomic_queue -j$(($(nproc)/2))
-#   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) BUILD=debug run_tests
 #   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) all run_tests
-#   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) run_benchmarks_n
-#   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=clang-20 BUILD=debug TAGS
+#   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=gcc-14 BUILD=debug run_tests
 #   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=clang-20 BUILD=debug run_tests
-#   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=clang BUILD=sanitize run_tests
-#   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=clang run_benchmarks_n
 #   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=gcc-14 run_benchmarks_n
+#   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=clang-20 run_benchmarks_n
 #   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=gcc-14 ASM=1
+#   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=clang-20 BUILD=debug TAGS
+#   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=clang BUILD=sanitize run_tests
 #
 # Additional CPPFLAGS, CXXFLAGS, LDLIBS, LDFLAGS can come from the command line, e.g. make CPPFLAGS='-I<my-include-dir>', or from environment variables.  For example, also produce assembly outputs:
 #
@@ -26,6 +25,13 @@ export TOOLSET := gcc
 
 export BUILD_ROOT := $(or ${BUILD_ROOT},build)
 build_dir := ${BUILD_ROOT}/${BUILD}/${TOOLSET}
+
+# Don't try loading localized messages for anything.
+undefine LANG
+undefine LANGUAGE
+undefine LC_CTYPE
+undefine LC_MESSAGES
+undefine LC_ALL
 
 cxx.gcc := g++
 cc.gcc := gcc
@@ -191,6 +197,7 @@ ${BUILD_ROOT}/chrt.mk : Makefile | $$(dir $$@)
 
 N := 1
 TAG := results
+new_filename = $(shell date "+${TAG}.%Y%m%dT%H%M%S.${TOOLSET}.${n_cpus}")
 
 results/%.txt : ${build_dir}/benchmarks | $$(dir $$@)
 	{ for((i=1;i<=${N};++i)); do printf "%(%F %T)T [$$i/${N}] "; ${chrt_fifo} ${lb} /bin/time -v $<; done; } |& tee -i $@
@@ -198,17 +205,19 @@ results/%.txt : ${build_dir}/benchmarks | $$(dir $$@)
 perf/%.txt : ${build_dir}/benchmarks | $$(dir $$@)
 	{ printf "%(%F %T)T "; ${chrt_fifo} ${lb} perf stat -dd $< ; } |& tee -i $@
 
-run_benchmarks_n : results/$$(shell echo ${TAG}.$$$$(date +%Y%m%dT%H%M%S).${TOOLSET}.${n_cpus}.${N}.txt)
+.PRECIOUS : perf/%.txt results/%.txt # Don't delete these on error.
+
+run_benchmarks_n : results/$${new_filename}.${N}.txt
 	@printf "%(%F %T)T $@ saved \e[32m$(abspath $<)\e[0m\n\n"
 
-run_benchmarks_perf : perf/$$(shell echo ${TAG}.$$$$(date +%Y%m%dT%H%M%S).${TOOLSET}.${n_cpus}.${N}.txt)
+run_benchmarks_perf : perf/$${new_filename}.txt
 	@printf "%(%F %T)T $@ saved \e[32m$(abspath $<)\e[0m\n\n"
 
 run_benchmarks : ${build_dir}/benchmarks
 	@echo -n "$@ "; set -x; scripts/benchmark.sh ${chrt_fifo} $<
 
 run_tests : ${build_dir}/tests
-	@echo -n "$@ "; set -x; $< --log_level=warning
+	@echo -n "$@ "; set -x; $< --log_level=unit_scope --report_level=short
 
 run_% : ${build_dir}/% force
 	@echo -n "$@ "; set -x; $<
@@ -232,9 +241,9 @@ env :
 force :
 
 .PHONY : update_env_txt env versions run_benchmarks clean all compile_commands compile_commands.json TAGS run_tests run_benchmarks_n run_benchmarks_perf
-.DELETE_ON_ERROR:
-.SECONDARY:
-.SUFFIXES:
+.DELETE_ON_ERROR :
+.SECONDARY :
+.SUFFIXES :
 
 # Local Variables:
 # compile-command: "/bin/time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) BUILD=debug run_tests"

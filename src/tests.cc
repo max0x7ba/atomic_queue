@@ -26,25 +26,25 @@ enum { STOP_MSG = -1 };
 enum { CAPACITY = 4096 };
 
 using stress_queues = boost::mpl::list<
-AtomicQueue<unsigned, CAPACITY>,
-AtomicQueue2<unsigned, CAPACITY>,
-AtomicQueue<unsigned, CAPACITY, 0u, true, true, false, true>,
-AtomicQueue2<unsigned, CAPACITY, true, true, false, true>,
+    AtomicQueue<unsigned, CAPACITY>,
+    AtomicQueue2<unsigned, CAPACITY>,
+    AtomicQueue<unsigned, CAPACITY, 0u, true, true, false, true>,
+    AtomicQueue2<unsigned, CAPACITY, true, true, false, true>,
 
-CapacityArgAdaptor<AtomicQueueB<unsigned>, CAPACITY>,
-CapacityArgAdaptor<AtomicQueueB2<unsigned>, CAPACITY>,
-CapacityArgAdaptor<AtomicQueueB<unsigned, std::allocator<unsigned>, 0u, true, false, true>, CAPACITY>,
-CapacityArgAdaptor<AtomicQueueB2<unsigned, std::allocator<unsigned>, true, false, true>, CAPACITY>,
+    CapacityArgAdaptor<AtomicQueueB<unsigned>, CAPACITY>,
+    CapacityArgAdaptor<AtomicQueueB2<unsigned>, CAPACITY>,
+    CapacityArgAdaptor<AtomicQueueB<unsigned, std::allocator<unsigned>, 0u, true, false, true>, CAPACITY>,
+    CapacityArgAdaptor<AtomicQueueB2<unsigned, std::allocator<unsigned>, true, false, true>, CAPACITY>,
 
-RetryDecorator<AtomicQueue<unsigned, CAPACITY>>,
-RetryDecorator<AtomicQueue2<unsigned, CAPACITY>>,
-RetryDecorator<AtomicQueue<unsigned, CAPACITY, 0u, true, true, false, true>>,
-RetryDecorator<AtomicQueue2<unsigned, CAPACITY, true, true, false, true>>,
+    RetryDecorator<AtomicQueue<unsigned, CAPACITY>>,
+    RetryDecorator<AtomicQueue2<unsigned, CAPACITY>>,
+    RetryDecorator<AtomicQueue<unsigned, CAPACITY, 0u, true, true, false, true>>,
+    RetryDecorator<AtomicQueue2<unsigned, CAPACITY, true, true, false, true>>,
 
-RetryDecorator<CapacityArgAdaptor<AtomicQueueB<unsigned>, CAPACITY>>,
-RetryDecorator<CapacityArgAdaptor<AtomicQueueB2<unsigned>, CAPACITY>>,
-RetryDecorator<CapacityArgAdaptor<AtomicQueueB<unsigned, std::allocator<unsigned>, 0u, true, false, true>, CAPACITY>>,
-RetryDecorator<CapacityArgAdaptor<AtomicQueueB2<unsigned, std::allocator<unsigned>, true, false, true>, CAPACITY>>
+    RetryDecorator<CapacityArgAdaptor<AtomicQueueB<unsigned>, CAPACITY>>,
+    RetryDecorator<CapacityArgAdaptor<AtomicQueueB2<unsigned>, CAPACITY>>,
+    RetryDecorator<CapacityArgAdaptor<AtomicQueueB<unsigned, std::allocator<unsigned>, 0u, true, false, true>, CAPACITY>>,
+    RetryDecorator<CapacityArgAdaptor<AtomicQueueB2<unsigned, std::allocator<unsigned>, true, false, true>, CAPACITY>>
 >;
 
 // Check that all push'es are ever pop'ed once with multiple producer and multiple consumers.
@@ -155,8 +155,8 @@ bool operator!=(const test_stateful_allocator<T1, State>& lhs, const test_statef
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 using move_only_element_queues = boost::mpl::list<
-AtomicQueue2<std::unique_ptr<int>, CAPACITY>,
-CapacityArgAdaptor<AtomicQueueB2<std::unique_ptr<int>>, CAPACITY>
+    AtomicQueue2<std::unique_ptr<int>, CAPACITY>,
+    CapacityArgAdaptor<AtomicQueueB2<std::unique_ptr<int>>, CAPACITY>
 >;
 
 BOOST_AUTO_TEST_CASE_TEMPLATE(move_only_element, Queue, move_only_element_queues) {
@@ -189,6 +189,8 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(move_only_element, Queue, move_only_element_queues
     BOOST_CHECK_EQUAL(q.was_size(), 0u);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 BOOST_AUTO_TEST_CASE(allocator_constructor_only_b) {
     using allocator_type = test_stateful_allocator<int, std::string>;
     const auto allocator = allocator_type(nullptr, "Capybara");
@@ -211,15 +213,28 @@ BOOST_AUTO_TEST_CASE(allocator_constructor_only_b2) {
     BOOST_CHECK_EQUAL(q2.get_allocator(), allocator);
 }
 
-BOOST_AUTO_TEST_CASE(move_constructor_assignment) {
-    AtomicQueueB2<std::unique_ptr<int>> q(2);
-    auto q2 = std::move(q);
-    q = std::move(q2);
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    AtomicQueueB<int> p(2);
-    auto p2 = std::move(p);
-    p = std::move(p2);
+using move_constructor_assignment_queues = boost::mpl::list<
+    CapacityArgAdaptor<AtomicQueueB<int>, 2>,
+    CapacityArgAdaptor<AtomicQueueB2<std::unique_ptr<int>>, 2>
+>;
+
+BOOST_AUTO_TEST_CASE_TEMPLATE(move_constructor_assignment, Queue, move_constructor_assignment_queues) {
+    Queue q;
+    auto const capacity = q.capacity();
+    BOOST_CHECK_GE(capacity, 2);
+
+    Queue q2 = std::move(q);
+    BOOST_CHECK(!q.capacity());
+    BOOST_CHECK_EQUAL(q2.capacity(), capacity);
+
+    q = std::move(q2);
+    BOOST_CHECK_EQUAL(q.capacity(), capacity);
+    BOOST_CHECK(!q2.capacity());
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 BOOST_AUTO_TEST_CASE(try_push_pop) {
     using Queue = atomic_queue::AtomicQueueB2<
