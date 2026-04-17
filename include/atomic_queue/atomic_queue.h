@@ -382,6 +382,10 @@ public:
     ATOMIC_QUEUE_INLINE unsigned capacity() const noexcept {
         return static_cast<Derived const&>(*this).size_;
     }
+
+    ATOMIC_QUEUE_INLINE static constexpr bool is_spsc() noexcept {
+        return Derived::spsc_;
+    }
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

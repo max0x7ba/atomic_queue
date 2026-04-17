@@ -19,17 +19,42 @@
 
 using namespace ::atomic_queue;
 
-namespace {
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 enum { N_STRESS_MSG = 1000000 };
 enum { STOP_MSG = -1 };
+enum { CAPACITY = 4096 };
+
+using stress_queues = boost::mpl::list<
+AtomicQueue<unsigned, CAPACITY>,
+AtomicQueue2<unsigned, CAPACITY>,
+AtomicQueue<unsigned, CAPACITY, 0u, true, true, false, true>,
+AtomicQueue2<unsigned, CAPACITY, true, true, false, true>,
+
+CapacityArgAdaptor<AtomicQueueB<unsigned>, CAPACITY>,
+CapacityArgAdaptor<AtomicQueueB2<unsigned>, CAPACITY>,
+CapacityArgAdaptor<AtomicQueueB<unsigned, std::allocator<unsigned>, 0u, true, false, true>, CAPACITY>,
+CapacityArgAdaptor<AtomicQueueB2<unsigned, std::allocator<unsigned>, true, false, true>, CAPACITY>,
+
+RetryDecorator<AtomicQueue<unsigned, CAPACITY>>,
+RetryDecorator<AtomicQueue2<unsigned, CAPACITY>>,
+RetryDecorator<AtomicQueue<unsigned, CAPACITY, 0u, true, true, false, true>>,
+RetryDecorator<AtomicQueue2<unsigned, CAPACITY, true, true, false, true>>,
+
+RetryDecorator<CapacityArgAdaptor<AtomicQueueB<unsigned>, CAPACITY>>,
+RetryDecorator<CapacityArgAdaptor<AtomicQueueB2<unsigned>, CAPACITY>>,
+RetryDecorator<CapacityArgAdaptor<AtomicQueueB<unsigned, std::allocator<unsigned>, 0u, true, false, true>, CAPACITY>>,
+RetryDecorator<CapacityArgAdaptor<AtomicQueueB2<unsigned, std::allocator<unsigned>, true, false, true>, CAPACITY>>
+>;
 
 // Check that all push'es are ever pop'ed once with multiple producer and multiple consumers.
-template<class Queue, int PRODUCERS = 3, int CONSUMERS = 3>
-void stress() {
+BOOST_AUTO_TEST_CASE_TEMPLATE(stress, Queue, stress_queues) {
+    enum {
+        PRODUCERS = Queue::is_spsc() ? 1 : 3,
+        CONSUMERS = Queue::is_spsc() ? 1 : 3
+    };
     using T = typename Queue::value_type;
+
     Queue q;
     Barrier barrier;
 
@@ -73,34 +98,7 @@ void stress() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<class Q>
-void test_unique_ptr_int(Q& q) {
-    BOOST_CHECK(q.was_empty());
-    BOOST_CHECK_EQUAL(q.was_size(), 0u);
-    std::unique_ptr<int> p{new int{1}};
-    BOOST_REQUIRE(q.try_push(std::move(p)));
-    BOOST_CHECK(!p);
-    BOOST_CHECK(!q.was_empty());
-    BOOST_CHECK_EQUAL(q.was_size(), 1u);
-
-    p.reset(new int{2});
-    q.push(std::move(p));
-    BOOST_REQUIRE(!p);
-    BOOST_CHECK(!q.was_empty());
-    BOOST_CHECK_EQUAL(q.was_size(), 2u);
-
-    BOOST_REQUIRE(q.try_pop(p));
-    BOOST_REQUIRE(p.get());
-    BOOST_CHECK_EQUAL(*p, 1);
-    BOOST_CHECK(!q.was_empty());
-    BOOST_CHECK_EQUAL(q.was_size(), 1u);
-
-    p = q.pop();
-    BOOST_REQUIRE(p.get());
-    BOOST_CHECK_EQUAL(*p, 2);
-    BOOST_CHECK(q.was_empty());
-    BOOST_CHECK_EQUAL(q.was_size(), 0u);
-}
+namespace {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -152,85 +150,43 @@ bool operator!=(const test_stateful_allocator<T1, State>& lhs, const test_statef
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-
 } // namespace
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-constexpr unsigned CAPACITY = 4096;
+using move_only_element_queues = boost::mpl::list<
+AtomicQueue2<std::unique_ptr<int>, CAPACITY>,
+CapacityArgAdaptor<AtomicQueueB2<std::unique_ptr<int>>, CAPACITY>
+>;
 
-BOOST_AUTO_TEST_CASE(stress_AtomicQueue) {
-    stress<RetryDecorator<AtomicQueue<unsigned, CAPACITY>>>();
-}
+BOOST_AUTO_TEST_CASE_TEMPLATE(move_only_element, Queue, move_only_element_queues) {
+    Queue q;
 
-BOOST_AUTO_TEST_CASE(stress_OptimistAtomicQueue) {
-    stress<AtomicQueue<unsigned, CAPACITY>>();
-}
+    BOOST_CHECK(q.was_empty());
+    BOOST_CHECK_EQUAL(q.was_size(), 0u);
+    std::unique_ptr<int> p{new int{1}};
+    BOOST_REQUIRE(q.try_push(std::move(p)));
+    BOOST_CHECK(!p);
+    BOOST_CHECK(!q.was_empty());
+    BOOST_CHECK_EQUAL(q.was_size(), 1u);
 
-BOOST_AUTO_TEST_CASE(stress_AtomicQueue2) {
-    stress<RetryDecorator<AtomicQueue2<unsigned, CAPACITY>>>();
-}
+    p.reset(new int{2});
+    q.push(std::move(p));
+    BOOST_REQUIRE(!p);
+    BOOST_CHECK(!q.was_empty());
+    BOOST_CHECK_EQUAL(q.was_size(), 2u);
 
-BOOST_AUTO_TEST_CASE(stress_OptimistAtomicQueue2) {
-    stress<AtomicQueue2<unsigned, CAPACITY>>();
-}
+    BOOST_REQUIRE(q.try_pop(p));
+    BOOST_REQUIRE(p.get());
+    BOOST_CHECK_EQUAL(*p, 1);
+    BOOST_CHECK(!q.was_empty());
+    BOOST_CHECK_EQUAL(q.was_size(), 1u);
 
-BOOST_AUTO_TEST_CASE(spsc_stress_AtomicQueue) {
-    stress<RetryDecorator<AtomicQueue<unsigned, CAPACITY, 0u, true, true, false, true>>, 1, 1>();
-}
-
-BOOST_AUTO_TEST_CASE(spsc_stress_OptimistAtomicQueue) {
-    stress<AtomicQueue<unsigned, CAPACITY, 0u, true, true, false, true>, 1, 1>();
-}
-
-BOOST_AUTO_TEST_CASE(spsc_stress_AtomicQueue2) {
-    stress<RetryDecorator<AtomicQueue2<unsigned, CAPACITY, true, true, false, true>>, 1, 1>();
-}
-
-BOOST_AUTO_TEST_CASE(spsc_stress_OptimistAtomicQueue2) {
-    stress<AtomicQueue2<unsigned, CAPACITY, true, true, false, true>, 1, 1>();
-}
-
-BOOST_AUTO_TEST_CASE(stress_AtomicQueueB) {
-    stress<RetryDecorator<CapacityArgAdaptor<AtomicQueueB<unsigned>, CAPACITY>>>();
-}
-
-BOOST_AUTO_TEST_CASE(stress_OptimistAtomicQueueB) {
-    stress<CapacityArgAdaptor<AtomicQueueB<unsigned>, CAPACITY>>();
-}
-
-BOOST_AUTO_TEST_CASE(stress_AtomicQueueB2) {
-    stress<RetryDecorator<CapacityArgAdaptor<AtomicQueueB2<unsigned>, CAPACITY>>>();
-}
-
-BOOST_AUTO_TEST_CASE(stress_OptimistAtomicQueueB2) {
-    stress<CapacityArgAdaptor<AtomicQueueB2<unsigned>, CAPACITY>>();
-}
-
-BOOST_AUTO_TEST_CASE(spsc_stress_AtomicQueueB) {
-    stress<RetryDecorator<CapacityArgAdaptor<AtomicQueueB<unsigned, std::allocator<unsigned>, 0u, true, false, true>, CAPACITY>>, 1, 1>();
-}
-
-BOOST_AUTO_TEST_CASE(spsc_stress_OptimistAtomicQueueB) {
-    stress<CapacityArgAdaptor<AtomicQueueB<unsigned, std::allocator<unsigned>, 0u, true, false, true>, CAPACITY>, 1, 1>();
-}
-
-BOOST_AUTO_TEST_CASE(spsc_stress_AtomicQueueB2) {
-    stress<RetryDecorator<CapacityArgAdaptor<AtomicQueueB2<unsigned, std::allocator<unsigned>, true, false, true>, CAPACITY>>, 1, 1>();
-}
-
-BOOST_AUTO_TEST_CASE(spsc_stress_OptimistAtomicQueueB2) {
-    stress<CapacityArgAdaptor<AtomicQueueB2<unsigned, std::allocator<unsigned>, true, false, true>, CAPACITY>, 1, 1>();
-}
-
-BOOST_AUTO_TEST_CASE(move_only_2) {
-    AtomicQueue2<std::unique_ptr<int>, CAPACITY> q;
-    test_unique_ptr_int(q);
-}
-
-BOOST_AUTO_TEST_CASE(move_only_b2) {
-    AtomicQueueB2<std::unique_ptr<int>> q(2);
-    test_unique_ptr_int(q);
+    p = q.pop();
+    BOOST_REQUIRE(p.get());
+    BOOST_CHECK_EQUAL(*p, 2);
+    BOOST_CHECK(q.was_empty());
+    BOOST_CHECK_EQUAL(q.was_size(), 0u);
 }
 
 BOOST_AUTO_TEST_CASE(allocator_constructor_only_b) {
