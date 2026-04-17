@@ -223,7 +223,7 @@ using move_constructor_assignment_queues = boost::mpl::list<
 BOOST_AUTO_TEST_CASE_TEMPLATE(move_constructor_assignment, Queue, move_constructor_assignment_queues) {
     Queue q;
     auto const capacity = q.capacity();
-    BOOST_CHECK_GE(capacity, 2);
+    BOOST_CHECK_GE(capacity, 2u);
 
     Queue q2 = std::move(q);
     BOOST_CHECK(!q.capacity());
@@ -287,8 +287,9 @@ BOOST_AUTO_TEST_CASE(try_push_pop) {
 }
 
 BOOST_AUTO_TEST_CASE(size) {
+    constexpr unsigned CAPACITY = CACHE_LINE_SIZE * CACHE_LINE_SIZE;
     atomic_queue::RetryDecorator<atomic_queue::AtomicQueueB2<float>> q(10);
-    BOOST_CHECK_EQUAL(q.capacity(), CACHE_LINE_SIZE * CACHE_LINE_SIZE);
+    BOOST_CHECK_EQUAL(q.capacity(), CAPACITY);
     BOOST_CHECK(q.was_empty());
     BOOST_CHECK(!q.was_full());
 }

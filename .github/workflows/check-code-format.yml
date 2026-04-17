@@ -1,0 +1,42 @@
+name: Check Code Format
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - '!**'
+      - '**.h'
+      - '**.cc'
+      - .github/workflows/check-code-format.yml
+  pull_request:
+    branches: [ master ]
+    paths:
+      - '!**'
+      - '**.h'
+      - '**.cc'
+      - .github/workflows/check-code-format.yml
+
+jobs:
+  check-code-format:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install clang-format
+        env:
+          CLANG_FORMAT_VERSION: 22
+        run: |
+          UBUNTU_CODENAME=$(. /etc/os-release && echo $VERSION_CODENAME)
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
+          echo "deb http://apt.llvm.org/${UBUNTU_CODENAME}/ llvm-toolchain-${UBUNTU_CODENAME}-${CLANG_FORMAT_VERSION} main" | sudo tee /etc/apt/sources.list.d/llvm.list
+          echo "deb-src http://apt.llvm.org/${UBUNTU_CODENAME}/ llvm-toolchain-${UBUNTU_CODENAME}-${CLANG_FORMAT_VERSION} main" | sudo tee -a /etc/apt/sources.list.d/llvm.list
+          sudo apt-get update
+          sudo apt-get install clang-format-${CLANG_FORMAT_VERSION}
+          sudo ln -s -f /usr/bin/clang-format-${CLANG_FORMAT_VERSION} /usr/bin/clang-format
+          clang-format --version
+
+      - name: Check code format
+        run: |
+          find . -type f \( -name "*.h" -o -name "*.cc" \) > source_files.txt
+          clang-format --dry-run --Werror --verbose --files=source_files.txt

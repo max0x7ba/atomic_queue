@@ -1,0 +1,62 @@
+name: macOS Continuous Integrations
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - '!**'
+      - '**.h'
+      - '**.cc'
+      - 'meson*'
+      - '**/CMakeLists.txt'
+      - .github/workflows/ci-macos.yml
+  pull_request:
+    branches: [ master ]
+    paths:
+      - '!**'
+      - '**.h'
+      - '**.cc'
+      - 'meson*'
+      - '**/CMakeLists.txt'
+      - .github/workflows/ci-macos.yml
+
+jobs:
+  ci-macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-26, macos-26-intel]
+        compiler:
+          - {c: clang, cpp: clang++}
+        sanitize: [address, undefined, thread]
+        build_system: [cmake, meson]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install dependencies
+        run: |
+          brew install meson boost
+
+      - name: Build and test with CMake
+        if: matrix.build_system == 'cmake'
+        env:
+          CC: ${{ matrix.compiler.c }}
+          CXX: ${{ matrix.compiler.cpp }}
+        run: |
+          cmake -S . -G Ninja -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS_INIT="-fsanitize=${{ matrix.sanitize }}" -DCMAKE_CXX_FLAGS_INIT="-fsanitize=${{ matrix.sanitize }}" -DCMAKE_EXE_LINKER_FLAGS_INIT="-fsanitize=${{ matrix.sanitize }}" -DATOMIC_QUEUE_BUILD_TESTS=ON -DATOMIC_QUEUE_BUILD_EXAMPLES=ON
+          cmake --build build --target all
+          ctest --test-dir build --output-on-failure
+
+      - name: Build and test with Meson
+        if: matrix.build_system == 'meson'
+        env:
+          CC: ${{ matrix.compiler.c }}
+          CXX: ${{ matrix.compiler.cpp }}
+        run: |
+          meson setup build -Dwerror=true -Dwarning_level=3 -Db_sanitize=${{ matrix.sanitize }}
+          meson compile -C build
+          meson test -C build --print-errorlogs

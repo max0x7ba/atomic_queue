@@ -4,9 +4,9 @@
 [![Conan Center](https://img.shields.io/conan/v/atomic_queue)](https://conan.io/center/recipes/atomic_queue)
 [![Vcpkg Version](https://img.shields.io/vcpkg/v/atomic-queue)](https://vcpkg.io/en/package/atomic-queue)
 <br>
-[![Makefile Continuous Integrations](https://github.com/max0x7ba/atomic_queue/actions/workflows/ci.yml/badge.svg)](https://github.com/max0x7ba/atomic_queue/actions/workflows/ci.yml)
-[![CMake Continuous Integrations](https://github.com/max0x7ba/atomic_queue/actions/workflows/cmake-gcc-clang.yml/badge.svg)](https://github.com/max0x7ba/atomic_queue/actions/workflows/cmake-gcc-clang.yml)
-[![Meson Continuous Integrations](https://github.com/max0x7ba/atomic_queue/actions/workflows/ci-meson.yml/badge.svg)](https://github.com/max0x7ba/atomic_queue/actions/workflows/ci-meson.yml)
+[![Linux Continuous Integrations](https://github.com/max0x7ba/atomic_queue/actions/workflows/ci-linux.yml/badge.svg)](https://github.com/max0x7ba/atomic_queue/actions/workflows/ci-linux.yml)
+[![macOS Continuous Integrations](https://github.com/max0x7ba/atomic_queue/actions/workflows/ci-macos.yml/badge.svg)](https://github.com/max0x7ba/atomic_queue/actions/workflows/ci-macos.yml)
+[![Windows Continuous Integrations](https://github.com/max0x7ba/atomic_queue/actions/workflows/ci-windows.yml/badge.svg)](https://github.com/max0x7ba/atomic_queue/actions/workflows/ci-windows.yml)
 <br>
 ![platform Linux x86_64](https://img.shields.io/badge/platform-Linux%20x86_64--bit-gold)
 ![platform Linux ARM](https://img.shields.io/badge/platform-Linux%20ARM-gold)

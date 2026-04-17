@@ -1,0 +1,48 @@
+name: Windows Continuous Integrations
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - '!**'
+      - '**.h'
+      - '**.cc'
+      - '**/CMakeLists.txt'
+      - .github/workflows/ci-windows.yml
+  pull_request:
+    branches: [ master ]
+    paths:
+      - '!**'
+      - '**.h'
+      - '**.cc'
+      - '**/CMakeLists.txt'
+      - .github/workflows/ci-windows.yml
+
+jobs:
+  ci-windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2025, windows-2022]
+        build_system: [cmake]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install boost
+        uses: MarkusJx/install-boost@v2.6.0
+        id: install-boost-windows
+        with:
+          boost_version: 1.89.0
+          platform_version: 2022
+          toolset: msvc
+
+      - name: Build and test with CMake
+        if: matrix.build_system == 'cmake'
+        run: |
+          cmake -S . -G Ninja -B build -DCMAKE_BUILD_TYPE=Release -DBOOST_ROOT="${{steps.install-boost-windows.outputs.BOOST_ROOT}}" -DATOMIC_QUEUE_BUILD_TESTS=ON -DATOMIC_QUEUE_BUILD_EXAMPLES=ON
+          cmake --build build --target all
+          ctest --test-dir build --output-on-failure

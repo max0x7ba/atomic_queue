@@ -30,4 +30,23 @@ if ( ATOMIC_QUEUE_BUILD_TESTS )
         NAME atomic_queue_tests
         COMMAND atomic_queue_tests
     )
+
+    if (APPLE)
+        add_executable(
+            atomic_queue_tests_objcpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests.mm
+        )
+
+        target_link_libraries(
+            atomic_queue_tests_objcpp
+            atomic_queue
+            Boost::unit_test_framework
+        )
+
+        add_test(
+            NAME atomic_queue_tests_objcpp
+            COMMAND atomic_queue_tests_objcpp
+        )
+    endif()
+
 endif()
