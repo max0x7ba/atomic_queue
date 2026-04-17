@@ -144,7 +144,7 @@ ATOMIC_QUEUE_INLINE static constexpr uint64_t round_up_to_power_of_2(uint64_t a)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<class T>
-constexpr T nil() noexcept {
+constexpr T nil_val() noexcept {
 #if __cpp_lib_atomic_is_always_lock_free // Better compile-time error message requires C++17.
     static_assert(std::atomic<T>::is_always_lock_free, "Queue element type T is not atomic. Use AtomicQueue2/AtomicQueueB2 for such element types.");
 #endif
@@ -390,7 +390,7 @@ public:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<class T, unsigned SIZE, T NIL = details::nil<T>(), bool MINIMIZE_CONTENTION = true, bool MAXIMIZE_THROUGHPUT = true, bool TOTAL_ORDER = false, bool SPSC = false>
+template<class T, unsigned SIZE, T NIL = details::nil_val<T>(), bool MINIMIZE_CONTENTION = true, bool MAXIMIZE_THROUGHPUT = true, bool TOTAL_ORDER = false, bool SPSC = false>
 class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>> {
     using Base = AtomicQueueCommon<AtomicQueue<T, SIZE, NIL, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>>;
     friend Base;
@@ -464,7 +464,7 @@ public:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<class T, class A = std::allocator<T>, T NIL = details::nil<T>(), bool MAXIMIZE_THROUGHPUT = true, bool TOTAL_ORDER = false, bool SPSC = false>
+template<class T, class A = std::allocator<T>, T NIL = details::nil_val<T>(), bool MAXIMIZE_THROUGHPUT = true, bool TOTAL_ORDER = false, bool SPSC = false>
 class AtomicQueueB : private std::allocator_traits<A>::template rebind_alloc<std::atomic<T>>,
                      public AtomicQueueCommon<AtomicQueueB<T, A, NIL, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>> {
     using AllocatorElements = typename std::allocator_traits<A>::template rebind_alloc<std::atomic<T>>;
