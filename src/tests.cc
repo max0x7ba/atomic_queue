@@ -354,16 +354,12 @@ struct remap_index_fn {
     auto operator()(Bits<BITS>, unsigned index) const noexcept { return atomic_queue::details::remap_index_xor::remap_index<BITS>(index); }
 };
 
-#ifdef __BMI2__
-struct remap_index_bmi_fn {
+struct remap_index_and_fn {
     template<int BITS>
-    auto operator()(Bits<BITS>, unsigned index) const noexcept { return atomic_queue::details::remap_index_bmi::remap_index<BITS>(index); }
+    auto operator()(Bits<BITS>, unsigned index) const noexcept { return atomic_queue::details::remap_index_and::remap_index<BITS>(index); }
 };
 
-using remap_index_fns = boost::mpl::list<remap_index_fn, remap_index_bmi_fn>;
-#else
-using remap_index_fns = boost::mpl::list<remap_index_fn>;
-#endif
+using remap_index_fns = boost::mpl::list<remap_index_fn, remap_index_and_fn>;
 
 BOOST_AUTO_TEST_CASE_TEMPLATE(remap_index, Remap, remap_index_fns) {
     Remap remap;

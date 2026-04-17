@@ -58,8 +58,9 @@ struct GetIndexShuffleBits<false, array_size, elements_per_cache_line> {
 
 namespace remap_index_xor {
 
+// Each step depends on the previous, a serial chain of 6 operations, ~6 cycles.
 template<int BITS>
-ATOMIC_QUEUE_INLINE static unsigned remap_index(unsigned index) noexcept {
+ATOMIC_QUEUE_INLINE static constexpr unsigned remap_index(unsigned index) noexcept {
     unsigned constexpr mix_mask{(1u << BITS) - 1};
     unsigned const mix{(index ^ (index >> BITS)) & mix_mask};
     return index ^ mix ^ (mix << BITS);
@@ -72,22 +73,16 @@ ATOMIC_QUEUE_INLINE constexpr unsigned remap_index<0>(unsigned index) noexcept {
 
 } // remap_index_xor
 
-#ifdef __BMI2__
-namespace remap_index_bmi {
-// Shorter and faster machine code for swapping bits with BMI instructions, if available.
-// BMI instructions store the result into another 3rd register, without loading the first operand into the result register.
-// +1% faster throughput benchmark with BMI instructions.
+namespace remap_index_and {
+
+// Faster index remapping with independent parallel computations of index components.
+// The shifts and ands dispatch in parallel, 8 operations, ~3 cycles.
+// At least +1% faster throughput benchmark relative to remap_index_xor.
 template<int BITS>
-ATOMIC_QUEUE_INLINE static unsigned remap_index(unsigned index) noexcept {
-    static_assert(2 * BITS <= 8 * sizeof index, "Invalid BITS value.");
-    unsigned constexpr mask = ~(((1u << BITS) - 1) << BITS); // 1 instr: mov.
-
-    // Compute the new element and cache line indexes independently in parallel.
-    unsigned const cache_line_idx{_pext_u32(index, mask) << BITS}; // 2 instr: pext, shl.
-    unsigned const elem_idx{(index & ~mask) >> BITS}; // 2 instr: andn, shr.
-
-    // Merge the new indexes at the very end.
-    return elem_idx | cache_line_idx; // 1 instr: or.
+ATOMIC_QUEUE_INLINE static constexpr unsigned remap_index(unsigned index) noexcept {
+    unsigned constexpr lo{~0u >> (8 * sizeof(index) - BITS)};
+    unsigned constexpr hi{~0u << (2 * BITS)};
+    return ((index >> BITS) & lo) | ((index & lo) << BITS) | (index & hi);
 }
 
 template<>
@@ -95,11 +90,9 @@ ATOMIC_QUEUE_INLINE constexpr unsigned remap_index<0>(unsigned index) noexcept {
     return index;
 }
 
-} // remap_index_bmi
-using namespace remap_index_bmi;
-#else
-using namespace remap_index_xor;
-#endif
+} // remap_index_and
+
+using namespace remap_index_and;
 
 template<int BITS, class T>
 ATOMIC_QUEUE_INLINE static constexpr T& remap(T* ATOMIC_QUEUE_RESTRICT elements, unsigned index) noexcept {
