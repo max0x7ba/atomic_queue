@@ -108,10 +108,27 @@ struct RemapBmi {
     template<int N_BITS>
     ATOMIC_QUEUE_INLINE static unsigned remap(unsigned index, Bits<N_BITS>) noexcept {
         unsigned constexpr lo2{~Bits<N_BITS>::hi};
-        unsigned c{unsigned{N_BITS} << 8 | N_BITS};
-        asm("":"+R"(c));
-        unsigned i2 = __builtin_ia32_bextr_u32(index, c);
-        return i2 | (((index << c) & lo2) | (index & ~lo2));
+
+        unsigned nn{N_BITS << 8 | N_BITS};
+        // Disable constant propagation for nn to prevent the compiler from transforming the following code into more expensive instructions.
+        // Allocate a 32-bit i386 register for nn. r8-r15 are undesirable because instructions using r8-r15 are 1-byte longer.
+        // This one register is used by both bextr and shlx/shl instructions (otherwise transformed into different code).
+#ifdef __BMI2__
+        asm("":"+R"(nn)); // Any i386 register for BMI2 shlx shift count.
+#else
+        asm("":"+c"(nn)); // Without BMI2, shl shift count must be in ecx register.
+#endif
+        // These 2 statements generate 2 instructions which require nn in the register.
+        unsigned cache_line_idx = __builtin_ia32_bextr_u32(index, nn); // BMI1 instruction.
+        // C++ standard doesn't not define behavour of shifts not less than the number of bits.
+        // Address sanitizer reports "shift exponent X is too large for 32-bit type 'unsigned int'".
+        // On x86, all dynamic shift instructions (count in a register) mask the count to 5/6 bits (32/64-bit registers).
+        // (index << (nn & 31)) should compile into the same code as (index << nn), because (nn & 31) is done by dynamic shift instructions.
+        // But compilers emit unnecessary (nn & 31) instructions for (index << (nn & 31)) and that's a recurring code-generation bug.
+        // (index << (nn & 31)) would make Address sanitizer happy.
+        unsigned cache_elem_idx = index << nn; // This statement generates shlx r32,r32,r32 with BMI2, otherwise shl r32,cl.
+
+        return cache_line_idx | (cache_elem_idx & lo2) | (index & ~lo2);
     }
 };
 #endif
