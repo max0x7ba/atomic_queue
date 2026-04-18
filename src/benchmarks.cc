@@ -449,9 +449,11 @@ void run_ping_pong_benchmark(char const* name, HugePages& hp, std::vector<unsign
 
     // Select the best times of RUNS runs.
     std::array<cycles_t, 2> best_times = {CYCLES_MAX, CYCLES_MAX};
-    // for(bool alternative_placement : {false, true}) {
-    for(bool alternative_placement : {false}) {
-        unsigned const cpus[2] = {hw_thread_ids[0], hw_thread_ids[1 + alternative_placement]};
+
+    // Ping-pong between the first available CPU and every other.
+    unsigned const n_cpus = hw_thread_ids.size();
+    for(unsigned cpu2 = 1; cpu2 < n_cpus; ++cpu2) {
+        unsigned const cpus[2] = {hw_thread_ids[0], hw_thread_ids[cpu2]};
         for(unsigned run = RUNS; run--;) {
             auto times = ping_pong_benchmark<Queue>(N_PING_PONG_MESSAGES, hp, cpus);
             if(best_times[0] + best_times[1] > times[0] + times[1])
