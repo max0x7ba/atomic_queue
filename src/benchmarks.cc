@@ -50,7 +50,6 @@ using sum_t = long long;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-using cycles_t = decltype(__builtin_ia32_rdtsc());
 static_assert(std::is_unsigned<cycles_t>::value);
 using icycles_t = std::make_signed<cycles_t>::type; // Signed integers convert into double with one AVX instruction, unlike unsigned.
 cycles_t constexpr CYCLES_MAX = -1;
@@ -174,7 +173,7 @@ void throughput_producer(unsigned N, Queue* queue, std::atomic<cycles_t>* t0, Ba
 
     // The first producer saves the start time.
     cycles_t expected = 0;
-    t0->compare_exchange_strong(expected, __builtin_ia32_rdtsc(), std::memory_order_acq_rel, std::memory_order_relaxed);
+    t0->compare_exchange_strong(expected, cycles_start(), std::memory_order_acq_rel, std::memory_order_relaxed);
 
     region_guard_t<Queue> guard;
     ProducerOf<Queue> producer{*queue};
@@ -197,7 +196,7 @@ void throughput_consumer_impl(unsigned N, Queue* queue, sum_t* consumer_sum, std
     }
 
     // The last consumer saves the end time.
-    auto t = __builtin_ia32_rdtsc();
+    auto t = cycles_end();
     if(1 == last_consumer->fetch_sub(1, std::memory_order_acq_rel))
         *t1 = t;
 
@@ -387,7 +386,7 @@ void run_throughput_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const
 
 template<class Queue>
 void ping_pong_thread_impl(Queue* q1, Queue* q2, unsigned N, cycles_t* time, std::false_type /*sender*/) {
-    cycles_t t0 = __builtin_ia32_rdtsc();
+    cycles_t t0 = cycles_start();
     region_guard_t<Queue> guard;
     ConsumerOf<Queue> consumer_q1{*q1};
     ProducerOf<Queue> producer_q2{*q2};
@@ -395,13 +394,13 @@ void ping_pong_thread_impl(Queue* q1, Queue* q2, unsigned N, cycles_t* time, std
         j = consumer_q1.pop(*q1);
         producer_q2.push(*q2, i);
     }
-    cycles_t t1 = __builtin_ia32_rdtsc();
+    cycles_t t1 = cycles_end();
     *time = t1 - t0;
 }
 
 template<class Queue>
 void ping_pong_thread_impl(Queue* q1, Queue* q2, unsigned N, cycles_t* time, std::true_type /*sender*/) {
-    cycles_t t0 = __builtin_ia32_rdtsc();
+    cycles_t t0 = cycles_start();
     region_guard_t<Queue> guard;
     ProducerOf<Queue> producer_q1{*q1};
     ConsumerOf<Queue> consumer_q2{*q2};
@@ -409,7 +408,7 @@ void ping_pong_thread_impl(Queue* q1, Queue* q2, unsigned N, cycles_t* time, std
         producer_q1.push(*q1, i);
         j = consumer_q2.pop(*q2);
     }
-    cycles_t t1 = __builtin_ia32_rdtsc();
+    cycles_t t1 = cycles_end();
     *time = t1 - t0;
 }
 
