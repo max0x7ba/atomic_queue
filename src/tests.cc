@@ -311,11 +311,11 @@ BOOST_AUTO_TEST_CASE(power_of_2) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-auto const bits0 = details::Bits<0>{};
-auto const bits1 = details::Bits<1>{};
-auto const bits2 = details::Bits<2>{};
-auto const bits3 = details::Bits<3>{};
-auto const bits4 = details::Bits<4>{};
+auto const bits0 = details::IndexBits<0>{};
+auto const bits1 = details::IndexBits<1>{};
+auto const bits2 = details::IndexBits<2>{};
+auto const bits3 = details::IndexBits<3>{};
+auto const bits4 = details::IndexBits<4>{};
 
 using remap_index_fns = boost::mpl::list<
     details::RemapXor,
@@ -351,7 +351,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(remap_index, Remap, remap_index_fns) {
     BOOST_CHECK_EQUAL(remap(bits3, 0b000'001u), 0b001'000u);
     BOOST_CHECK_EQUAL(remap(bits3, 0b001'000u), 0b000'001u);
 
-    // remap_index is its own inverse: Applying it twice yields the original index.
+    // remap_index is its own inverse: applying it twice yields the original index.
     for(unsigned i = 1024; i--;) {
         BOOST_CHECK_EQUAL(remap(bits1, remap(bits1, i)), i);
         BOOST_CHECK_EQUAL(remap(bits2, remap(bits2, i)), i);
@@ -362,8 +362,9 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(remap_index, Remap, remap_index_fns) {
     // remap_index is a bijection over any power-of-2 range that covers the swapped bits.
     constexpr unsigned N = 256; // 8-bit index.
     std::bitset<N> seen;
+    BOOST_REQUIRE(seen.none());
     for(unsigned i = N; i--;) {
-        auto j = remap(bits3, i); // Swap bits [0:2] with bits [3:5].in the 8-bit index.
+        auto j = remap(bits3, i); // Swap bits [0:2] with bits [3:5] in the 8-bit index.
         BOOST_CHECK_LT(j, N);
         seen.set(j);
     }
