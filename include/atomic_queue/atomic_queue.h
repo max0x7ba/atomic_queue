@@ -60,7 +60,6 @@ template<int N_BITS>
 struct IndexBits {
     enum : unsigned {
         mask_elem_idx = ~(~0u << N_BITS),
-        mask_cache_line_idx = mask_elem_idx << N_BITS,
         mask_hi = ~0u << (2 * N_BITS),
         count = N_BITS
     };
@@ -111,7 +110,7 @@ struct RemapBmi {
         // (index << (nn & 31)) would make Address sanitizer happy.
         unsigned new_cache_line_idx = index << nn; // This statement generates shlx r32,r32,r32 with BMI2, otherwise shl r32,cl.
 
-        return new_cache_elem_idx | (new_cache_line_idx & Bits::mask_cache_line_idx) | (index & Bits::mask_hi);
+        return new_cache_elem_idx | (new_cache_line_idx & ~Bits::mask_hi) | (index & Bits::mask_hi);
     }
 };
 #endif
