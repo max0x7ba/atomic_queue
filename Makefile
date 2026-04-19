@@ -65,7 +65,7 @@ cxxflags.x86_64 := -fcf-protection=none -masm=intel
 
 cxxflags.gcc.asm.1 := -save-temps=obj -fverbose-asm -fno-{stack-protector,stack-clash-protection}
 cxxflags.gcc.debug := -Og -f{stack-protector-all,no-omit-frame-pointer} # -D_GLIBCXX_DEBUG
-cxxflags.gcc.release := -O3 -mtune=native -falign-{functions,loops}=64 -DNDEBUG ${cxxflags.gcc.asm.${ASM}}
+cxxflags.gcc.release := -O2 -mtune=native -fgcse-after-reload -momit-leaf-frame-pointer -falign-{functions,loops}=64 -DNDEBUG ${cxxflags.gcc.asm.${ASM}}
 cxxflags.gcc.sanitize := ${cxxflags.gcc.debug} -fsanitize=thread
 cxxflags.gcc.sanitize2 := ${cxxflags.gcc.debug} -fsanitize=undefined,address
 cxxflags.gcc := -march=native -f{no-plt,no-math-errno,finite-math-only,message-length=0} -W{all,extra,error,no-{array-bounds,maybe-uninitialized,unused-variable,unused-function,unused-local-typedefs}} ${cxxflags.gcc.${BUILD}}
@@ -77,7 +77,7 @@ ldflags.gcc := -fuse-ld=gold ${ldflags.gcc.${BUILD}}
 # clang-14 for arm doesn't support -march=native.
 has_native := $(if $(and $(findstring clang,${CXX}), $(findstring aarch64,$(shell uname -m)), $(shell ${CXX} -march=native -c -xc++ -o/dev/null /dev/null 2>&1)),,1)
 cxxflags.clang.debug := -O0 -fstack-protector-all $(and ${has_native},-march=native)
-cxxflags.clang.release := -O3 -falign-functions=64 -DNDEBUG $(and ${has_native},-march=native -mtune=native)
+cxxflags.clang.release := -O2 -falign-functions=64 -DNDEBUG $(and ${has_native},-march=native -mtune=native)
 cxxflags.clang.sanitize := ${cxxflags.clang.debug} -fsanitize=thread
 cxxflags.clang.sanitize2 := ${cxxflags.clang.debug} -fsanitize=undefined,address
 cxxflags.clang := -stdlib=libstdc++ -f{no-plt,no-math-errno,finite-math-only,message-length=0} -W{all,extra,error,no-{unused-variable,unused-function,unused-local-typedefs}} ${cxxflags.clang.${BUILD}}
@@ -195,11 +195,10 @@ ${recompile} ${relink} : ${build_dir}/.make/re% : ${build_dir}/.make/env.%.txt #
 include ${BUILD_ROOT}/chrt.mk
 ${BUILD_ROOT}/chrt.mk : Makefile | $$(dir $$@)
 	echo "chrt_fifo := $$(chrt -f 50 printf 'chrt' || printf 'sudo chrt') -f 50" > $@
-	echo "n_cpus := $$(nproc)" >> $@
 
 N := 1
 TAG := results
-new_filename = $(shell date "+${TAG}.%Y%m%dT%H%M%S.${TOOLSET}.${n_cpus}")
+new_filename = $(shell date "+${TAG}.%Y%m%dT%H%M%S.${TOOLSET}.$$(nproc)")
 
 results/%.txt : ${build_dir}/benchmarks | $$(dir $$@)
 	{ for((i=1;i<=${N};++i)); do printf "\n%(%F %T)T [$$i/${N}] "; ${chrt_fifo} ${lb} /bin/time -v $<; echo; done; } |& tee -i $@
