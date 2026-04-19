@@ -228,10 +228,12 @@ $(function() {
 
     plot_scalability('scalability-9900KS-5GHz', scalability_9900KS, 60e6, 1000e6);
     plot_scalability('scalability-ryzen-5825u', scalability_ryzen_5825u, 40e6, 1000e6);
+    plot_scalability('cc-scalability-ryzen-5825u', cc_scalability_ryzen_5825u, 40e6, 1000e6);
     plot_scalability('scalability-xeon-gold-6132', scalability_xeon_gold_6132, 15e6, 300e6);
     plot_scalability('scalability-ryzen-5950x', scalability_ryzen_5950x, 20e6, 500e6);
     plot_latency('latency-9900KS-5GHz', latency_9900KS);
     plot_latency('latency-ryzen-5825u', latency_ryzen_5825u);
+    plot_latency('cc-latency-ryzen-5825u', cc_latency_ryzen_5825u);
     plot_latency('latency-xeon-gold-6132', latency_xeon_gold_6132);
     plot_latency('latency-ryzen-5950x', latency_ryzen_5950x);
 
