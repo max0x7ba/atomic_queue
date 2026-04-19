@@ -156,9 +156,13 @@ push()                          pop()
 ### Queue API
 The queue class templates provide the following member functions:
 * `try_push` - Appends an element to the end of the queue. Returns `false` when the queue is full.
+* `try_push` (batch) - Appends an iterator range to the end of the queue. Returns the iterator one past the last element that got pushed, which could be different from the last iterator when the queue becomes full.
 * `try_pop` - Removes an element from the front of the queue. Returns `false` when the queue is empty.
+* `try_pop` (batch) - Removes elements from the front of the queue and places them into an iterator. Returns the number of elements popped, which may be different from the number of requested elements if the queue becomes empty.
 * `push` (optimist) - Appends an element to the end of the queue. Busy waits when the queue is full. Faster than `try_push` when the queue is not full. Optional FIFO producer queuing and total order.
+* `push` (optimist, batch) - Appends an iterator range to the end of the queue. Busy waits when the queue is full. Returns the iterator past the last pushed element. Faster than `try_push` when the queue is not full. Optional FIFO producer queuing and total order.
 * `pop` (optimist) - Removes an element from the front of the queue. Busy waits when the queue is empty. Faster than `try_pop` when the queue is not empty. Optional FIFO consumer queuing and total order.
+* `pop` (optimist, batch) - Removes elements from the front of the queue and places them into an iterator. Returns the iterator past the last popped element. Busy waits when the queue is empty. Faster than `try_pop` when the queue is not empty. Optional FIFO consumer queuing and total order.
 * `was_size` - Returns the number of unconsumed elements during the call. The state may have changed by the time the return value is examined.
 * `was_empty` - Returns `true` if the container was empty during the call. The state may have changed by the time the return value is examined.
 * `was_full` - Returns `true` if the container was full during the call. The state may have changed by the time the return value is examined.
