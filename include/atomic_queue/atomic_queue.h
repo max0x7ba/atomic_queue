@@ -300,7 +300,7 @@ public:
         if(Derived::spsc_) {
             int const slots = static_cast<int>(tail_.load(X) + static_cast<Derived&>(*this).size_ - head);
             n = std::min(n, slots);
-            if (n <= 0)
+            if(n <= 0)
                 return first;
             head_.store(head + static_cast<unsigned>(n), X);
         }
@@ -309,14 +309,14 @@ public:
             do {
                 int const slots = static_cast<int>(tail_.load(X) + static_cast<Derived&>(*this).size_ - head);
                 n = std::min(length, slots);
-                if (n <= 0)
+                if(n <= 0)
                     return first;
             } while(ATOMIC_QUEUE_UNLIKELY(!head_.compare_exchange_weak(head, head + static_cast<unsigned>(n), X, X))); // This loop is not FIFO.
         }
 
         do {
             static_cast<Derived&>(*this).do_push(*first++, head++);
-        } while (--n);
+        } while(--n);
         return first;
     }
 
@@ -362,7 +362,7 @@ public:
         int i = n;
         do {
             *first++ = static_cast<Derived&>(*this).do_pop(tail++);
-        } while (--i);
+        } while(--i);
         return n;
     }
 
@@ -392,7 +392,7 @@ public:
             constexpr auto memory_order = Derived::total_order_ ? std::memory_order_seq_cst : std::memory_order_relaxed;
             head = head_.fetch_add(n, memory_order); // FIFO and total order on Intel regardless, as of 2019.
         }
-        while (n--) {
+        while(n--) {
             static_cast<Derived&>(*this).do_push(*first++, head++);
         }
         return first;
@@ -758,7 +758,7 @@ struct RetryDecorator : Queue {
 
     template<class OutputIt>
     ATOMIC_QUEUE_INLINE OutputIt pop(OutputIt first, int n) noexcept {
-        while (n -= this->try_pop(first, n)) {
+        while(n -= this->try_pop(first, n)) {
             spin_loop_pause();
         }
         return first;
