@@ -54,6 +54,25 @@ static_assert(std::is_unsigned<cycles_t>::value);
 using icycles_t = std::make_signed<cycles_t>::type; // Signed integers convert into double with one AVX instruction, unlike unsigned.
 cycles_t constexpr CYCLES_MAX = -1;
 
+// RDTSCP is not a serializing instruction, but it does wait until all previous instructions have executed and all previous loads are globally visible.
+using cycles_t = decltype(__builtin_ia32_rdtscp(0));
+
+ATOMIC_QUEUE_INLINE static cycles_t cycles_start() noexcept {
+    unsigned tsc_aux;
+    auto t0 = __builtin_ia32_rdtscp(&tsc_aux);
+    // If software requires RDTSCP to be executed prior to execution of any subsequent instruction (including any memory accesses), it can execute LFENCE immediately after RDTSCP.
+    _mm_lfence();
+    return t0;
+}
+
+ATOMIC_QUEUE_INLINE static cycles_t cycles_end() noexcept {
+    // If software requires RDTSCP to be executed only after all previous stores are globally visible, it can execute MFENCE immediately before RDTSCP.
+    _mm_mfence();
+    // RDTSCP is not a serializing instruction, but it does wait until all previous instructions have executed and all previous loads are globally visible.
+    unsigned tsc_aux;
+    return __builtin_ia32_rdtscp(&tsc_aux);
+}
+
 double TSC_TO_SECONDS = 0; // Set in main.
 
 ATOMIC_QUEUE_INLINE double to_seconds(icycles_t cycles) noexcept {

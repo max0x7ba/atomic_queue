@@ -42,25 +42,6 @@ ATOMIC_QUEUE_INLINE static void spin_loop_pause() noexcept {
     _mm_pause();
 }
 
-// RDTSCP is not a serializing instruction, but it does wait until all previous instructions have executed and all previous loads are globally visible.
-using cycles_t = decltype(__builtin_ia32_rdtscp(0));
-
-ATOMIC_QUEUE_INLINE static cycles_t cycles_start() noexcept {
-    unsigned tsc_aux;
-    auto t0 = __builtin_ia32_rdtscp(&tsc_aux);
-    // If software requires RDTSCP to be executed prior to execution of any subsequent instruction (including any memory accesses), it can execute LFENCE immediately after RDTSCP.
-    _mm_lfence();
-    return t0;
-}
-
-ATOMIC_QUEUE_INLINE static cycles_t cycles_end() noexcept {
-    // If software requires RDTSCP to be executed only after all previous stores are globally visible, it can execute MFENCE immediately before RDTSCP.
-    _mm_mfence();
-    // RDTSCP is not a serializing instruction, but it does wait until all previous instructions have executed and all previous loads are globally visible.
-    unsigned tsc_aux;
-    return __builtin_ia32_rdtscp(&tsc_aux);
-}
-
 #elif defined(__arm__) || defined(__aarch64__) || defined(_M_ARM64)
 /*
 TODO:
