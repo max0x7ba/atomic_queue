@@ -2,21 +2,22 @@
 
 # Usage examples (assuming this directory is ~/src/atomic_queue):
 #
-#   time make -rC ~/src/atomic_queue -j$(($(nproc)/2))
-#   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) all run_tests
-#   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=gcc-14 BUILD=debug run_tests
-#   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=clang-20 BUILD=debug run_tests
-#   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=gcc-14 run_benchmarks_n
-#   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=clang-20 run_benchmarks_n
-#   taskset -c 0,1,2,3 time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=gcc-14 run_benchmarks_n N=2
-#   taskset -c 0,2,4,6 time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=gcc-14 run_benchmarks_n N=2
-#   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=gcc-14 ASM=1
-#   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=clang-20 BUILD=debug TAGS
-#   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) TOOLSET=clang BUILD=sanitize run_tests
+#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2))
+#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) all run_tests
+#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=gcc-14 BUILD=debug run_tests
+#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=clang-20 BUILD=debug run_tests
+#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=gcc-14 run_benchmarks_n
+#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=clang-20 run_benchmarks_n
+#   taskset -c 0,1,2,3 time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=gcc-14 run_benchmarks_n N=2
+#   taskset -c 0,2,4,6 time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=gcc-14 run_benchmarks_n N=2
+#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=gcc-14 ASM=1
+#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=clang-20 BUILD=debug TAGS
+#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=clang BUILD=sanitize run_tests
+#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) BUILD=debug run_tests2
 #
 # Additional CPPFLAGS, CXXFLAGS, LDLIBS, LDFLAGS can come from the command line, e.g. make CPPFLAGS='-I<my-include-dir>', or from environment variables.  For example, also produce assembly outputs:
 #
-#   time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) CXXFLAGS="-save-temps=obj -fverbose-asm -masm=intel"
+#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) CXXFLAGS="-save-temps=obj -fverbose-asm -masm=intel"
 #
 
 SHELL := /bin/bash
@@ -172,7 +173,7 @@ Makefile :;
 ${build_dir}/.make ${build_dir}/.make/ perf/ results/ :
 	mkdir -p $@
 
-${BUILD_ROOT}/ ${build_dir} ${build_dir}/ : | ${build_dir}/.make ;
+${BUILD_ROOT}/ ${build_dir} ${build_dir}/ : | ${build_dir}/.make/ ;
 
 
 ver = "$(shell ${1} --version | ${head1})"
@@ -193,7 +194,7 @@ ${recompile} ${relink} : ${build_dir}/.make/re% : ${build_dir}/.make/env.%.txt #
 # cd ~/src/atomic_queue; make -r clean; set -x; make -rj8; make -rj8; make -rj8 CPPFLAGS=-DXYZ=1; make -rj8 CPPFLAGS=-DXYZ=1; make -rj8; make -rj8; make -rj8 LDLIBS=-lrt; make -rj8 LDLIBS=-lrt; make -rj8; make -rj8
 
 include ${BUILD_ROOT}/chrt.mk
-${BUILD_ROOT}/chrt.mk : Makefile | $$(dir $$@)
+${BUILD_ROOT}/chrt.mk : | $$(dir $$@)
 	echo "chrt_fifo := $$(chrt -f 50 printf 'chrt' || printf 'sudo chrt') -f 50" > $@
 
 N := 1
@@ -217,6 +218,11 @@ run_benchmarks_perf : perf/$${new_filename}.txt
 run_benchmarks : ${build_dir}/benchmarks
 	@echo -n "$@ "; set -x; scripts/benchmark.sh ${chrt_fifo} $<
 
+run_tests.% : force
+	${MAKE} --no-print-directory --output-sync TOOLSET=$* all run_tests
+
+run_tests2 : run_tests.gcc-14 run_tests.clang-20
+
 run_tests : ${build_dir}/tests
 	@echo -n "$@ "; set -x; $< --log_level=unit_scope --report_level=short
 
@@ -227,7 +233,10 @@ compile_commands compile_commands.json TAGS :
 	bear -- ${MAKE} --always-make --no-print-directory all
 
 clean :
-	rm -rf ${exes} ${build_dir}
+	rm -rf ${build_dir}
+
+distclean :
+	rm -rf ${BUILD_ROOT}
 
 versions:
 	${MAKE} --version | ${head1}
@@ -241,11 +250,11 @@ env :
 # If a rule has no prerequisites or recipe, and the target of the rule is a nonexistent file, then make imagines this target to have been updated whenever its rule is run. This implies that all targets depending on this one will always have their recipe run.
 force :
 
-.PHONY : update_env_txt env versions run_benchmarks clean all compile_commands compile_commands.json TAGS run_tests run_benchmarks_n run_benchmarks_perf
+.PHONY : update_env_txt env versions run_benchmarks clean all compile_commands compile_commands.json TAGS run_tests run_benchmarks_n run_benchmarks_perf run_tests2 distclean
 .DELETE_ON_ERROR :
 .SECONDARY :
 .SUFFIXES :
 
 # Local Variables:
-# compile-command: "/bin/time make -rC ~/src/atomic_queue -j$(($(nproc)/2)) BUILD=debug run_tests"
+# compile-command: "/bin/time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) BUILD=debug run_tests"
 # End:
