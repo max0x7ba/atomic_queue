@@ -50,12 +50,12 @@ using sum_t = long long;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// RDTSCP is not a serializing instruction, but it does wait until all previous instructions have executed and all previous loads are globally visible.
+using cycles_t = decltype(__builtin_ia32_rdtscp(0));
+
 static_assert(std::is_unsigned<cycles_t>::value);
 using icycles_t = std::make_signed<cycles_t>::type; // Signed integers convert into double with one AVX instruction, unlike unsigned.
 cycles_t constexpr CYCLES_MAX = -1;
-
-// RDTSCP is not a serializing instruction, but it does wait until all previous instructions have executed and all previous loads are globally visible.
-using cycles_t = decltype(__builtin_ia32_rdtscp(0));
 
 ATOMIC_QUEUE_INLINE static cycles_t cycles_start() noexcept {
     unsigned tsc_aux;
