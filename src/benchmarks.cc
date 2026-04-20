@@ -50,27 +50,17 @@ using sum_t = long long;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// RDTSCP is not a serializing instruction, but it does wait until all previous instructions have executed and all previous loads are globally visible.
-using cycles_t = decltype(__builtin_ia32_rdtscp(0));
-
+using cycles_t = decltype(__builtin_ia32_rdtsc());
 static_assert(std::is_unsigned<cycles_t>::value);
+
 using icycles_t = std::make_signed<cycles_t>::type; // Signed integers convert into double with one AVX instruction, unlike unsigned.
 cycles_t constexpr CYCLES_MAX = -1;
 
-ATOMIC_QUEUE_INLINE static cycles_t cycles_start() noexcept {
-    unsigned tsc_aux;
-    auto t0 = __builtin_ia32_rdtscp(&tsc_aux);
-    // If software requires RDTSCP to be executed prior to execution of any subsequent instruction (including any memory accesses), it can execute LFENCE immediately after RDTSCP.
+ATOMIC_QUEUE_INLINE static cycles_t cycles() noexcept {
+    // If software requires RDTSC to be executed only after all previous instructions have executed and all previous loads are
+    // globally visible, 1 it can execute LFENCE immediately before RDTSC.
     _mm_lfence();
-    return t0;
-}
-
-ATOMIC_QUEUE_INLINE static cycles_t cycles_end() noexcept {
-    // If software requires RDTSCP to be executed only after all previous stores are globally visible, it can execute MFENCE immediately before RDTSCP.
-    _mm_mfence();
-    // RDTSCP is not a serializing instruction, but it does wait until all previous instructions have executed and all previous loads are globally visible.
-    unsigned tsc_aux;
-    return __builtin_ia32_rdtscp(&tsc_aux);
+    return __builtin_ia32_rdtsc();
 }
 
 double TSC_TO_SECONDS = 0; // Set in main.
@@ -192,7 +182,7 @@ void throughput_producer(unsigned N, Queue* queue, std::atomic<cycles_t>* t0, Ba
 
     // The first producer saves the start time.
     cycles_t expected = 0;
-    t0->compare_exchange_strong(expected, cycles_start(), std::memory_order_acq_rel, std::memory_order_relaxed);
+    t0->compare_exchange_strong(expected, cycles(), std::memory_order_acq_rel, std::memory_order_relaxed);
 
     region_guard_t<Queue> guard;
     ProducerOf<Queue> producer{*queue};
@@ -215,7 +205,7 @@ void throughput_consumer_impl(unsigned N, Queue* queue, sum_t* consumer_sum, std
     }
 
     // The last consumer saves the end time.
-    auto t = cycles_end();
+    auto t = cycles();
     if(1 == last_consumer->fetch_sub(1, std::memory_order_acq_rel))
         *t1 = t;
 
@@ -405,7 +395,7 @@ void run_throughput_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const
 
 template<class Queue>
 void ping_pong_thread_impl(Queue* q1, Queue* q2, unsigned N, cycles_t* time, std::false_type /*sender*/) {
-    cycles_t t0 = cycles_start();
+    cycles_t t0 = cycles();
     region_guard_t<Queue> guard;
     ConsumerOf<Queue> consumer_q1{*q1};
     ProducerOf<Queue> producer_q2{*q2};
@@ -413,13 +403,13 @@ void ping_pong_thread_impl(Queue* q1, Queue* q2, unsigned N, cycles_t* time, std
         j = consumer_q1.pop(*q1);
         producer_q2.push(*q2, i);
     }
-    cycles_t t1 = cycles_end();
+    cycles_t t1 = cycles();
     *time = t1 - t0;
 }
 
 template<class Queue>
 void ping_pong_thread_impl(Queue* q1, Queue* q2, unsigned N, cycles_t* time, std::true_type /*sender*/) {
-    cycles_t t0 = cycles_start();
+    cycles_t t0 = cycles();
     region_guard_t<Queue> guard;
     ProducerOf<Queue> producer_q1{*q1};
     ConsumerOf<Queue> consumer_q2{*q2};
@@ -427,7 +417,7 @@ void ping_pong_thread_impl(Queue* q1, Queue* q2, unsigned N, cycles_t* time, std
         producer_q1.push(*q1, i);
         j = consumer_q2.pop(*q2);
     }
-    cycles_t t1 = cycles_end();
+    cycles_t t1 = cycles();
     *time = t1 - t0;
 }
 
