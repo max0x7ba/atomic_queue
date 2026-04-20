@@ -35,6 +35,7 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 using std::uint64_t;
+using std::int64_t;
 
 using namespace ::atomic_queue;
 
@@ -46,15 +47,36 @@ template<class T>
 using Type = std::common_type<T>; // Similar to boost::type<>.
 
 using sum_t = long long;
-using cycles_t = decltype(__builtin_ia32_rdtsc());
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-double const TSC_TO_SECONDS = 1e-9 / cpu_base_frequency();
+// RDTSCP is not a serializing instruction, but it does wait until all previous instructions have executed and all previous loads are globally visible.
+using cycles_t = decltype(__builtin_ia32_rdtscp(0));
 
-template<class T>
-inline double to_seconds(T tsc) {
-    return tsc * TSC_TO_SECONDS;
+static_assert(std::is_unsigned<cycles_t>::value);
+using icycles_t = std::make_signed<cycles_t>::type; // Signed integers convert into double with one AVX instruction, unlike unsigned.
+cycles_t constexpr CYCLES_MAX = -1;
+
+ATOMIC_QUEUE_INLINE static cycles_t cycles_start() noexcept {
+    unsigned tsc_aux;
+    auto t0 = __builtin_ia32_rdtscp(&tsc_aux);
+    // If software requires RDTSCP to be executed prior to execution of any subsequent instruction (including any memory accesses), it can execute LFENCE immediately after RDTSCP.
+    _mm_lfence();
+    return t0;
+}
+
+ATOMIC_QUEUE_INLINE static cycles_t cycles_end() noexcept {
+    // If software requires RDTSCP to be executed only after all previous stores are globally visible, it can execute MFENCE immediately before RDTSCP.
+    _mm_mfence();
+    // RDTSCP is not a serializing instruction, but it does wait until all previous instructions have executed and all previous loads are globally visible.
+    unsigned tsc_aux;
+    return __builtin_ia32_rdtscp(&tsc_aux);
+}
+
+double TSC_TO_SECONDS = 0; // Set in main.
+
+ATOMIC_QUEUE_INLINE double to_seconds(icycles_t cycles) noexcept {
+    return cycles * TSC_TO_SECONDS;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -63,12 +85,12 @@ template<class Queue>
 struct BoostSpScAdapter : Queue {
     using T = typename Queue::value_type;
 
-    void push(T element) {
+    ATOMIC_QUEUE_INLINE void push(T element) {
         while(!this->Queue::push(element))
             spin_loop_pause();
     }
 
-    T pop() {
+    ATOMIC_QUEUE_INLINE T pop() {
         T element;
         while(!this->Queue::pop(element))
             spin_loop_pause();
@@ -80,7 +102,7 @@ template<class Queue>
 struct BoostQueueAdapter : BoostSpScAdapter<Queue> {
     using T = typename Queue::value_type;
 
-    void push(T element) {
+    ATOMIC_QUEUE_INLINE void push(T element) {
         while(!this->Queue::bounded_push(element))
             spin_loop_pause();
     }
@@ -94,7 +116,7 @@ template<class Queue>
 struct XeniumQueueAdapter : Queue {
     using T = typename Queue::value_type;
 
-    T pop() {
+    ATOMIC_QUEUE_INLINE T pop() {
         T element;
         while(!this->Queue::try_pop(element))
             spin_loop_pause();
@@ -122,7 +144,7 @@ using region_guard_t = typename region_guard_traits<T>::region_guard;
 
 template<class Queue, size_t Capacity>
 struct TbbAdapter : RetryDecorator<Queue> {
-    TbbAdapter() {
+    ATOMIC_QUEUE_INLINE TbbAdapter() {
         this->set_capacity(Capacity);
     }
 };
@@ -170,7 +192,7 @@ void throughput_producer(unsigned N, Queue* queue, std::atomic<cycles_t>* t0, Ba
 
     // The first producer saves the start time.
     cycles_t expected = 0;
-    t0->compare_exchange_strong(expected, __builtin_ia32_rdtsc(), std::memory_order_acq_rel, std::memory_order_relaxed);
+    t0->compare_exchange_strong(expected, cycles_start(), std::memory_order_acq_rel, std::memory_order_relaxed);
 
     region_guard_t<Queue> guard;
     ProducerOf<Queue> producer{*queue};
@@ -193,7 +215,7 @@ void throughput_consumer_impl(unsigned N, Queue* queue, sum_t* consumer_sum, std
     }
 
     // The last consumer saves the end time.
-    auto t = __builtin_ia32_rdtsc();
+    auto t = cycles_end();
     if(1 == last_consumer->fetch_sub(1, std::memory_order_acq_rel))
         *t1 = t;
 
@@ -261,7 +283,7 @@ void run_throughput_benchmark(char const* name, HugePages& hp, std::vector<unsig
         double const expected_sum_inv = 1. / expected_sum;
 
         for(bool alternative_placement : {false, true}) {
-            cycles_t min_time = std::numeric_limits<cycles_t>::max();
+            cycles_t min_time = CYCLES_MAX;
 
             for(unsigned run = RUNS; run--;) {
                 cycles_t time = benchmark_throughput<Queue>(hp, hw_thread_ids, N, threads, alternative_placement, consumer_sums.data());
@@ -317,8 +339,7 @@ void run_throughput_spsc_benchmark(char const* name, HugePages& hp, std::vector<
 
 void run_throughput_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const& cpu_topology) {
     auto hw_thread_ids = hw_thread_id(cpu_topology); // Sorted by hw_thread_id: avoid HT, same socket.
-
-    std::printf("---- Running throughput benchmarks (higher is better) ----\n");
+    std::printf("---- Running throughput benchmarks with up to %zu CPUs (higher is better) ----\n", hw_thread_ids.size() & -2);
 
     int constexpr SIZE = 65536;
 
@@ -384,7 +405,7 @@ void run_throughput_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const
 
 template<class Queue>
 void ping_pong_thread_impl(Queue* q1, Queue* q2, unsigned N, cycles_t* time, std::false_type /*sender*/) {
-    cycles_t t0 = __builtin_ia32_rdtsc();
+    cycles_t t0 = cycles_start();
     region_guard_t<Queue> guard;
     ConsumerOf<Queue> consumer_q1{*q1};
     ProducerOf<Queue> producer_q2{*q2};
@@ -392,13 +413,13 @@ void ping_pong_thread_impl(Queue* q1, Queue* q2, unsigned N, cycles_t* time, std
         j = consumer_q1.pop(*q1);
         producer_q2.push(*q2, i);
     }
-    cycles_t t1 = __builtin_ia32_rdtsc();
+    cycles_t t1 = cycles_end();
     *time = t1 - t0;
 }
 
 template<class Queue>
 void ping_pong_thread_impl(Queue* q1, Queue* q2, unsigned N, cycles_t* time, std::true_type /*sender*/) {
-    cycles_t t0 = __builtin_ia32_rdtsc();
+    cycles_t t0 = cycles_start();
     region_guard_t<Queue> guard;
     ProducerOf<Queue> producer_q1{*q1};
     ConsumerOf<Queue> consumer_q2{*q2};
@@ -406,7 +427,7 @@ void ping_pong_thread_impl(Queue* q1, Queue* q2, unsigned N, cycles_t* time, std
         producer_q1.push(*q1, i);
         j = consumer_q2.pop(*q2);
     }
-    cycles_t t1 = __builtin_ia32_rdtsc();
+    cycles_t t1 = cycles_end();
     *time = t1 - t0;
 }
 
@@ -444,16 +465,20 @@ void run_ping_pong_benchmark(char const* name, HugePages& hp, std::vector<unsign
     int constexpr N_PING_PONG_MESSAGES = 100000;
     int constexpr RUNS = 10;
 
-    unsigned const cpus[2] = {hw_thread_ids[0], hw_thread_ids[1]};
+    // Select the best times of RUNS runs.
+    std::array<cycles_t, 2> best_times = {CYCLES_MAX, CYCLES_MAX};
 
-    // select the best of RUNS runs.
-    std::array<cycles_t, 2> best_times = {std::numeric_limits<int64_t>::max(), std::numeric_limits<int64_t>::max()};
-    for(unsigned run = RUNS; run--;) {
-        auto times = ping_pong_benchmark<Queue>(N_PING_PONG_MESSAGES, hp, cpus);
-        if(best_times[0] + best_times[1] > times[0] + times[1])
-            best_times = times;
+    // Ping-pong between the first available CPU and every other.
+    unsigned const n_cpus = hw_thread_ids.size();
+    for(unsigned cpu2 = 1; cpu2 < n_cpus; ++cpu2) {
+        unsigned const cpus[2] = {hw_thread_ids[0], hw_thread_ids[cpu2]};
+        for(unsigned run = RUNS; run--;) {
+            auto times = ping_pong_benchmark<Queue>(N_PING_PONG_MESSAGES, hp, cpus);
+            if(best_times[0] + best_times[1] > times[0] + times[1])
+                best_times = times;
 
-        check_huge_pages_leaks(name, hp);
+            check_huge_pages_leaks(name, hp);
+        }
     }
 
     auto avg_time = to_seconds((best_times[0] + best_times[1]) / 2);
@@ -466,7 +491,7 @@ void run_ping_pong_benchmark(char const* name, HugePages& hp, std::vector<unsign
 void run_ping_pong_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const& cpu_topology) {
     auto hw_thread_ids = hw_thread_id(cpu_topology); // Sorted by hw_thread_id: avoid HT, same socket.
 
-    std::printf("---- Running ping-pong benchmarks (lower is better) ----\n");
+    std::printf("---- Running ping-pong benchmarks with 2 CPUs (lower is better) ----\n");
 
     // This benchmark doesn't require queue capacity greater than 1, however, capacity of 1 elides
     // some instructions completely because of (x % 1) is always 0. Use something greater than 1 to
@@ -524,6 +549,18 @@ void advise_hugeadm_2MB() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+void log_available_cpus(std::vector<CpuTopologyInfo> const& cpu_topology) {
+    std::printf("Using %zu available CPUs: ", cpu_topology.size());
+    char sep = '[';
+    for(auto& cpu : cpu_topology) {
+        std::printf("%c%u", sep, cpu.hw_thread_id);
+        sep = ',';
+    }
+    std::printf("].\n");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 } // namespace
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -531,7 +568,10 @@ void advise_hugeadm_2MB() {
 int main() {
     std::setlocale(LC_NUMERIC, ""); // Enable thousand separator, if set in user's locale.
 
-    auto cpu_topology = get_cpu_topology_info();
+    TSC_TO_SECONDS = 1e-9 / cpu_base_frequency();
+
+    auto cpu_topology = get_available_cpu_topology_info();
+    log_available_cpus(cpu_topology);
     if(cpu_topology.size() < 2)
         throw std::runtime_error("A CPU with at least 2 hardware threads is required.");
 

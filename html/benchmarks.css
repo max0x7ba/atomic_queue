@@ -6,6 +6,13 @@ body {
     overflow-y: scroll;
 }
 
+code {
+  font-family: "Roboto Mono", monospace;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  font-style: normal;
+}
+
 h1, h2, h3 {
     margin-left: 20px;
 }

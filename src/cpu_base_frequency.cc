@@ -13,6 +13,29 @@
 
 #include <pthread.h>
 #include <dlfcn.h>
+#include <sched.h>
+
+using namespace atomic_queue;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+namespace {
+
+struct CpuSet : cpu_set_t {
+    CpuSet() noexcept { CPU_ZERO(this); }
+    bool is_set(int cpu) const noexcept { return CPU_ISSET(cpu, this); }
+    unsigned size() const noexcept { return CPU_COUNT(this); }
+
+    static CpuSet get_default() {
+        CpuSet cpus;
+        cpu_set_t& c = cpus;
+        if(int err = ::pthread_getaffinity_np(::pthread_self(), sizeof c, &c))
+            throw std::system_error(err, std::system_category(), "pthread_getaffinity_np");
+        return cpus;
+    }
+};
+
+} // namespace
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -66,6 +89,18 @@ std::vector<atomic_queue::CpuTopologyInfo> atomic_queue::get_cpu_topology_info()
         throw std::runtime_error("get_cpu_topology_info() invariant broken.");
 
     return sort_by_hw_thread_id(cpus);
+}
+
+std::vector<CpuTopologyInfo> atomic_queue::get_available_cpu_topology_info() {
+    auto cpus = CpuSet::get_default();
+    auto c = get_cpu_topology_info();
+    c.erase(
+        std::remove_if(c.begin(), c.end(), [p = c.data(), &cpus](auto& cpu_info) { return !cpus.is_set(&cpu_info - p); }),
+        c.end()
+        );
+    if(cpus.size() != c.size())
+        throw std::runtime_error("get_available_cpu_topology_info() invariant broken.");
+    return c;
 }
 
 std::vector<atomic_queue::CpuTopologyInfo> atomic_queue::sort_by_core_id(std::vector<atomic_queue::CpuTopologyInfo> const& v) {

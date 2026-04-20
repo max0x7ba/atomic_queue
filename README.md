@@ -1,6 +1,6 @@
 [![C++14](https://img.shields.io/badge/dialect-C%2B%2B14-blue)](https://en.cppreference.com/w/cpp/14)
 [![MIT license](https://img.shields.io/github/license/max0x7ba/atomic_queue)](https://github.com/max0x7ba/atomic_queue/blob/master/LICENSE)
-[![Latest release](https://img.shields.io/github/v/tag/max0x7ba/atomic_queue?label=latest%20release)](https://github.com/max0x7ba/atomic_queue/releases/tag/v1.7.3)
+[![Latest release](https://img.shields.io/github/v/tag/max0x7ba/atomic_queue?label=latest%20release)](https://github.com/max0x7ba/atomic_queue/releases/tag/v1.8.1)
 [![Conan Center](https://img.shields.io/conan/v/atomic_queue)](https://conan.io/center/recipes/atomic_queue)
 [![Vcpkg Version](https://img.shields.io/vcpkg/v/atomic-queue)](https://vcpkg.io/en/package/atomic-queue)
 <br>
@@ -33,9 +33,9 @@ Minimizing latency naturally maximizes throughput. Low latency reciprocal is hig
 The main design principle these queues follow is _minimalism_, which results in such design choices as:
 
 * Bare minimum of atomic instructions. Inlinable by default push and pop functions can hardly be any cheaper in terms of CPU instruction number / L1i cache pressure.
-* Explicit contention/false-sharing avoidance for queue and its elements.
+* Explicit contention/false-sharing avoidance for queue data members and its elements.
 * Linear fixed size ring-buffer array. No heap memory allocations after a queue object has constructed. It doesn't get any more CPU L1d or TLB cache friendly than that.
-* Value semantics. Meaning that the queues make a copy/move upon `push`/`pop`, no reference/pointer to elements in the queue can be obtained.
+* Value semantics. Meaning that the queues make a copy/move upon `push`/`pop` and keep no references/pointers to its function arguments after returning, and that no reference/pointer to elements in the queue ring-buffer can be obtained. Simplest to use, hard to misuse, best machine code due to no pointer aliasing possible.
 
 The impact of each of these small design choices on their own is barely measurable, but their total impact is much greater than a simple sum of the constituents' impacts, aka super-scalar compounding or synergy. The synergy emerging from combining multiple of these small design choices together is what allows CPUs to perform at their peak capacities least impeded.
 
@@ -113,6 +113,7 @@ Building is necessary to run the tests and benchmarks. The tests require the Boo
 ```bash
 git clone https://github.com/max0x7ba/atomic_queue.git
 cd atomic_queue
+
 make -r -j4 BUILD=debug run_tests
 ```
 
@@ -125,7 +126,14 @@ git clone https://github.com/cameron314/readerwriterqueue.git
 git clone https://github.com/mpoeter/xenium.git
 git clone https://github.com/max0x7ba/atomic_queue.git
 cd atomic_queue
-make -r -j4 run_benchmarks
+
+make -r -j4 run_benchmarks_n       # Build and run the benchmarks once.
+make -r -j4 run_benchmarks_n N=3   # Build and run the benchmarks 3 times.
+
+make -r -j4 TOOLSET=gcc-14 run_benchmarks_n    # Build with gcc-14 and run the benchmarks.
+make -r -j4 TOOLSET=clang-20 run_benchmarks_n  # Build with clang-20 and run the benchmarks.
+
+taskset --cpu-list 0,1,14,15 make -r -j4 TOOLSET=gcc-14 run_benchmarks_n  # Use only cpus [0,1,14,15] to build with gcc-14 and run the benchmarks 3 times.
 ```
 
 The benchmark also requires Intel TBB library to be available. It assumes that it is installed in `/usr/local/include` and `/usr/local/lib`. If it is installed elsewhere you may like to modify `cppflags.tbb` and `ldlibs.tbb` in `Makefile`.
@@ -137,7 +145,9 @@ The benchmark also requires Intel TBB library to be available. It assumes that i
 * `AtomicQueue2` - a fixed size ring-buffer for non-atomic elements.
 * `OptimistAtomicQueue2` - a faster fixed size ring-buffer for non-atomic elements which busy-waits when empty or full. It is `AtomicQueue2` used with `push`/`pop` instead of `try_push`/`try_pop`.
 
-These containers have corresponding `AtomicQueueB`, `OptimistAtomicQueueB`, `AtomicQueueB2`, `OptimistAtomicQueueB2` versions where the buffer size is specified as an argument to the constructor.
+These containers maintain their ring-buffers as array data members with size specified at compile-time and have no pointer data members. That makes them position-independent, allows allocating them into process-shared memory with a plain C++ placement new statement, and mapping at arbitrary addresses in different processes using the same queue objects in shared memory. The queue elements must be position-independent too to support this particular use-case (unlike classes with process-position-dependent pointers such as `std::unique_ptr`, `std::string` and all the C++ standard containers with default allocators).
+
+There are corresponding `B` variants (`AtomicQueueB`, `OptimistAtomicQueueB`, `AtomicQueueB2`, `OptimistAtomicQueueB2`) that use `std::allocator` or user-specified (stateful) allocator for allocating the ring-buffers, where the buffer size is specified as an argument to the constructor at run-time.
 
 Totally ordered mode is supported. In this mode consumers receive messages in the same FIFO order the messages were posted. This mode is supported for `push` and `pop` functions, but not for the `try_` versions. On Intel x86 the totally ordered mode has 0 cost, as of 2019.
 
@@ -195,7 +205,7 @@ In a production multiple-producer-multiple-consumer scenario the ring-buffer cap
 Using a power-of-2 ring-buffer array size allows a couple of important optimizations:
 
 * The writer and reader indexes get mapped into the ring-buffer array index using remainder binary operator `% SIZE`. Remainder binary operator `%` normally generates a division CPU instruction which isn't cheap, but using a power-of-2 size turns that remainder operator into one cheap binary `and` CPU instruction and that is as fast as it gets.
-* The *element index within the cache line* gets swapped with the *cache line index*, so that consecutive queue elements reside in different cache lines. This massively reduces cache line contention between multiple producers and multiple consumers. Instead of `N` producers together with `M` consumers competing on subsequent elements in the same ring-buffer cache line in the worst case, it is only one producer competing with one consumer (pedantically, when the number of CPUs is not greater than the number of elements that can fit in one cache line). This optimisation scales better with the number of producers and consumers, and element size. With low number of producers and consumers (up to about 2 of each in these benchmarks) disabling this optimisation may yield better throughput (but higher variance across runs).
+* The *element index within the cache line* gets swapped with the *cache line index*, so that consecutive queue elements get mapped into consecutive/distinct cache lines. This massively reduces cache line contention between multiple producers and multiple consumers. Instead of `N` producers together with `M` consumers competing on subsequent elements in the same ring-buffer cache line in the worst case, it is only one producer competing with one consumer (pedantically, when the number of CPUs is not greater than the number of elements that can fit in one cache line). This optimisation scales better with the number of producers and consumers, and element size. With low number of producers and consumers (up to about 2 of each in these benchmarks) disabling this optimisation may yield better throughput (but higher variance across runs).
 
 The containers use `unsigned` type for size and internal indexes. On x86-64 platform `unsigned` is 32-bit wide, whereas `size_t` is 64-bit wide. 64-bit instructions utilise an extra byte instruction prefix resulting in slightly more pressure on the CPU instruction cache and the front-end. Hence, 32-bit `unsigned` indexes are used to maximise performance. That limits the queue size to 4,294,967,295 elements, which seems to be a reasonable hard limit for many applications.
 
@@ -208,6 +218,10 @@ While the atomic queues can be used with any moveable element types (including `
 2. Atomically store/load the element into/from the slot. Producer storing into a slot changes its state to be non-`NIL`, consumer loading from a slot changes its state to be `NIL`. The slot is a spinlock for its one producer and one consumer threads.
 
 These queues anticipate that a thread doing `push` or `pop` may complete step 1 and then be preempted before completing step 2.
+
+When a thread completes step 1 and terminates (for any reason) without completing step 2, the queue slot remains locked and deadlocks the next thread attempting to `try_pop`/`try_push`/`pop`/`push` from/into that slot. A thread can be terminated by the OS (e.g., oomkiller), or throw/crash in the user-defined copy/move constructor/assignment of queue element (if any). Should that happen, the game is over, and the best course of action is to terminate as soon as possible and address the root cause of one's threads crashing.
+
+Once constructed/allocated, queue objects maintain their invariants and never throw exceptions, provided queue elements copy/move constructor/assignment never throw, and threads don't terminate half-way through `push`/`pop`.
 
 An algorithm is *lock-free* if there is guaranteed system-wide progress. These queues guarantee system-wide progress by the following properties:
 
@@ -268,6 +282,21 @@ N producer threads push a 4-byte integer into one same queue, N consumer threads
 
 ### Ping-pong benchmark
 One thread posts an integer to another thread through one queue and waits for a reply from another queue (2 queues in total). The benchmarks measures the total time of 100,000 ping-pongs, best of 10 runs. Contention is minimal here (1-producer-1-consumer, 1 element in the queue) to be able to achieve and measure the lowest latency. Reports the average round-trip time.
+
+### Observations
+The latency of cross-thread communication of 2 (SMT) threads running in the same CPU core is the lowest. Communicating to another core adds latency. Communicating to another CCX/CPU-socket adds more latency.
+
+In the ping-pong benchmark, all benchmarked queues demonstrate the lowest latency only when the 2 threads run in the same CPU core. When the 2 threads run in different CPU cores, the latency increases 3× or worse. E.g. `boost::lockfree::spsc_queue` round-trip latency is 111 and 332 nanoseconds correspondingly (AMD Ryzen 5825U).
+
+In the throughput benchmark, all queues demonstrate 1.5× lower or worse throughput when all producer and consumer threads run in different cores. The 3× longer latency of cross-core communications snowballs with the number of atomic instructions. Cross-core throughput is inversely proportional to the number and complexity of atomic instructions, it seems. Except the following 3 queues.
+
+`boost::lockfree::spsc_queue` uses the cheapest atomic load and store instructions, Its cross-core throughput doesn't get worse than its within-core throughput, but doesn't get any better.
+
+Only `OptimistAtomicQueue`/`OptimistAtomicQueueB` (atomic elements, statically/dynamically allocated buffers) demonstrate 1.5× or better cross-core throughput relative to its within-core throughput, in 1-producer-1-consumer (SPSC) mode only. These use the same algorithm with the same cheapest atomic load and store instructions as `boost::lockfree::spsc_queue` does, but demonstrate 10× greater throughput for that only because of higher implementation quality.
+
+Everything else bottlenecks cross-core throughput by using more and/or more expensive atomic instructions. E.g. it takes ~17 seconds to run the benchmarks using 4 CPUs in 2 cores, and ~25 seconds using 4 CPUs in 4 cores (AMD Ryzen 5825U).
+
+The benchmarks measure the best time from within-core, cross-core and cross-CCX/CPU-socket scenarios for each queue. That captures the best possible timings for each queue. But these scenarios are rather different and must be benchmarked and compared independently. Stellar performance of 2 SMT threads running in one CPU core is irrelevant for use-cases when threads run in different cores.
 
 ## Contributing
 Contributions are more than welcome. `.editorconfig` and `.clang-format` can be used to automatically match code formatting.
