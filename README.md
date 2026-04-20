@@ -66,7 +66,8 @@ Several other well established and popular thread-safe containers are used for r
 ## Using the library
 The containers provided are header-only class templates, no building/installing is necessary.
 
-### Install from GitHub
+### Installing
+#### From GitHub
 1. Clone the project:
    ```bash
    git clone https://github.com/max0x7ba/atomic_queue.git
@@ -80,7 +81,7 @@ add_subdirectory(atomic_queue)
 target_link_libraries(main PRIVATE atomic_queue::atomic_queue)
 ```
 
-### Using cmake FetchContent
+#### From GitHub using cmake FetchContent
 You can also use CMake's FetchContent.
 ```cmake
 include(FetchContent)
@@ -93,7 +94,7 @@ FetchContent_MakeAvailable(atomic_queue)
 target_link_libraries(main PRIVATE atomic_queue::atomic_queue)
 ```
 
-### Install using vcpkg
+#### From vcpkg
 ```
 vcpkg install atomic-queue
 ```
@@ -103,40 +104,71 @@ find_package(atomic_queue CONFIG REQUIRED)
 target_link_libraries(main PRIVATE atomic_queue::atomic_queue)
 ```
 
-### Install using conan
+#### Install using conan
 Follow the official tutorial on [how to consume conan packages](https://docs.conan.io/2/tutorial/consuming_packages.html).
 Details specific to this library are available in [ConanCenter](https://conan.io/center/recipes/atomic_queue).
 
-### Test build and run instructions
-Building is necessary to run the tests and benchmarks. The tests require the Boost.Test library (e.g. `libboost-test-dev` on Debian/Ubuntu).
+### Build and run
+Building is necessary to run the unit-tests and benchmarks.
+
+GNU Make `Makefile` is the original/reference build system this project has been developed, unit-tested and benchmarked with. It is feature-complete and most efficient, but the least portable to anything else than Linux. Linux tools, however, are the ultimate best for development, benchmarking, deep performance analyses and profiling at CPU instruction level.
+
+`CMake` and `Meson` build systems provide the greatest portability and easy usage/consumption of the library, build and run the unit-tests on their supported platforms. They provide the best library user experience, as opposed to best library developer experience.
+
+Some most desirable developer features in GNU Make not found elsewhere:
+
+* Ultimate totalitarian control of compilers, tools and their options with no friction or indirection. Having to invoke CMake or Meson is undesirable extra friction.
+* Unconditionally robust builds, which never require invoking `make clean`. That's possible only when tracking complete actual compiler and linker options, which this `Makefile` does at 0-cost.
+* Fast parallel builds and unit-test runs, unmatched by anything else, for rapid R&D cycles.
+* Fast _**multi-toolset parallel builds**_ and unit-test runs, with no idling CPUs at all times, for fastest possible exhaustive pre-deployment tests. That's impossible for/with build file generators, for `ninja` in principle, and/or anything else.
+
+GNU Make command line options with the greatest impact on built time:
+
+* `-j` sets the number of worker processes to build with in parallel. `-j$(($(nproc)/2))` sets it to half the number of available CPUs.
+* `-R` disables GNU Make legacy built-in variables and rules for at least +25% faster dependency checking. `make -R` is the right default invocation for GNU Make. Not specifying `-R` command line option for GNU Make is wasting time and energy for no good reason. (`ninja` docs never mention `make -R` because `ninja` is unable to build as fast as `make -R` does.)
+
+#### Build and run unit-tests
+Building and running the unit-tests require Boost.Test library (e.g. `libboost-test-dev` on Debian/Ubuntu).
 
 ```bash
 git clone https://github.com/max0x7ba/atomic_queue.git
 cd atomic_queue
+```
+After succeeding the above commands,
+```
+# Build and run the unit-tests with gcc (default).
+make -R -j$(($(nproc)/2)) BUILD=debug run_tests
 
-make -r -j4 BUILD=debug run_tests
+# Build and run the unit-tests with gcc,gcc-14,clang,clang-20 in parallel.
+make -R -j$(($(nproc)/2)) BUILD=debug TOOLSET=gcc,gcc-14,clang,clang-20 run_tests
 ```
 
-### Benchmark build and run instructions
-The benchmarks require several third-party libraries to be cloned as sibling directories, as well as Intel TBB.
+#### Build and run benchmarks
+Building and running the benchmarks require a few other Boost libraries. Installing the complete set of Boost development libraries is the easiest (e.g. `libboost-all-dev` on Debian/Ubuntu).
+The benchmarks require several third-party libraries to be cloned as sibling directories, as well as Intel TBB:
 
 ```bash
 git clone https://github.com/cameron314/concurrentqueue.git
 git clone https://github.com/cameron314/readerwriterqueue.git
 git clone https://github.com/mpoeter/xenium.git
+
 git clone https://github.com/max0x7ba/atomic_queue.git
 cd atomic_queue
-
-make -r -j4 run_benchmarks_n       # Build and run the benchmarks once.
-make -r -j4 run_benchmarks_n N=3   # Build and run the benchmarks 3 times.
-
-make -r -j4 TOOLSET=gcc-14 run_benchmarks_n    # Build with gcc-14 and run the benchmarks.
-make -r -j4 TOOLSET=clang-20 run_benchmarks_n  # Build with clang-20 and run the benchmarks.
-
-taskset --cpu-list 0,1,14,15 make -r -j4 TOOLSET=gcc-14 run_benchmarks_n  # Use only cpus [0,1,14,15] to build with gcc-14 and run the benchmarks 3 times.
 ```
 
-The benchmark also requires Intel TBB library to be available. It assumes that it is installed in `/usr/local/include` and `/usr/local/lib`. If it is installed elsewhere you may like to modify `cppflags.tbb` and `ldlibs.tbb` in `Makefile`.
+The benchmarks also require Intel TBB library to be available. It assumes that it is installed in `/usr/local/include` and `/usr/local/lib`. If it is installed elsewhere you may like to modify `cppflags.tbb` and `ldlibs.tbb` in `Makefile`.
+
+After succeeding the above commands,
+
+```
+make -R -j$(($(nproc)/2)) run_benchmarks_n       # Build and run the benchmarks once.
+make -R -j$(($(nproc)/2)) run_benchmarks_n N=3   # Build and run the benchmarks 3 times.
+
+make -R -j$(($(nproc)/2)) TOOLSET=gcc-14 run_benchmarks_n    # Build with gcc-14 and run the benchmarks.
+make -R -j$(($(nproc)/2)) TOOLSET=clang-20 run_benchmarks_n  # Build with clang-20 and run the benchmarks.
+
+taskset --cpu-list 0,1,14,15 make -R -j$(($(nproc)/2)) TOOLSET=gcc-14 run_benchmarks_n  # Use only cpus [0,1,14,15] to build with gcc-14 and run the benchmarks 3 times.
+```
 
 ## Library contents
 ### Available queues
@@ -288,7 +320,7 @@ In the throughput benchmark, all queues demonstrate 1.5× lower or worse through
 
 `boost::lockfree::spsc_queue` uses the cheapest atomic load and store instructions, Its cross-core throughput doesn't get worse than its within-core throughput, but doesn't get any better.
 
-Only `OptimistAtomicQueue`/`OptimistAtomicQueueB` (atomic elements, statically/dynamically allocated buffers) demonstrate 1.5× or better cross-core throughput relative to its within-core throughput, in 1-producer-1-consumer (SPSC) mode only. These use the same algorithm with the same cheapest atomic load and store instructions as `boost::lockfree::spsc_queue` does, but demonstrate 10× greater throughput for that only because of higher implementation quality.
+Only `OptimistAtomicQueue`/`OptimistAtomicQueueB` (atomic elements, statically/dynamically allocated buffers) demonstrate 1.5× or better cross-core throughput relative to its within-core throughput, in 1-producer-1-consumer (SPSC) mode only. These use the same algorithm with the same cheapest atomic load and store instructions as `boost::lockfree::spsc_queue` does, but benchmark 10× greater throughput for that only because of higher implementation quality
 
 Everything else bottlenecks cross-core throughput by using more and/or more expensive atomic instructions. E.g. it takes ~17 seconds to run the benchmarks using 4 CPUs in 2 cores, and ~25 seconds using 4 CPUs in 4 cores (AMD Ryzen 5825U).
 

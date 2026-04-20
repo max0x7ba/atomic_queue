@@ -14,21 +14,37 @@
 #   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=gcc-14 ASM=1
 #   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=clang-20 BUILD=debug TAGS
 #   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=clang BUILD=sanitize run_tests
-#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) BUILD=debug run_tests2
+#
+# Build and run with multiple toolsets in parallel:
+#
+#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=gcc,gcc-14,clang,clang-20 BUILD=debug all run_tests
+#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=gcc,gcc-14,clang,clang-20 CPPFLAGS="-DATOMIC_QUEUE_REMAP=RemapAnd" all run_tests
 #
 # Additional CPPFLAGS, CXXFLAGS, LDLIBS, LDFLAGS can come from the command line, e.g. make CPPFLAGS='-I<my-include-dir>', or from environment variables.  For example, also produce assembly outputs:
 #
-#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) CXXFLAGS="-save-temps=obj -fverbose-asm -masm=intel"
+#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) CPPFLAGS="-DATOMIC_QUEUE_REMAP=RemapAnd"
 #
+
+################################################################################################################################
+# The defaults.
+
+export BUILD := release
+export BUILD_ROOT := $(or ${BUILD_ROOT},build)
+export TOOLSET := gcc
+export ASM := 0
+export N := 1
+export TAG := results
+
+export CPPFLAGS
+export CXXFLAGS
+export LDLIBS
+export LDFLAGS
+
+################################################################################################################################
+# Boiler-plate begin.
 
 SHELL := /bin/bash
 .SHELLFLAGS := --norc -o pipefail -e -c
-
-export BUILD := release
-export TOOLSET := gcc
-
-export BUILD_ROOT := $(or ${BUILD_ROOT},build)
-build_dir := ${BUILD_ROOT}/${BUILD}/${TOOLSET}
 
 # Don't try loading localized messages for anything.
 undefine LANG
@@ -36,6 +52,23 @@ undefine LANGUAGE
 undefine LC_CTYPE
 undefine LC_MESSAGES
 undefine LC_ALL
+
+comma := ,
+empty :=
+space := ${empty} ${empty}
+space-to-comma = $(subst ${space},${comma},${1})
+comma-to-space = $(subst ${comma},${space},${1})
+
+# TOOLSET can be a list of comma-separated values.
+toolsets := $(call comma-to-space,${TOOLSET})
+mutli_toolset := $(intcmp $(words ${toolsets}),2,,1)
+
+all :
+.SECONDEXPANSION :
+
+ifeq (,${mutli_toolset}) # Build with a single toolset.
+
+build_dir := ${BUILD_ROOT}/${BUILD}/${TOOLSET}
 
 cxx.gcc := g++
 cc.gcc := gcc
@@ -59,8 +92,6 @@ CXX := $(call toolset_exe,cxx)
 CC := $(call toolset_exe,cc)
 LD := $(call toolset_exe,ld)
 AR := $(call toolset_exe,ar,ar)
-
-export ASM := 0
 
 uname_m := $(shell uname -m)
 cxxflags.x86_64 := -fcf-protection=none -masm=intel
@@ -120,8 +151,7 @@ else
 strip2 = $(strip ${1})
 endif
 
-all :
-
+# Boiler-plate end.
 ################################################################################################################################
 # Build targets definitions begin.
 
@@ -140,8 +170,10 @@ ${build_dir}/benchmarks : ldlibs += ${ldlibs.tbb} ${ldlibs.moodycamel} ${ldlibs.
 
 # Build targets definitions end.
 ################################################################################################################################
+# Boiler-plate begin.
 
 all : ${exes}
+	@:
 
 define EXE_TARGET
 ${build_dir}/${1} : $(patsubst %.cc,${build_dir}/%.o,${${1}_src})
@@ -151,8 +183,6 @@ $(foreach exe,${exes},$(eval $(call EXE_TARGET,${exe})))
 ${exes} : % : ${build_dir}/%
 .PHONY : ${exes}
 # for t in gcc gcc clang clang; do make -C ~/src/atomic_queue -rj$(($(nproc)/2)) BUILD=debug TOOLSET=$t; done
-
-.SECONDEXPANSION:
 
 ${exes:%=${build_dir}/%} : ${build_dir}/% : ${relink} | $$(dir $$@)
 	$(call strip2,${LINK.EXE})
@@ -166,16 +196,6 @@ ${build_dir}/%.a : ${relink} | $$(dir $$@)
 
 ${build_dir}/%.o : src/%.cc ${recompile} | $$(dir $$@)
 	$(call strip2,${COMPILE.CXX})
-
-src/%.cc :;
-${build_dir}/%.d :;
-Makefile :;
-
-${build_dir}/.make ${build_dir}/.make/ perf/ results/ :
-	mkdir -p $@
-
-${BUILD_ROOT}/ ${build_dir} ${build_dir}/ : | ${build_dir}/.make/ ;
-
 
 ver = "$(shell ${1} --version | ${head1})"
 # Trigger recompilation when compiler environment change.
@@ -194,12 +214,6 @@ ${recompile} ${relink} : ${build_dir}/.make/re% : ${build_dir}/.make/env.%.txt #
 	touch $@
 # cd ~/src/atomic_queue; make -r clean; set -x; make -rj8; make -rj8; make -rj8 CPPFLAGS=-DXYZ=1; make -rj8 CPPFLAGS=-DXYZ=1; make -rj8; make -rj8; make -rj8 LDLIBS=-lrt; make -rj8 LDLIBS=-lrt; make -rj8; make -rj8
 
-include ${BUILD_ROOT}/chrt.mk
-${BUILD_ROOT}/chrt.mk : | $$(dir $$@)
-	echo "chrt_fifo := $$(chrt -f 50 printf 'chrt' || printf 'sudo chrt') -f 50" > $@
-
-N := 1
-TAG := results
 new_filename = $(shell date "+${TAG}.%Y%m%dT%H%M%S.${TOOLSET}.$$(nproc)")
 
 results/%.txt : ${build_dir}/benchmarks | $$(dir $$@)
@@ -220,7 +234,7 @@ run_benchmarks : ${build_dir}/benchmarks
 	@echo -n "$@ "; set -x; scripts/benchmark.sh ${chrt_fifo} $<
 
 run_tests.% : force
-	${MAKE} --no-print-directory --output-sync TOOLSET=$* all run_tests
+	${MAKE} -R --no-print-directory --output-sync TOOLSET=$* all run_tests
 
 run_tests2 : run_tests.gcc-14 run_tests.clang-20
 
@@ -231,30 +245,68 @@ run_% : ${build_dir}/% force
 	@echo -n "$@ "; set -x; $<
 
 compile_commands compile_commands.json TAGS :
-	bear -- ${MAKE} --always-make --no-print-directory all
+	bear -- ${MAKE} -R --always-make --no-print-directory all
 
 clean :
 	rm -rf ${build_dir}
-
-distclean :
-	rm -rf ${BUILD_ROOT}
 
 versions:
 	${MAKE} --version | ${head1}
 	${CXX} --version | ${head1}
 
+${build_dir}/.make ${build_dir}/.make/ perf/ results/ :
+	mkdir -p $@
+
+${BUILD_ROOT}/ ${build_dir} ${build_dir}/ : | ${build_dir}/.make/ ;
+
+.PHONY : update_env_txt env versions run_benchmarks clean all compile_commands compile_commands.json TAGS run_tests run_benchmarks_n run_benchmarks_perf run_tests2
+
+endif # Build with a single toolset.
+
+.PHONY :  distclean
+distclean :
+	rm -rf ${BUILD_ROOT}
+
 env :
 	uname --all
 	env | sort --ignore-case
+
+src/%.cc :;
+${build_dir}/%.d :;
+Makefile :;
+
+include ${BUILD_ROOT}/chrt.mk
+${BUILD_ROOT}/chrt.mk : | $$(dir $$@)
+	echo "chrt_fifo := $$(chrt -f 50 printf 'chrt' || printf 'sudo chrt') -f 50" > $@
 
 # Prerequisites of .PHONY are always interpreted as literal target names, never as patterns (even if they contain ‘%’ characters). To always rebuild a pattern rule consider using a "force target".
 # If a rule has no prerequisites or recipe, and the target of the rule is a nonexistent file, then make imagines this target to have been updated whenever its rule is run. This implies that all targets depending on this one will always have their recipe run.
 force :
 
-.PHONY : update_env_txt env versions run_benchmarks clean all compile_commands compile_commands.json TAGS run_tests run_benchmarks_n run_benchmarks_perf run_tests2 distclean
 .DELETE_ON_ERROR :
 .SECONDARY :
 .SUFFIXES :
+
+ifneq (,${mutli_toolset}) # Parallelize building with multiple toolsets.
+
+n_jobs := $(or $(subst -j,,$(filter -j%,${MAKEFLAGS})),1)
+targets := $(or ${MAKECMDGOALS},all)
+log_src := $(firstword ${MAKEFILE_LIST})
+$(info ${log_src}: Build targets "${targets}" with toolsets "${toolsets}" in parallel using ${n_jobs} CPUs.)
+
+timestamp_ms = $(shell printf "%.0f" $${EPOCHREALTIME}e+3)
+export t0 := ${timestamp_ms}
+
+${BUILD_ROOT}/ :
+	mkdir -p $@
+
+with-toolset-% :
+	${MAKE} -R --no-print-directory --output-sync TOOLSET=$* ${MAKECMDGOALS}
+
+% : ${toolsets:%=with-toolset-%}
+	@printf "${log_src}: made targets '%s' with '%s', took %'.3f seconds.\n" "${targets}" "${toolsets}" "$$((${timestamp_ms} - ${t0}))"e-3
+
+endif # Parallelize building with multiple toolsets.
 
 # Local Variables:
 # compile-command: "/bin/time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) BUILD=debug run_tests"
