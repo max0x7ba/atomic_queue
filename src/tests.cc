@@ -9,7 +9,6 @@
 #include "atomic_queue/barrier.h"
 #include "benchmarks.h"
 
-#include <array>
 #include <boost/mpl/list.hpp>
 #include <bitset>
 #include <cstdint>
@@ -26,7 +25,7 @@ using namespace ::atomic_queue;
 enum { N_STRESS_MSG = 1000000 };
 enum { STOP_MSG = -1 };
 enum { CAPACITY = 4096 };
-constexpr std::array<int, 3> BATCH_SIZES = {1, 4, 12};
+constexpr auto BATCH_SIZES = {1, 4, 7, 12};
 
 using stress_queues = boost::mpl::list<
     AtomicQueue<unsigned, CAPACITY>,
