@@ -352,11 +352,17 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(remap_index, Remap, remap_index_fns) {
     BOOST_CHECK_EQUAL(remap(bits3, 0b001'000u), 0b000'001u);
 
     // remap_index is its own inverse: applying it twice yields the original index.
-    for(unsigned i = 1024; i--;) {
-        BOOST_CHECK_EQUAL(remap(bits1, remap(bits1, i)), i);
-        BOOST_CHECK_EQUAL(remap(bits2, remap(bits2, i)), i);
-        BOOST_CHECK_EQUAL(remap(bits3, remap(bits3, i)), i);
-        BOOST_CHECK_EQUAL(remap(bits4, remap(bits4, i)), i);
+    unsigned constexpr size = 1024;
+    unsigned constexpr poison_unused_msb = -size;
+    for(unsigned i = size; i--;) {
+        BOOST_CHECK_EQUAL(remap(bits1, remap(bits1, i, size)), i);
+        BOOST_CHECK_EQUAL(remap(bits2, remap(bits2, i, size)), i);
+        BOOST_CHECK_EQUAL(remap(bits3, remap(bits3, i, size)), i);
+        BOOST_CHECK_EQUAL(remap(bits4, remap(bits4, i, size)), i);
+        BOOST_CHECK_EQUAL(remap(bits1, remap(bits1, i | poison_unused_msb, size)), i);
+        BOOST_CHECK_EQUAL(remap(bits2, remap(bits2, i | poison_unused_msb, size)), i);
+        BOOST_CHECK_EQUAL(remap(bits3, remap(bits3, i | poison_unused_msb, size)), i);
+        BOOST_CHECK_EQUAL(remap(bits4, remap(bits4, i | poison_unused_msb, size)), i);
     }
 
     // remap_index is a bijection over any power-of-2 range that covers the swapped bits.

@@ -72,6 +72,11 @@ struct RemapXor {
         unsigned const mix{(index ^ (index >> Bits::count)) & Bits::mask_elem_idx};
         return index ^ mix ^ (mix << Bits::count);
     }
+
+    template<class Bits>
+    ATOMIC_QUEUE_INLINE static constexpr unsigned remap(unsigned index, unsigned size, Bits b) noexcept {
+        return remap(index & (size - 1), b);
+    }
 };
 
 struct RemapAnd {
@@ -79,8 +84,16 @@ struct RemapAnd {
     // The shifts and ands dispatch in parallel, ~8 instructions, ~4 cycles.
     // At least +1% faster throughput benchmark relative to RemapXor.
     template<class Bits>
-    ATOMIC_QUEUE_INLINE static constexpr unsigned remap(unsigned index, Bits) noexcept {
-        return ((index >> Bits::count) & Bits::mask_elem_idx) | ((index & Bits::mask_elem_idx) << Bits::count) | (index & Bits::mask_hi);
+    ATOMIC_QUEUE_INLINE static constexpr unsigned remap(unsigned index, unsigned size, Bits) noexcept {
+        return
+            ((index >> Bits::count) & Bits::mask_elem_idx) |
+            ((index & Bits::mask_elem_idx) << Bits::count) |
+            (index & (Bits::mask_hi & (size - 1)));
+    }
+
+    template<class Bits>
+    ATOMIC_QUEUE_INLINE static constexpr unsigned remap(unsigned index, Bits b) noexcept {
+        return remap(index, 0, b);
     }
 };
 
@@ -90,16 +103,15 @@ struct RemapBmi {
     // bextr, shlx, and dispatch in parallel, ~7 instructions, ~3 cycles.
     // At least +1.5% faster throughput benchmark relative to RemapXor.
     template<class Bits>
-    ATOMIC_QUEUE_INLINE static unsigned remap(unsigned index, Bits) noexcept {
+    ATOMIC_QUEUE_INLINE static unsigned remap(unsigned index, unsigned size, Bits) noexcept {
         unsigned nn{Bits::count << 8 | Bits::count};
         // Disable constant propagation for nn to prevent the compiler from transforming the following code into more expensive instructions.
-        // Allocate a 32-bit i386 register for nn. r8-r15 are undesirable because instructions using r8-r15 are 1-byte longer.
         // This one register is used by both bextr and shlx/shl instructions (otherwise transformed into different code).
-        // Disable constant propagation for index too. Clang does that in the unit-test to minimize machine code, and that's unnecessary.
+        // Disable constant propagation for index too to always generate the same machine code.
 #ifdef __BMI2__
-        asm("":"+R"(nn), "+R"(index)); // Any i386 register for BMI2 shlx shift count.
+        asm("":"+r"(nn): "r"(index)); // Any register for BMI2 shlx shift count.
 #else
-        asm("":"+c"(nn), "+R"(index)); // Without BMI2, shl shift count must be in ecx register.
+        asm("":"+c"(nn): "r"(index)); // Without BMI2, shl shift count must be in ecx register.
 #endif
         // These 2 statements generate 2 instructions which require nn in the register.
         unsigned new_elem_idx = __builtin_ia32_bextr_u32(index, nn); // BMI1 instruction.
@@ -111,7 +123,12 @@ struct RemapBmi {
         // (index << (nn & 31)) would make Address sanitizer happy.
         unsigned new_line_idx = index << nn; // This statement generates shlx r32,r32,r32 with BMI2, otherwise shl r32,cl.
 
-        return new_elem_idx | (new_line_idx & ~Bits::mask_hi) | (index & Bits::mask_hi);
+        return new_elem_idx | (new_line_idx & ~Bits::mask_hi) | (index & (Bits::mask_hi & (size - 1)));
+    }
+
+    template<class Bits>
+    ATOMIC_QUEUE_INLINE static unsigned remap(unsigned index, Bits b) noexcept {
+        return remap(index, 0, b);
     }
 };
 #endif
@@ -120,13 +137,17 @@ template<class Remap>
 struct Remap0 : Remap {
     using Remap::remap;
 
+    ATOMIC_QUEUE_INLINE static constexpr unsigned remap(unsigned index, unsigned size, IndexBits<0>) noexcept {
+        return index % size;
+    }
+
     ATOMIC_QUEUE_INLINE static constexpr unsigned remap(unsigned index, IndexBits<0>) noexcept {
         return index;
     }
 
-    template<class Bits>
-    ATOMIC_QUEUE_INLINE unsigned operator()(Bits bits, unsigned index) const noexcept {
-        return this->remap(index, bits);
+    template<class Bits, class... A>
+    ATOMIC_QUEUE_INLINE auto operator()(Bits bits, A... a) const noexcept {
+        return this->remap(a..., bits);
     }
 };
 
@@ -140,8 +161,8 @@ using Remap = Remap0<RemapAnd>;
 #endif
 
 template<int N_BITS, class T>
-ATOMIC_QUEUE_INLINE static constexpr T& remap(T* ATOMIC_QUEUE_RESTRICT elements, unsigned index) noexcept {
-    return elements[Remap::remap(index, IndexBits<N_BITS>{})];
+ATOMIC_QUEUE_INLINE static constexpr T& remap(T* ATOMIC_QUEUE_RESTRICT elements, unsigned index, unsigned size) noexcept {
+    return elements[Remap::remap(index, size, IndexBits<N_BITS>{})];
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -453,12 +474,12 @@ class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL, MINIMIZE_
     alignas(CACHE_LINE_SIZE) std::atomic<T> elements_[size_];
 
     ATOMIC_QUEUE_INLINE T do_pop(unsigned tail) noexcept {
-        std::atomic<T>& q_element = details::remap<SHUFFLE_BITS>(elements_, tail % size_);
+        std::atomic<T>& q_element = details::remap<SHUFFLE_BITS>(elements_, tail, size_);
         return Base::template do_pop<T, NIL>(q_element);
     }
 
     ATOMIC_QUEUE_INLINE void do_push(T element, unsigned head) noexcept {
-        std::atomic<T>& q_element = details::remap<SHUFFLE_BITS>(elements_, head % size_);
+        std::atomic<T>& q_element = details::remap<SHUFFLE_BITS>(elements_, head, size_);
         Base::template do_push<T, NIL>(element, q_element);
     }
 
@@ -494,13 +515,13 @@ class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE, MINIMIZE_CON
     alignas(CACHE_LINE_SIZE) T elements_[size_] = {};
 
     ATOMIC_QUEUE_INLINE T do_pop(unsigned tail) noexcept {
-        unsigned index = details::Remap::remap(tail % size_, Bits{});
+        unsigned index = details::Remap::remap(tail, size_, Bits{});
         return Base::do_pop(states_[index], elements_[index]);
     }
 
     template<class U>
     ATOMIC_QUEUE_INLINE void do_push(U&& element, unsigned head) noexcept {
-        unsigned index = details::Remap::remap(head % size_, Bits{});
+        unsigned index = details::Remap::remap(head, size_, Bits{});
         Base::do_push(std::forward<U>(element), states_[index], elements_[index]);
     }
 
@@ -544,12 +565,12 @@ class AtomicQueueB : private std::allocator_traits<A>::template rebind_alloc<std
     std::atomic<T>* ATOMIC_QUEUE_RESTRICT elements_;
 
     ATOMIC_QUEUE_INLINE T do_pop(unsigned tail) noexcept {
-        std::atomic<T>& q_element = details::remap<SHUFFLE_BITS>(elements_, tail & (size_ - 1));
+        std::atomic<T>& q_element = details::remap<SHUFFLE_BITS>(elements_, tail, size_);
         return Base::template do_pop<T, NIL>(q_element);
     }
 
     ATOMIC_QUEUE_INLINE void do_push(T element, unsigned head) noexcept {
-        std::atomic<T>& q_element = details::remap<SHUFFLE_BITS>(elements_, head & (size_ - 1));
+        std::atomic<T>& q_element = details::remap<SHUFFLE_BITS>(elements_, head, size_);
         Base::template do_push<T, NIL>(element, q_element);
     }
 
@@ -639,13 +660,13 @@ class AtomicQueueB2 : private std::allocator_traits<A>::template rebind_alloc<un
     using Bits = details::IndexBits<SHUFFLE_BITS>;
 
     ATOMIC_QUEUE_INLINE T do_pop(unsigned tail) noexcept {
-        unsigned index = details::Remap::remap(tail & (size_ - 1), Bits{});
+        unsigned index = details::Remap::remap(tail, size_, Bits{});
         return Base::do_pop(states_[index], elements_[index]);
     }
 
     template<class U>
     ATOMIC_QUEUE_INLINE void do_push(U&& element, unsigned head) noexcept {
-        unsigned index = details::Remap::remap(head & (size_ - 1), Bits{});
+        unsigned index = details::Remap::remap(head, size_, Bits{});
         Base::do_push(std::forward<U>(element), states_[index], elements_[index]);
     }
 
