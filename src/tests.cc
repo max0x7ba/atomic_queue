@@ -25,6 +25,7 @@ using namespace ::atomic_queue;
 enum { N_STRESS_MSG = 1000000 };
 enum { STOP_MSG = -1 };
 enum { CAPACITY = 4096 };
+
 constexpr auto BATCH_SIZES = {1, 4, 7, 12};
 
 using stress_queues = boost::mpl::list<
@@ -57,6 +58,55 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(stress, Queue, stress_queues) {
     };
     using T = typename Queue::value_type;
 
+    Queue q;
+    Barrier barrier;
+
+    std::thread producers[PRODUCERS];
+    for(unsigned i = 0; i < PRODUCERS; ++i)
+        producers[i] = std::thread([&q, &barrier]() {
+            barrier.wait();
+            for(T n = N_STRESS_MSG; n; --n)
+                q.push(n);
+        });
+
+    uint64_t results[CONSUMERS];
+    std::thread consumers[CONSUMERS];
+    for(unsigned i = 0; i < CONSUMERS; ++i)
+        consumers[i] = std::thread([&q, &barrier, &r = results[i]]() {
+            barrier.wait();
+            uint64_t result = 0;
+            for(T n; (n = q.pop()) != static_cast<T>(STOP_MSG);)
+                result += n;
+            r = result;
+        });
+
+    barrier.release(PRODUCERS + CONSUMERS);
+    for(auto& t : producers)
+        t.join();
+    for(int i = CONSUMERS; i--;)
+        q.push(STOP_MSG);
+    for(auto& t : consumers)
+        t.join();
+
+    constexpr uint64_t expected_result = (N_STRESS_MSG + 1) / 2. * N_STRESS_MSG * PRODUCERS;
+    constexpr uint64_t consumer_result_min = expected_result / CONSUMERS / 10;
+    uint64_t result = 0;
+    for(auto& r : results) {
+        BOOST_WARN_GT(r, consumer_result_min); // Make sure a consumer didn't starve. False positives are possible here.
+        result += r;
+    }
+    int64_t result_diff = result - expected_result;
+    BOOST_CHECK_EQUAL(result_diff, 0);
+}
+
+// Check that all (batch) push'es are ever (batch) pop'ed once with multiple producer and multiple consumers.
+BOOST_AUTO_TEST_CASE_TEMPLATE(stress_batch, Queue, stress_queues) {
+    enum {
+        PRODUCERS = Queue::is_spsc() ? 1 : 3,
+        CONSUMERS = Queue::is_spsc() ? 1 : 3
+    };
+    using T = typename Queue::value_type;
+
     for (int const BATCH_SIZE : BATCH_SIZES) {
         Queue q;
         Barrier barrier;
@@ -66,17 +116,14 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(stress, Queue, stress_queues) {
             producers[i] = std::thread([&q, &barrier, BATCH_SIZE]() {
                 barrier.wait();
                 for(T n = N_STRESS_MSG; n;) {
-                    if (BATCH_SIZE <= 1) {
-                        q.push(n--);
+                    // Inserting elements into local buffer before
+                    std::vector<T> buffer(BATCH_SIZE);
+                    typename std::vector<T>::iterator it = buffer.begin();
+                    while (it != buffer.end() && n) {
+                        *it++ = n--;
                     }
-                    else {
-                        std::vector<T> buffer(BATCH_SIZE);
-                        typename std::vector<T>::iterator it = buffer.begin();
-                        while (it != buffer.end() && n) {
-                            *it++ = n--;
-                        }
-                        q.push(buffer.begin(), it);
-                    }
+                    // Pushing them to the queue
+                    q.push(buffer.begin(), it);
                 }
             });
 
@@ -86,15 +133,15 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(stress, Queue, stress_queues) {
             consumers[i] = std::thread([&q, &barrier, &r = results[i], BATCH_SIZE]() {
                 barrier.wait();
                 uint64_t result = 0;
-                if (BATCH_SIZE <= 1) {
-                    for(T n; (n = q.pop()) != static_cast<T>(STOP_MSG);)
-                        result += n;
-                }
-                else {
+                
+                // Allocating local buffer
+                std::vector<T> buffer(BATCH_SIZE);
+                {
                     bool continue_pops = true;
                     while (continue_pops) {
-                        std::vector<T> buffer(BATCH_SIZE);
+                        // Popping into local buffer before
                         typename std::vector<T>::iterator out_it = q.pop(buffer.begin(), BATCH_SIZE);
+                        // Accumulating the output
                         for (typename std::vector<T>::iterator it = buffer.begin(); it != out_it; ++it) {
                             if (*it != static_cast<T>(STOP_MSG)) {
                                 result += *it;
@@ -111,7 +158,8 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(stress, Queue, stress_queues) {
         barrier.release(PRODUCERS + CONSUMERS);
         for(auto& t : producers)
             t.join();
-        for(int i = CONSUMERS * std::max(1, BATCH_SIZE); i--;)
+        // At least (CONSUMERS - 1) * BATCH_SIZE + 1 stop messages are required due to batch pop's
+        for(int i = CONSUMERS * BATCH_SIZE; i--;)
             q.push(STOP_MSG);
         for(auto& t : consumers)
             t.join();
