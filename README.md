@@ -311,23 +311,40 @@ N producer threads push a 4-byte integer into one same queue, N consumer threads
 ### Ping-pong benchmark
 One thread posts an integer to another thread through one queue and waits for a reply from another queue (2 queues in total). The benchmarks measures the total time of 100,000 ping-pongs, best of 10 runs. Contention is minimal here (1-producer-1-consumer, 1 element in the queue) to be able to achieve and measure the lowest latency. Reports the average round-trip time.
 
-### Observations
-The latency of cross-thread communication of 2 (SMT) threads running in the same CPU core is the lowest. Communicating to another core adds latency. Communicating to another CCX/CPU-socket adds more latency.
+## Benchmarks observations
 
-In the ping-pong benchmark, all benchmarked queues demonstrate the lowest latency only when the 2 threads run in the same CPU core. When the 2 threads run in different CPU cores, the latency increases 3× or worse. E.g. `boost::lockfree::spsc_queue` round-trip latency is 111 and 332 nanoseconds correspondingly (AMD Ryzen 5825U).
+The lowest latency for cross-thread communication is achieved when both threads run on the **same CPU core** (2 SMT threads). Moving communication to a different core adds noticeable latency, and crossing CCX boundaries or CPU sockets increases it further.
 
-In the throughput benchmark, all queues demonstrate 1.5× lower or worse throughput when all producer and consumer threads run in different cores. The 3× longer latency of cross-core communications snowballs with the number of atomic instructions. Cross-core throughput is inversely proportional to the number and complexity of atomic instructions, it seems. Except the following 3 queues.
+### Ping-Pong Latency Benchmark
 
-`boost::lockfree::spsc_queue` uses the cheapest atomic load and store instructions, Its cross-core throughput doesn't get worse than its within-core throughput, but doesn't get any better.
+In the round-trip latency benchmark, **every tested queue** achieves its best latency only when the producer and consumer threads share the same CPU core.
+When the threads run on **different cores**, latency increases by **3× or more**.
 
-Only `OptimistAtomicQueue`/`OptimistAtomicQueueB` (atomic elements, statically/dynamically allocated buffers) demonstrate 1.5× or better cross-core throughput relative to its within-core throughput, in 1-producer-1-consumer (SPSC) mode only. These use the same algorithm with the same cheapest atomic load and store instructions as `boost::lockfree::spsc_queue` does, but benchmark 10× greater throughput for that only because of higher implementation quality
+**Example** (AMD Ryzen 5825U):
+- `boost::lockfree::spsc_queue`: **111 ns** (same core) vs **332 ns** (different cores)
 
-Everything else bottlenecks cross-core throughput by using more and/or more expensive atomic instructions. E.g. it takes ~17 seconds to run the benchmarks using 4 CPUs in 2 cores, and ~25 seconds using 4 CPUs in 4 cores (AMD Ryzen 5825U).
+### Throughput Benchmark
 
-The benchmarks measure the best time from within-core, cross-core and cross-CCX/CPU-socket scenarios for each queue. That captures the best possible timings for each queue. But these scenarios are rather different and must be benchmarked and compared independently. Stellar performance of 2 SMT threads running in one CPU core is irrelevant for use-cases when threads run in different cores.
+When producer and consumer threads run on different cores, **all queues** show **at least 1.5× lower** throughput.
+The ~3× higher latency of cross-core communication compounds with every atomic operation, making throughput highly sensitive to the number and cost of atomic instructions.
 
-## Contributing
-Contributions are more than welcome. `.editorconfig` and `.clang-format` can be used to automatically match code formatting.
+#### Exceptions
+
+- **`boost::lockfree::spsc_queue`**
+  Uses the cheapest atomic load/store instructions. Its cross-core throughput remains roughly **equal** to its within-core throughput (neither better nor worse).
+
+- **`xenium::vyukov_bounded_queue`**, **`OptimistAtomicQueue`**/**`OptimistAtomicQueueB`** (atomic elements, static/dynamic buffers)
+  These are the **only** implementations that achieve **≥1.5× higher** throughput across cores compared to within-core in **SPSC** (1-producer / 1-consumer) mode.
+  **`OptimistAtomicQueue`**/**`OptimistAtomicQueueB`** use the same minimal atomic instructions as `boost::lockfree::spsc_queue`, but deliver **~10× higher** absolute throughput thanks to superior implementation quality.
+
+All other queues bottleneck cross-core performance by using more frequent or more expensive atomic operations.
+
+### Notes
+
+- Running the full benchmark suite with 4 threads takes approximately **17 seconds** when all 4 threads are placed within 2 cores, and **~25 seconds** when spread across 4 different cores (AMD Ryzen 5825U).
+- The numbers shown for each queue reflect the **best-case** result across within-core, cross-core, and cross-CCX/socket scenarios.
+- **Important**: These scenarios behave very differently in practice. Excellent performance with two SMT threads on a single core is often irrelevant for real-world use cases where threads must run on different cores.
+- **Recommendation**: Always benchmark your specific thread placement (same core vs. different cores vs. different CCX) for latency-critical or throughput-critical applications.
 
 ## Reading material
 Some books on the subject of multi-threaded programming I found quite instructive:
