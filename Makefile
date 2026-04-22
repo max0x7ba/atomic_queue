@@ -19,6 +19,7 @@
 #
 #   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=gcc,gcc-14,clang,clang-20 BUILD=debug all run_tests
 #   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=gcc,gcc-14,clang,clang-20 CPPFLAGS="-DATOMIC_QUEUE_REMAP=RemapAnd" all run_tests
+#   printf "%s\n" distclean "all run_tests" | xargs -Iargs time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc,gcc-14,clang,clang-20 BUILD=debug args
 #
 # Additional CPPFLAGS, CXXFLAGS, LDLIBS, LDFLAGS can come from the command line, e.g. make CPPFLAGS='-I<my-include-dir>', or from environment variables.  For example, also produce assembly outputs:
 #
@@ -28,8 +29,13 @@
 ################################################################################################################################
 # The defaults.
 
+export T := 0
+build_root.0 := build
+build_root.1 := /tmp/build
+build_root.2 := /tmp/build2
+export BUILD_ROOT := $(or ${BUILD_ROOT},${build_root.${T}})
+
 export BUILD := release
-export BUILD_ROOT := $(or ${BUILD_ROOT},build)
 export TOOLSET := gcc
 export ASM := 0
 export N := 1
@@ -93,7 +99,6 @@ CC := $(call toolset_exe,cc)
 LD := $(call toolset_exe,ld)
 AR := $(call toolset_exe,ar,ar)
 
-uname_m := $(shell uname -m)
 cxxflags.x86_64 := -fcf-protection=none -masm=intel
 
 cxxflags.gcc.asm.1 := -save-temps=obj -fverbose-asm -fno-{stack-protector,stack-clash-protection}
@@ -175,9 +180,11 @@ ${build_dir}/benchmarks : ldlibs += ${ldlibs.tbb} ${ldlibs.moodycamel} ${ldlibs.
 all : ${exes}
 	@:
 
+auto_generated_header_d :=
+
 define EXE_TARGET
 ${build_dir}/${1} : $(patsubst %.cc,${build_dir}/%.o,${${1}_src})
--include $(patsubst %.cc,${build_dir}/%.d,${${1}_src})
+auto_generated_header_d += $(patsubst %.cc,${build_dir}/%.d,${${1}_src})
 endef
 $(foreach exe,${exes},$(eval $(call EXE_TARGET,${exe})))
 ${exes} : % : ${build_dir}/%
@@ -197,22 +204,23 @@ ${build_dir}/%.a : ${relink} | $$(dir $$@)
 ${build_dir}/%.o : src/%.cc ${recompile} | $$(dir $$@)
 	$(call strip2,${COMPILE.CXX})
 
-ver = "$(shell ${1} --version | ${head1})"
-# Trigger recompilation when compiler environment change.
-env.compile := $(call ver,${CXX}) ${cppflags} ${cxxflags} ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium} ${cxxflags.tbb} ${cxxflags.moodycamel} ${cxxflags.xenium}
-# Trigger relink when linker environment change.
-env.link := $(call ver,${LD}) ${ldflags} ${ldlibs} ${ldlibs.tbb} ${ldlibs.moodycamel} ${ldlibs.xenium}
+################################################################################################################################
+# Compiler and linker options tracking.
 
-define env_txt_rule
-${build_dir}/.make/env.${1}.txt : $(shell cmp --quiet ${build_dir}/.make/env.${1}.txt <(printf "%s\n" ${env.${1}}) || echo update_env_txt) | ${build_dir}/.make/
-	@printf "%s\n" ${env.${1}} >$$@
-endef
-$(eval $(call env_txt_rule,compile))
-$(eval $(call env_txt_rule,link))
-${recompile} ${relink} : ${build_dir}/.make/re% : ${build_dir}/.make/env.%.txt # Makefile
-	@[[ ! -f $@ ]] || { u="$?"; echo "Re-$* is triggered by changes in $${u// /, }."; }
-	touch $@
+ver = "$(shell ${1} --version | ${head1})"
+
+# Trigger recompilation when compiler environment change.
+${recompile} : private print := printf "%s\n" $(call strip2,$(call ver,${CXX}) ${cppflags} ${cxxflags} ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium} ${cxxflags.tbb} ${cxxflags.moodycamel} ${cxxflags.xenium} ${ASM})
+
+# Trigger relink when linker environment change.
+${relink} : private print := printf "%s\n" $(call strip2,$(call ver,${LD}) ${ldflags} ${ldlibs} ${ldlibs.tbb} ${ldlibs.moodycamel} ${ldlibs.xenium})
+
+${recompile} ${relink} : ${build_dir}/.make/% : $$(shell /bin/cmp --quiet $$@ <($${print}) || echo update_env_txt) | $$(dir $$@)
+	${print} > $@
+
 # cd ~/src/atomic_queue; make -r clean; set -x; make -rj8; make -rj8; make -rj8 CPPFLAGS=-DXYZ=1; make -rj8 CPPFLAGS=-DXYZ=1; make -rj8; make -rj8; make -rj8 LDLIBS=-lrt; make -rj8 LDLIBS=-lrt; make -rj8; make -rj8
+
+################################################################################################################################
 
 new_filename = $(shell date "+${TAG}.%Y%m%dT%H%M%S.${TOOLSET}.$$(nproc)")
 
@@ -254,14 +262,29 @@ versions:
 	${MAKE} --version | ${head1}
 	${CXX} --version | ${head1}
 
-${build_dir}/.make ${build_dir}/.make/ perf/ results/ :
+${build_dir}/.make/ perf/ results/ :
 	mkdir -p $@
 
-${BUILD_ROOT}/ ${build_dir} ${build_dir}/ : | ${build_dir}/.make/ ;
+${build_dir}/ : | ${build_dir}/.make/ ;
 
 .PHONY : update_env_txt env versions run_benchmarks clean all compile_commands compile_commands.json TAGS run_tests run_benchmarks_n run_benchmarks_perf run_tests2
 
 endif # Build with a single toolset.
+
+ifeq (,$(findstring clean,${MAKECMDGOALS}))
+# Not cleanining.
+
+include ${BUILD_ROOT}/chrt.mk
+
+${BUILD_ROOT}/chrt.mk : | $$(dir $$@)
+	{ echo "chrt_fifo := $$(chrt -f 50 printf 'chrt' || printf 'sudo chrt') -f 50"; echo "uname_m := $$(uname -m)"; } > $@
+
+-include $(sort ${auto_generated_header_d}) # Remove duplicates and include.
+
+endif
+
+${BUILD_ROOT}/ :
+	mkdir -p $@
 
 .PHONY :  distclean
 distclean :
@@ -272,12 +295,8 @@ env :
 	env | sort --ignore-case
 
 src/%.cc :;
-${build_dir}/%.d :;
+%.d :;
 Makefile :;
-
-include ${BUILD_ROOT}/chrt.mk
-${BUILD_ROOT}/chrt.mk : | $$(dir $$@)
-	echo "chrt_fifo := $$(chrt -f 50 printf 'chrt' || printf 'sudo chrt') -f 50" > $@
 
 # Prerequisites of .PHONY are always interpreted as literal target names, never as patterns (even if they contain ‘%’ characters). To always rebuild a pattern rule consider using a "force target".
 # If a rule has no prerequisites or recipe, and the target of the rule is a nonexistent file, then make imagines this target to have been updated whenever its rule is run. This implies that all targets depending on this one will always have their recipe run.
@@ -296,9 +315,6 @@ $(info ${log_src}: Build targets "${targets}" with toolsets "${toolsets}" in par
 
 timestamp_ms = $(shell printf "%.0f" $${EPOCHREALTIME}e+3)
 export t0 := ${timestamp_ms}
-
-${BUILD_ROOT}/ :
-	mkdir -p $@
 
 with-toolset-% :
 	${MAKE} -R --no-print-directory --output-sync TOOLSET=$* ${MAKECMDGOALS}
