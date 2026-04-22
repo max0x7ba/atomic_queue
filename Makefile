@@ -11,7 +11,7 @@
 #   taskset -c 0,1,2,3 time make -C ~/src/atomic_queue -Rj4 T=1 TOOLSET=gcc-14 run_benchmarks_n N=2
 #   taskset -c 0,2,4,6 time make -C ~/src/atomic_queue -Rj4 T=1 TOOLSET=gcc-14 run_benchmarks_n N=2
 #   taskset -c $(seq -s, 0 2 15) time make -C ~/src/atomic_queue -Rj8 T=1 TOOLSET=gcc-14 run_benchmarks_n N=33 TAG=cross-core
-#   taskset -c 4-7 time make -C ~/src/atomic_queue -Rj4 TOOLSET=gcc-14 run_benchmarks_n N=2 TAG=and2
+#   taskset -c 4-7 time make -C ~/src/atomic_queue -Rj4 TOOLSET=gcc-14 run_benchmarks_n N=2 TAG=statev1
 #   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=gcc-14 ASM=1
 #   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=clang-20 BUILD=debug TAGS
 #   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=clang BUILD=sanitize run_tests

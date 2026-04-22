@@ -22,6 +22,20 @@ using std::uint64_t;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+ATOMIC_QUEUE_INLINE static constexpr int as_signed(unsigned c) noexcept { return c; }
+ATOMIC_QUEUE_INLINE static constexpr int as_signed(int c) noexcept { return c; }
+ATOMIC_QUEUE_INLINE static constexpr unsigned as_unsigned(unsigned c) noexcept { return c; }
+ATOMIC_QUEUE_INLINE static constexpr unsigned as_unsigned(int c) noexcept { return c; }
+
+ATOMIC_QUEUE_INLINE static constexpr signed char as_signed(unsigned char c) noexcept { return c; }
+ATOMIC_QUEUE_INLINE static constexpr signed char as_signed(signed char c) noexcept { return c; }
+ATOMIC_QUEUE_INLINE static constexpr signed char as_signed(char c) noexcept { return c; }
+ATOMIC_QUEUE_INLINE static constexpr unsigned char as_unsigned(unsigned char c) noexcept { return c; }
+ATOMIC_QUEUE_INLINE static constexpr unsigned char as_unsigned(signed char c) noexcept { return c; }
+ATOMIC_QUEUE_INLINE static constexpr unsigned char as_unsigned(char c) noexcept { return c; }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 namespace details {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -316,7 +330,7 @@ protected:
         }
     }
 
-    enum State : unsigned char { EMPTY, STORING, STORED, LOADING };
+    enum State : unsigned char { EMPTY, STORING=1, STORED=4, LOADING=16 };
 
     template<class T>
     ATOMIC_QUEUE_INLINE static T do_pop(std::atomic<unsigned char>& state, T& q_element) noexcept {
@@ -329,18 +343,28 @@ protected:
             return element;
         }
         else {
-            for(;;) {
-                unsigned char expected = STORED;
-                if(ATOMIC_QUEUE_LIKELY(state.compare_exchange_weak(expected, LOADING, A, X))) {
-                    T element{std::move(q_element)};
-                    state.store(EMPTY, R);
-                    return element;
-                }
+            // for(;;) {
+            //     unsigned char expected = STORED;
+            //     if(ATOMIC_QUEUE_LIKELY(state.compare_exchange_weak(expected, LOADING, A, X))) {
+            //         T element{std::move(q_element)};
+            //         state.store(EMPTY, R);
+            //         return element;
+            //     }
+            //     // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
+            //     do
+            //         spin_loop_pause();
+            //     while(Derived::maximize_throughput_ && state.load(X) != STORED);
+            // }
+
+            while(ATOMIC_QUEUE_UNLIKELY((state.fetch_add(LOADING, AR) & (STORED | STORED << 1 | LOADING | LOADING << 1)) != STORED)) {
                 // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
                 do
                     spin_loop_pause();
-                while(Derived::maximize_throughput_ && state.load(X) != STORED);
+                while((state.load(A) & (STORED | STORED << 1 | LOADING | LOADING << 1)) != STORED);
             }
+            T element{std::move(q_element)};
+            state.store(EMPTY, R);
+            return element;
         }
     }
 
@@ -354,18 +378,34 @@ protected:
             state.store(STORED, R);
         }
         else {
-            for(;;) {
-                unsigned char expected = EMPTY;
-                if(ATOMIC_QUEUE_LIKELY(state.compare_exchange_weak(expected, STORING, A, X))) {
-                    q_element = std::forward<U>(element);
-                    state.store(STORED, R);
-                    return;
-                }
+            // for(;;) {
+            //     unsigned char expected = EMPTY;
+            //     if(ATOMIC_QUEUE_LIKELY(state.compare_exchange_weak(expected, STORING, A, X))) {
+            //         q_element = std::forward<U>(element);
+            //         state.store(STORED, R);
+            //         return;
+            //     }
+            //     // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
+            //     do
+            //         spin_loop_pause();
+            //     while(Derived::maximize_throughput_ && state.load(X) != EMPTY);
+            // }
+
+            while(ATOMIC_QUEUE_UNLIKELY(state.fetch_add(STORING, AR) & (STORED | STORED << 1 | STORING | STORING << 1))) {
                 // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
                 do
                     spin_loop_pause();
-                while(Derived::maximize_throughput_ && state.load(X) != EMPTY);
+                while(state.load(A) & (STORED | STORED << 1 | STORING | STORING << 1));
             }
+
+            // while(ATOMIC_QUEUE_UNLIKELY(state.exchange(STORING, A) != EMPTY)) {
+            //     // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
+            //     do
+            //         spin_loop_pause();
+            //     while(Derived::maximize_throughput_ && state.load(X) != EMPTY);
+            // }
+            q_element = std::forward<U>(element);
+            state.store(STORED, R);
         }
     }
 
