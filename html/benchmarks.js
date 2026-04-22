@@ -66,6 +66,8 @@ $(function() {
         const series = [];
         for(const [name, stats] of Object.entries(results)) {
             const s = settings[name];
+            if(!s)
+                continue;
             series.push({
                 name: name,
                 color: s[0],
