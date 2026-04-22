@@ -9,9 +9,13 @@
 #include "atomic_queue/barrier.h"
 #include "benchmarks.h"
 
+#include <algorithm>
 #include <boost/mpl/list.hpp>
 #include <bitset>
 #include <cstdint>
+#include <ctime>
+#include <numeric>
+#include <random>
 #include <thread>
 #include <string>
 #include <vector>
@@ -25,8 +29,6 @@ using namespace ::atomic_queue;
 enum { N_STRESS_MSG = 1000000 };
 enum { STOP_MSG = -1 };
 enum { CAPACITY = 4096 };
-
-constexpr auto BATCH_SIZES = {1, 4, 7, 12};
 
 using stress_queues = boost::mpl::list<
     AtomicQueue<unsigned, CAPACITY>,
@@ -107,73 +109,95 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(stress_batch, Queue, stress_queues) {
     };
     using T = typename Queue::value_type;
 
-    for (int const BATCH_SIZE : BATCH_SIZES) {
-        Queue q;
-        Barrier barrier;
+    Queue q;
+    Barrier barrier;
 
-        std::thread producers[PRODUCERS];
-        for(unsigned i = 0; i < PRODUCERS; ++i)
-            producers[i] = std::thread([&q, &barrier, BATCH_SIZE]() {
-                barrier.wait();
-                for(T n = N_STRESS_MSG; n;) {
-                    // Inserting elements into local buffer before
-                    std::vector<T> buffer(BATCH_SIZE);
-                    typename std::vector<T>::iterator it = buffer.begin();
-                    while (it != buffer.end() && n) {
-                        *it++ = n--;
-                    }
-                    // Pushing them to the queue
-                    q.push(buffer.begin(), it);
-                }
-            });
+    std::size_t const seed = std::time(nullptr);
+    std::mt19937 gen(seed);
+    std::uniform_int_distribution<> distr(1, 2 * q.capacity());
+    int const BATCH_SIZE = distr(gen);
 
-        uint64_t results[CONSUMERS];
-        std::thread consumers[CONSUMERS];
-        for(unsigned i = 0; i < CONSUMERS; ++i)
-            consumers[i] = std::thread([&q, &barrier, &r = results[i], BATCH_SIZE]() {
-                barrier.wait();
-                uint64_t result = 0;
-                
-                // Allocating local buffer
+    std::vector<std::atomic<int>> number_of_pops(CONSUMERS);
+    for (auto & val : number_of_pops) val.store(0, X);
+
+    std::vector<std::atomic<bool>> consumer_finished(CONSUMERS);
+    for (auto & val : consumer_finished) val.store(false, X);
+
+    std::thread producers[PRODUCERS];
+    for(unsigned i = 0; i < PRODUCERS; ++i)
+        producers[i] = std::thread([&q, &barrier, BATCH_SIZE]() {
+            barrier.wait();
+            for(T n = N_STRESS_MSG; n;) {
+                // Inserting elements into local buffer before
                 std::vector<T> buffer(BATCH_SIZE);
-                {
-                    bool continue_pops = true;
-                    while (continue_pops) {
-                        // Popping into local buffer before
-                        typename std::vector<T>::iterator out_it = q.pop(buffer.begin(), BATCH_SIZE);
-                        // Accumulating the output
-                        for (typename std::vector<T>::iterator it = buffer.begin(); it != out_it; ++it) {
-                            if (*it != static_cast<T>(STOP_MSG)) {
-                                result += *it;
-                            }
-                            else {
-                                continue_pops = false;
-                            }
+                typename std::vector<T>::iterator it = buffer.begin();
+                while (it != buffer.end() && n) {
+                    *it++ = n--;
+                }
+                // Pushing them to the queue
+                q.push(buffer.begin(), it);
+            }
+        });
+
+    uint64_t results[CONSUMERS];
+    std::thread consumers[CONSUMERS];
+    for(unsigned i = 0; i < CONSUMERS; ++i)
+        consumers[i] = std::thread([&q, &barrier, &r = results[i], &n_pop = number_of_pops[i], &finished = consumer_finished[i], BATCH_SIZE]() {
+            barrier.wait();
+            uint64_t result = 0;
+            
+            // Allocating local buffer
+            std::vector<T> buffer(BATCH_SIZE);
+            {
+                bool continue_pops = true;
+                while (continue_pops) {
+                    // Popping into local buffer before
+                    n_pop.fetch_add(BATCH_SIZE, A);
+                    typename std::vector<T>::iterator out_it = q.pop(buffer.begin(), BATCH_SIZE);
+                    // Accumulating the output
+                    for (typename std::vector<T>::iterator it = buffer.begin(); it != out_it; ++it) {
+                        if (*it != static_cast<T>(STOP_MSG)) {
+                            result += *it;
+                        }
+                        else {
+                            continue_pops = false;
                         }
                     }
                 }
-                r = result;
-            });
+                finished.store(true, R);
+            }
+            r = result;
+        });
 
-        barrier.release(PRODUCERS + CONSUMERS);
-        for(auto& t : producers)
-            t.join();
-        // At least (CONSUMERS - 1) * BATCH_SIZE + 1 stop messages are required due to batch pop's
-        for(int i = CONSUMERS * BATCH_SIZE; i--;)
-            q.push(STOP_MSG);
-        for(auto& t : consumers)
-            t.join();
-
-        constexpr uint64_t expected_result = (N_STRESS_MSG + 1) / 2. * N_STRESS_MSG * PRODUCERS;
-        constexpr uint64_t consumer_result_min = expected_result / CONSUMERS / 10;
-        uint64_t result = 0;
-        for(auto& r : results) {
-            BOOST_WARN_GT(r, consumer_result_min); // Make sure a consumer didn't starve. False positives are possible here.
-            result += r;
-        }
-        int64_t result_diff = result - expected_result;
-        BOOST_CHECK_EQUAL(result_diff, 0);
+    barrier.release(PRODUCERS + CONSUMERS);
+    for(auto& t : producers)
+        t.join();
+    
+    int const residue = (N_STRESS_MSG * PRODUCERS) % BATCH_SIZE;
+    for(int i = BATCH_SIZE - residue; i--;) {
+        q.push(STOP_MSG);
     }
+    int number_of_pushes = (N_STRESS_MSG * PRODUCERS) / BATCH_SIZE * BATCH_SIZE + BATCH_SIZE;
+    while(not std::all_of(consumer_finished.cbegin(), consumer_finished.cend(), [](const auto &val) { return val.load(A); })) {
+        while(std::accumulate(number_of_pops.cbegin(), number_of_pops.cend(), 0, [](int acc, const auto &val) { return acc + val.load(X);} ) > number_of_pushes) {
+            for(int i = BATCH_SIZE; i--;)
+                q.push(STOP_MSG);
+            number_of_pushes += BATCH_SIZE;
+        }
+    }
+
+    for(auto& t : consumers)
+        t.join();
+
+    constexpr uint64_t expected_result = (N_STRESS_MSG + 1) / 2. * N_STRESS_MSG * PRODUCERS;
+    constexpr uint64_t consumer_result_min = expected_result / CONSUMERS / 10;
+    uint64_t result = 0;
+    for(auto& r : results) {
+        BOOST_WARN_GT(r, consumer_result_min); // Make sure a consumer didn't starve. False positives are possible here.
+        result += r;
+    }
+    int64_t result_diff = result - expected_result;
+    BOOST_CHECK_EQUAL(result_diff, 0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
