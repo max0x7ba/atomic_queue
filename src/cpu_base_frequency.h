@@ -29,6 +29,8 @@ std::vector<CpuTopologyInfo> sort_by_hw_thread_id(std::vector<CpuTopologyInfo> c
 
 std::vector<unsigned> hw_thread_id(std::vector<CpuTopologyInfo> const&);
 
+void log_cpus(std::vector<CpuTopologyInfo> const&) noexcept;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void set_thread_affinity(unsigned hw_thread_id);

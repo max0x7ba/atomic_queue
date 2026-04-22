@@ -58,7 +58,7 @@ cycles_t constexpr CYCLES_MAX = -1;
 
 ATOMIC_QUEUE_INLINE static cycles_t cycles() noexcept {
     // If software requires RDTSC to be executed only after all previous instructions have executed and all previous loads are
-    // globally visible, 1 it can execute LFENCE immediately before RDTSC.
+    // globally visible, it can execute LFENCE immediately before RDTSC.
     _mm_lfence();
     return __builtin_ia32_rdtsc();
 }
@@ -539,18 +539,6 @@ void advise_hugeadm_2MB() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void log_available_cpus(std::vector<CpuTopologyInfo> const& cpu_topology) {
-    std::printf("Using %zu available CPUs: ", cpu_topology.size());
-    char sep = '[';
-    for(auto& cpu : cpu_topology) {
-        std::printf("%c%u", sep, cpu.hw_thread_id);
-        sep = ',';
-    }
-    std::printf("].\n");
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 } // namespace
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -561,7 +549,7 @@ int main() {
     TSC_TO_SECONDS = 1e-9 / cpu_base_frequency();
 
     auto cpu_topology = get_available_cpu_topology_info();
-    log_available_cpus(cpu_topology);
+    log_cpus(cpu_topology);
     if(cpu_topology.size() < 2)
         throw std::runtime_error("A CPU with at least 2 hardware threads is required.");
 

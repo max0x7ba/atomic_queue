@@ -7,6 +7,7 @@
 #include <fstream>
 #include <tuple>
 #include <regex>
+#include <cstdio>
 #include <string>
 #include <thread>
 #include <system_error>
@@ -124,6 +125,18 @@ std::vector<unsigned> atomic_queue::hw_thread_id(std::vector<atomic_queue::CpuTo
     for(unsigned i = 0, j = u.size(); i < j; ++i)
         u[i] = v[i].hw_thread_id;
     return u;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void atomic_queue::log_cpus(std::vector<CpuTopologyInfo> const& cpu_topology) noexcept {
+    std::printf("Using %zu available CPUs: ", cpu_topology.size());
+    char sep = '[';
+    for(auto& cpu : cpu_topology) {
+        std::printf("%c%u", sep, cpu.hw_thread_id);
+        sep = ',';
+    }
+    std::printf("].\n");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
