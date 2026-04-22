@@ -8,8 +8,9 @@
 #   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=clang-20 BUILD=debug run_tests
 #   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=gcc-14 run_benchmarks_n
 #   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=clang-20 run_benchmarks_n
-#   taskset -c 0,1,2,3 time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=gcc-14 run_benchmarks_n N=2
-#   taskset -c 0,2,4,6 time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=gcc-14 run_benchmarks_n N=2
+#   taskset -c 0,1,2,3 time make -C ~/src/atomic_queue -Rj4 T=1 TOOLSET=gcc-14 run_benchmarks_n N=2
+#   taskset -c 0,2,4,6 time make -C ~/src/atomic_queue -Rj4 T=1 TOOLSET=gcc-14 run_benchmarks_n N=2
+#   taskset -c $(seq -s, 0 2 15) time make -C ~/src/atomic_queue -Rj8 T=1 TOOLSET=gcc-14 run_benchmarks_n N=33 TAG=cross-core
 #   taskset -c 4-7 time make -C ~/src/atomic_queue -Rj4 TOOLSET=gcc-14 run_benchmarks_n N=2 TAG=and2
 #   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=gcc-14 ASM=1
 #   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=clang-20 BUILD=debug TAGS
@@ -17,8 +18,8 @@
 #
 # Build and run with multiple toolsets in parallel:
 #
-#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=gcc,gcc-14,clang,clang-20 BUILD=debug all run_tests
-#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=gcc,gcc-14,clang,clang-20 CPPFLAGS="-DATOMIC_QUEUE_REMAP=RemapAnd" all run_tests
+#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc,gcc-14,clang,clang-20 BUILD=debug all run_tests
+#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc,gcc-14,clang,clang-20 CPPFLAGS="-DATOMIC_QUEUE_REMAP=RemapAnd" all run_tests
 #   printf "%s\n" distclean "all run_tests" | xargs -Iargs time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc,gcc-14,clang,clang-20 BUILD=debug args
 #
 # Additional CPPFLAGS, CXXFLAGS, LDLIBS, LDFLAGS can come from the command line, e.g. make CPPFLAGS='-I<my-include-dir>', or from environment variables.  For example, also produce assembly outputs:
@@ -241,11 +242,6 @@ run_benchmarks_perf : perf/$${new_filename}.txt
 run_benchmarks : ${build_dir}/benchmarks
 	@echo -n "$@ "; set -x; scripts/benchmark.sh ${chrt_fifo} $<
 
-run_tests.% : force
-	${MAKE} -R --no-print-directory --output-sync TOOLSET=$* all run_tests
-
-run_tests2 : run_tests.gcc-14 run_tests.clang-20
-
 run_tests : ${build_dir}/tests
 	@echo -n "$@ "; set -x; $< --log_level=unit_scope --report_level=short
 
@@ -267,21 +263,23 @@ ${build_dir}/.make/ perf/ results/ :
 
 ${build_dir}/ : | ${build_dir}/.make/ ;
 
-.PHONY : update_env_txt env versions run_benchmarks clean all compile_commands compile_commands.json TAGS run_tests run_benchmarks_n run_benchmarks_perf run_tests2
+env2 : env
+
+.PHONY : update_env_txt env versions run_benchmarks clean all compile_commands compile_commands.json TAGS run_tests run_benchmarks_n run_benchmarks_perf env2
 
 endif # Build with a single toolset.
 
-ifeq (,$(findstring clean,${MAKECMDGOALS}))
-# Not cleanining.
+################################################################################################################################
 
+ifeq (,$(findstring clean,${MAKECMDGOALS})) # Not cleanining.
 include ${BUILD_ROOT}/chrt.mk
-
 ${BUILD_ROOT}/chrt.mk : | $$(dir $$@)
 	{ echo "chrt_fifo := $$(chrt -f 50 printf 'chrt' || printf 'sudo chrt') -f 50"; echo "uname_m := $$(uname -m)"; } > $@
 
 -include $(sort ${auto_generated_header_d}) # Remove duplicates and include.
+endif # Not cleanining.
 
-endif
+################################################################################################################################
 
 ${BUILD_ROOT}/ :
 	mkdir -p $@
@@ -306,21 +304,24 @@ force :
 .SECONDARY :
 .SUFFIXES :
 
+################################################################################################################################
 ifneq (,${mutli_toolset}) # Parallelize building with multiple toolsets.
 
 n_jobs := $(or $(subst -j,,$(filter -j%,${MAKEFLAGS})),1)
+# $(info n_jobs=${n_jobs})
+
 targets := $(or ${MAKECMDGOALS},all)
 log_src := $(firstword ${MAKEFILE_LIST})
 $(info ${log_src}: Build targets "${targets}" with toolsets "${toolsets}" in parallel using ${n_jobs} CPUs.)
 
-timestamp_ms = $(shell printf "%.0f" $${EPOCHREALTIME}e+3)
-export t0 := ${timestamp_ms}
+timestamp_usec = $(shell printf "%.0f" $${EPOCHREALTIME}e+6)
+export t0 := ${timestamp_usec}
 
 with-toolset-% :
 	${MAKE} -R --no-print-directory --output-sync TOOLSET=$* ${MAKECMDGOALS}
 
 % : ${toolsets:%=with-toolset-%}
-	@printf "${log_src}: made targets '%s' with '%s', took %'.3f seconds.\n" "${targets}" "${toolsets}" "$$((${timestamp_ms} - ${t0}))"e-3
+	@printf "${log_src}: made targets '%s' with '%s', took %'.3f seconds.\n" "${targets}" "${toolsets}" "$$((${timestamp_usec} - ${t0}))"e-6
 
 endif # Parallelize building with multiple toolsets.
 
