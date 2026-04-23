@@ -122,11 +122,13 @@ struct RemapBmi {
         // Disable constant propagation for nn to prevent the compiler from transforming the following code into more expensive instructions.
         // This one register is used by both bextr and shlx/shl instructions (otherwise transformed into different code).
         // Disable constant propagation for index too to always generate the same machine code.
+        static_assert(ATOMIC_QUEUE_FULL_THROTTLE == 1, "Unexpected ATOMIC_QUEUE_FULL_THROTTLE value.");
 #ifdef __BMI2__
         asm("":"+r"(nn): "r"(index)); // Any register for BMI2 shlx shift count.
 #else
         asm("":"+c"(nn): "r"(index)); // Without BMI2, shl shift count must be in ecx register.
 #endif
+
         // These 2 statements generate 2 instructions which require nn in the register.
         unsigned new_elem_idx = __builtin_ia32_bextr_u32(index, nn); // BMI1 instruction.
         // C++ standard does not define behaviour of shifts not less than the number of bits.
@@ -255,6 +257,10 @@ ATOMIC_QUEUE_INLINE static void copy_relaxed(std::atomic<T>& a, std::atomic<T> c
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+using State = unsigned char;
+using AtomicState = std::atomic<State>;
+enum StateE : State { EMPTY, STORING = 1, LOADING = 4, STORED = 128 };
+
 template<class Derived>
 class AtomicQueueCommon {
     ATOMIC_QUEUE_INLINE constexpr Derived& downcast() noexcept {
@@ -330,10 +336,8 @@ protected:
         }
     }
 
-    enum State : unsigned char { EMPTY, STORING=1, STORED=4, LOADING=16 };
-
     template<class T>
-    ATOMIC_QUEUE_INLINE static T do_pop(std::atomic<unsigned char>& state, T& q_element) noexcept {
+    ATOMIC_QUEUE_INLINE static T do_pop(std::atomic<State>& state, T& q_element) noexcept {
         if(Derived::spsc_) {
             while(ATOMIC_QUEUE_UNLIKELY(state.load(A) != STORED))
                 if(Derived::maximize_throughput_)
@@ -356,20 +360,29 @@ protected:
             //     while(Derived::maximize_throughput_ && state.load(X) != STORED);
             // }
 
-            while(ATOMIC_QUEUE_UNLIKELY((state.fetch_add(LOADING, AR) & (STORED | STORED << 1 | LOADING | LOADING << 1)) != STORED)) {
+            // Faster code-path without compare_exchange_weak. Not ideal yet.
+            // do_pop#1 may wait on do_push#1, while do_push#1 might wait on do_pop#0.
+            State constexpr M = LOADING * 3 | STORED;
+            while(ATOMIC_QUEUE_UNLIKELY(State(state.fetch_add(LOADING, A) & M) != STORED))
                 // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
                 do
                     spin_loop_pause();
-                while((state.load(A) & (STORED | STORED << 1 | LOADING | LOADING << 1)) != STORED);
-            }
+                while(State(state.load(X) & M) != STORED);
+
             T element{std::move(q_element)};
-            state.store(EMPTY, R);
+
+            State e = EMPTY;
+#if ATOMIC_QUEUE_FULL_THROTTLE
+            asm("":"+r"(e));
+#endif
+            state.store(e, R);
+
             return element;
         }
     }
 
     template<class U, class T>
-    ATOMIC_QUEUE_INLINE static void do_push(U&& element, std::atomic<unsigned char>& state, T& q_element) noexcept {
+    ATOMIC_QUEUE_INLINE static void do_push(U&& element, std::atomic<State>& state, T& q_element) noexcept {
         if(Derived::spsc_) {
             while(ATOMIC_QUEUE_UNLIKELY(state.load(A) != EMPTY))
                 if(Derived::maximize_throughput_)
@@ -391,21 +404,24 @@ protected:
             //     while(Derived::maximize_throughput_ && state.load(X) != EMPTY);
             // }
 
-            while(ATOMIC_QUEUE_UNLIKELY(state.fetch_add(STORING, AR) & (STORED | STORED << 1 | STORING | STORING << 1))) {
+            // Faster code-path without compare_exchange_weak. Not ideal yet.
+            // do_push#1 might wait on do_pop#0.
+            State constexpr M = STORING * 3 | STORED;
+            State s;
+            while(ATOMIC_QUEUE_UNLIKELY((s = State(state.fetch_add(STORING, A) & M))))
                 // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
                 do
                     spin_loop_pause();
-                while(state.load(A) & (STORED | STORED << 1 | STORING | STORING << 1));
-            }
+                while(State(state.load(X) & M));
 
-            // while(ATOMIC_QUEUE_UNLIKELY(state.exchange(STORING, A) != EMPTY)) {
-            //     // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
-            //     do
-            //         spin_loop_pause();
-            //     while(Derived::maximize_throughput_ && state.load(X) != EMPTY);
-            // }
             q_element = std::forward<U>(element);
-            state.store(STORED, R);
+
+            // s is 0 here; (or s, STORED) is cheaper than (mov s, STORED).
+            s |= STORED;
+#if ATOMIC_QUEUE_FULL_THROTTLE
+            asm("":"+r"(s));
+#endif
+            state.store(s, R);
         }
     }
 
@@ -541,17 +557,16 @@ public:
 template<class T, unsigned SIZE, bool MINIMIZE_CONTENTION = true, bool MAXIMIZE_THROUGHPUT = true, bool TOTAL_ORDER = false, bool SPSC = false>
 class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>> {
     using Base = AtomicQueueCommon<AtomicQueue2<T, SIZE, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>>;
-    using State = typename Base::State;
     friend Base;
 
     static constexpr unsigned size_ = MINIMIZE_CONTENTION ? details::round_up_to_power_of_2(SIZE) : SIZE;
-    static constexpr int SHUFFLE_BITS = details::GetIndexShuffleBits<MINIMIZE_CONTENTION, size_, CACHE_LINE_SIZE / sizeof(State)>::value;
+    static constexpr int SHUFFLE_BITS = details::GetIndexShuffleBits<MINIMIZE_CONTENTION, size_, CACHE_LINE_SIZE / sizeof(AtomicState)>::value;
     using Bits = details::IndexBits<SHUFFLE_BITS>;
     static constexpr bool total_order_ = TOTAL_ORDER;
     static constexpr bool spsc_ = SPSC;
     static constexpr bool maximize_throughput_ = MAXIMIZE_THROUGHPUT;
 
-    alignas(CACHE_LINE_SIZE) std::atomic<unsigned char> states_[size_] = {};
+    alignas(CACHE_LINE_SIZE) AtomicState states_[size_] = {};
     alignas(CACHE_LINE_SIZE) T elements_[size_] = {};
 
     ATOMIC_QUEUE_INLINE T do_pop(unsigned tail) noexcept {
@@ -672,8 +687,6 @@ class AtomicQueueB2 : private std::allocator_traits<A>::template rebind_alloc<un
                       public AtomicQueueCommon<AtomicQueueB2<T, A, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>> {
     using StorageAllocator = typename std::allocator_traits<A>::template rebind_alloc<unsigned char>;
     using Base = AtomicQueueCommon<AtomicQueueB2<T, A, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>>;
-    using State = typename Base::State;
-    using AtomicState = std::atomic<unsigned char>;
     friend Base;
 
     static constexpr bool total_order_ = TOTAL_ORDER;
@@ -733,7 +746,7 @@ public:
         , size_(std::max(details::round_up_to_power_of_2(size), 1u << (SHUFFLE_BITS * 2)))
         , states_(allocate_<AtomicState>())
         , elements_(allocate_<T>()) {
-        std::uninitialized_fill_n(states_, size_, Base::EMPTY);
+        std::uninitialized_fill_n(states_, size_, EMPTY);
         A a = get_allocator();
         assert(a == allocator); // The standard requires the original and rebound allocators to manage the same state.
         for(auto p = elements_, q = elements_ + size_; p < q; ++p)
