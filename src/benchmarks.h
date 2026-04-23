@@ -90,6 +90,7 @@ struct RetryDecorator : Queue {
 
     template<class OutputIt>
     ATOMIC_QUEUE_INLINE OutputIt pop(OutputIt first, int n) noexcept {
+        if (n <= 0) return first;
         while(n -= this->try_pop(first, n)) {
             spin_loop_pause();
         }
