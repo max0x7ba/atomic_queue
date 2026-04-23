@@ -10,6 +10,7 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <memory>
 #include <utility>
 
@@ -445,6 +446,33 @@ public:
         return true;
     }
 
+    template<class InputIt>
+    ATOMIC_QUEUE_INLINE InputIt try_push(InputIt first, InputIt const last) noexcept {
+        int n = static_cast<int>(std::distance(first, last));
+        auto head = head_.load(X);
+        if(Derived::spsc_) {
+            int const slots = static_cast<int>(tail_.load(X) + downcast().size_ - head);
+            n = std::min(n, slots);
+            if(n <= 0)
+                return first;
+            head_.store(head + static_cast<unsigned>(n), X);
+        }
+        else {
+            int const length = n;
+            do {
+                int const slots = static_cast<int>(tail_.load(X) + downcast().size_ - head);
+                n = std::min(length, slots);
+                if(n <= 0)
+                    return first;
+            } while(ATOMIC_QUEUE_UNLIKELY(!head_.compare_exchange_weak(head, head + static_cast<unsigned>(n), X, X))); // This loop is not FIFO.
+        }
+
+        do {
+            downcast().do_push(*first++, head++);
+        } while(--n);
+        return first;
+    }
+
     template<class T>
     ATOMIC_QUEUE_INLINE bool try_pop(T& element) noexcept {
         auto tail = tail_.load(X);
@@ -464,6 +492,33 @@ public:
         return true;
     }
 
+    template<class OutputIt>
+    ATOMIC_QUEUE_INLINE int try_pop(OutputIt& first, int n) noexcept {
+        auto tail = tail_.load(X);
+        if(Derived::spsc_) {
+            int const num_elements = static_cast<int>(head_.load(X) - tail);
+            n = std::min(n, num_elements);
+            if(n <= 0)
+                return 0;
+            tail_.store(tail + static_cast<unsigned>(n), X);
+        }
+        else {
+            int const desired_pops = n;
+            do {
+                int const num_elements = static_cast<int>(head_.load(X) - tail);
+                n = std::min(desired_pops, num_elements);
+                if(n <= 0)
+                    return 0;
+            } while(ATOMIC_QUEUE_UNLIKELY(!tail_.compare_exchange_weak(tail, tail + static_cast<unsigned>(n), X, X))); // This loop is not FIFO.
+        }
+
+        int i = n;
+        do {
+            *first++ = downcast().do_pop(tail++);
+        } while(--i);
+        return n;
+    }
+
     template<class T>
     ATOMIC_QUEUE_INLINE void push(T&& element) noexcept {
         unsigned head;
@@ -478,6 +533,24 @@ public:
         downcast().do_push(std::forward<T>(element), head);
     }
 
+    template<class InputIt>
+    ATOMIC_QUEUE_INLINE InputIt push(InputIt first, InputIt const last) noexcept {
+        unsigned n = static_cast<unsigned>(std::distance(first, last));
+        unsigned head;
+        if(Derived::spsc_) {
+            head = head_.load(X);
+            head_.store(head + n, X);
+        }
+        else {
+            constexpr auto memory_order = Derived::total_order_ ? std::memory_order_seq_cst : std::memory_order_relaxed;
+            head = head_.fetch_add(n, memory_order); // FIFO and total order on Intel regardless, as of 2019.
+        }
+        while(n--) {
+            downcast().do_push(*first++, head++);
+        }
+        return first;
+    }
+
     ATOMIC_QUEUE_INLINE auto pop() noexcept {
         unsigned tail;
         if(Derived::spsc_) {
@@ -489,6 +562,23 @@ public:
             tail = tail_.fetch_add(1, memory_order); // FIFO and total order on Intel regardless, as of 2019.
         }
         return downcast().do_pop(tail);
+    }
+
+    template<class OutputIt>
+    ATOMIC_QUEUE_INLINE OutputIt pop(OutputIt first, unsigned n) noexcept {
+        unsigned tail;
+        if(Derived::spsc_) {
+            tail = tail_.load(X);
+            tail_.store(tail + n, X);
+        }
+        else {
+            constexpr auto memory_order = Derived::total_order_ ? std::memory_order_seq_cst : std::memory_order_relaxed;
+            tail = tail_.fetch_add(n, memory_order); // FIFO and total order on Intel regardless, as of 2019.
+        }
+        while(n--) {
+            *first++ = downcast().do_pop(tail++);
+        }
+        return first;
     }
 
     ATOMIC_QUEUE_INLINE bool was_empty() const noexcept {

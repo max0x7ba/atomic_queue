@@ -73,11 +73,28 @@ struct RetryDecorator : Queue {
             spin_loop_pause();
     }
 
+    template<class InputIt>
+    ATOMIC_QUEUE_INLINE InputIt push(InputIt first, InputIt const last) noexcept {
+        while(last != (first = this->try_push(first, last))) {
+            spin_loop_pause();
+        }
+        return first;
+    }
+
     ATOMIC_QUEUE_INLINE T pop() noexcept {
         T element;
         while(!this->try_pop(element))
             spin_loop_pause();
         return element;
+    }
+
+    template<class OutputIt>
+    ATOMIC_QUEUE_INLINE OutputIt pop(OutputIt first, int n) noexcept {
+        if (n <= 0) return first;
+        while(n -= this->try_pop(first, n)) {
+            spin_loop_pause();
+        }
+        return first;
     }
 };
 
