@@ -179,7 +179,11 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(stress_batch, Queue, stress_queues) {
         t.join();
     
     int number_of_pushes = N_STRESS_MSG * PRODUCERS;
-    while(not std::all_of(consumer_finished.cbegin(), consumer_finished.cend(), [](const auto &val) { return val.load(A); })) {
+    for (auto it = consumer_finished.cbegin(); it != consumer_finished.cend();) {
+        if (it->load(A)) {
+            ++it;
+            continue;
+        }
         for(int n; (n = std::accumulate(number_of_pops.cbegin(), number_of_pops.cend(), 0, [](int acc, const auto &val) { return acc + val.load(X);}) - number_of_pushes) > 0;) {
             number_of_pushes += n;
             do {
