@@ -112,11 +112,6 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(stress_batch, Queue, stress_queues) {
     Queue q;
     Barrier barrier;
 
-    std::size_t const seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
-    std::mt19937 gen(seed);
-    std::uniform_int_distribution<> distr(1, 2 * q.capacity());
-    int const BATCH_SIZE = distr(gen);
-
     std::vector<std::atomic<int>> number_of_pops(CONSUMERS);
     for (auto & val : number_of_pops) val.store(0, X);
 
@@ -125,10 +120,15 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(stress_batch, Queue, stress_queues) {
 
     std::thread producers[PRODUCERS];
     for(unsigned i = 0; i < PRODUCERS; ++i)
-        producers[i] = std::thread([&q, &barrier, BATCH_SIZE]() {
+        producers[i] = std::thread([&q, &barrier]() {
+            std::size_t const seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+            std::mt19937 gen(seed);
+            std::uniform_int_distribution<> distr(1, 2 * q.capacity());;
+
             barrier.wait();
             for(T n = N_STRESS_MSG; n;) {
                 // Inserting elements into local buffer before
+                int const BATCH_SIZE = distr(gen);
                 std::vector<T> buffer(BATCH_SIZE);
                 typename std::vector<T>::iterator it = buffer.begin();
                 while (it != buffer.end() && n) {
@@ -142,17 +142,22 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(stress_batch, Queue, stress_queues) {
     uint64_t results[CONSUMERS];
     std::thread consumers[CONSUMERS];
     for(unsigned i = 0; i < CONSUMERS; ++i)
-        consumers[i] = std::thread([&q, &barrier, &r = results[i], &n_pop = number_of_pops[i], &finished = consumer_finished[i], BATCH_SIZE]() {
+        consumers[i] = std::thread([&q, &barrier, &r = results[i], &n_pop = number_of_pops[i], &finished = consumer_finished[i]]() {
+            std::size_t const seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+            std::mt19937 gen(seed);
+            std::uniform_int_distribution<> distr(1, 2 * q.capacity());;
+            
             barrier.wait();
             uint64_t result = 0;
             
             // Allocating local buffer
-            std::vector<T> buffer(BATCH_SIZE);
             {
                 bool continue_pops = true;
                 while (continue_pops) {
+                    int const BATCH_SIZE = distr(gen);
                     // Popping into local buffer before
                     n_pop.fetch_add(BATCH_SIZE, A);
+                    std::vector<T> buffer(BATCH_SIZE);
                     typename std::vector<T>::iterator out_it = q.pop(buffer.begin(), BATCH_SIZE);
                     // Accumulating the output
                     for (typename std::vector<T>::iterator it = buffer.begin(); it != out_it; ++it) {
@@ -173,16 +178,13 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(stress_batch, Queue, stress_queues) {
     for(auto& t : producers)
         t.join();
     
-    int const residue = (N_STRESS_MSG * PRODUCERS) % BATCH_SIZE;
-    for(int i = BATCH_SIZE - residue; i--;) {
-        q.push(STOP_MSG);
-    }
-    int number_of_pushes = (N_STRESS_MSG * PRODUCERS) / BATCH_SIZE * BATCH_SIZE + BATCH_SIZE;
+    int number_of_pushes = N_STRESS_MSG * PRODUCERS;
     while(not std::all_of(consumer_finished.cbegin(), consumer_finished.cend(), [](const auto &val) { return val.load(A); })) {
-        while(std::accumulate(number_of_pops.cbegin(), number_of_pops.cend(), 0, [](int acc, const auto &val) { return acc + val.load(X);} ) > number_of_pushes) {
-            for(int i = BATCH_SIZE; i--;)
+        for(int n; (n = std::accumulate(number_of_pops.cbegin(), number_of_pops.cend(), 0, [](int acc, const auto &val) { return acc + val.load(X);}) - number_of_pushes) > 0;) {
+            number_of_pushes += n;
+            do {
                 q.push(STOP_MSG);
-            number_of_pushes += BATCH_SIZE;
+            } while(--n);
         }
     }
 
