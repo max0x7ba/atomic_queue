@@ -12,8 +12,8 @@
 #include <algorithm>
 #include <boost/mpl/list.hpp>
 #include <bitset>
+#include <chrono>
 #include <cstdint>
-#include <ctime>
 #include <numeric>
 #include <random>
 #include <thread>
@@ -112,7 +112,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(stress_batch, Queue, stress_queues) {
     Queue q;
     Barrier barrier;
 
-    std::size_t const seed = std::time(nullptr);
+    std::size_t const seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
     std::mt19937 gen(seed);
     std::uniform_int_distribution<> distr(1, 2 * q.capacity());
     int const BATCH_SIZE = distr(gen);
