@@ -417,10 +417,10 @@ protected:
             q_element = std::forward<U>(element);
 
             // s is 0 here; (or s, STORED) is cheaper than (mov s, STORED).
-            s |= STORED;
 #if ATOMIC_QUEUE_FULL_THROTTLE
             asm("":"+r"(s));
 #endif
+            s |= STORED;
             state.store(s, R);
         }
     }
