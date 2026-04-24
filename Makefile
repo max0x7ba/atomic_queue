@@ -4,10 +4,10 @@
 #
 #   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2))
 #   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) all run_tests
-#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=gcc-14 BUILD=debug run_tests
-#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=clang-20 BUILD=debug run_tests
-#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=gcc-14 run_benchmarks_n
-#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=clang-20 run_benchmarks_n
+#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 BUILD=debug run_tests
+#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=clang-20 BUILD=debug run_tests
+#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 run_benchmarks_n
+#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=clang-20 run_benchmarks_n
 #   taskset -c 0,1,2,3 time make -C ~/src/atomic_queue -Rj4 T=1 TOOLSET=gcc-14 run_benchmarks_n N=2
 #   taskset -c 0,2,4,6 time make -C ~/src/atomic_queue -Rj4 T=1 TOOLSET=gcc-14 run_benchmarks_n N=2
 #   taskset -c $(seq -s, 0 2 15) time make -C ~/src/atomic_queue -Rj8 T=1 TOOLSET=gcc-14 run_benchmarks_n N=33 TAG=cross-core
@@ -30,22 +30,55 @@
 ################################################################################################################################
 # The defaults.
 
-export T := 0
-build_root.0 := build
-build_root.1 := /tmp/build
-build_root.2 := /tmp/build2
-export BUILD_ROOT := $(or ${BUILD_ROOT},${build_root.${T}})
+# Easy BUILD_ROOT selection by setting T variable.
+T := 0
+build_root.0 := build   # T=0 builds into build sub-directory.
+build_root.1 := /tmp/b1 # T=1 builds into /tmp/b1.
+build_root.2 := /tmp/b2 # T=2 builds into /tmp/b2.
 
-export BUILD := release
-export TOOLSET := gcc
-export ASM := 0
-export N := 1
-export TAG := results
+# Tedious BUILD_ROOT selection by setting BUILD_ROOT variable.
+BUILD_ROOT := $(strip $(or ${build_root.${T}},$(error build_root.${T} is undefined.)))
 
-export CPPFLAGS
-export CXXFLAGS
-export LDLIBS
-export LDFLAGS
+BUILD := release
+TOOLSET := gcc
+ASM := 0
+
+################################################################################################################################
+# Name of the benchmarks experiment and the number of iterations.
+TAG := results
+N := 1
+
+################################################################################################################################
+# Enables GNU Make to enable the jobserver protocol for the toolset programs to request allocating more threads.
+JOBSERVER := 1
+J.0 :=
+J.1 := +
+J := ${J.${JOBSERVER}}
+
+################################################################################################################################
+
+override undefine has_system_config
+
+ifneq (,$(findstring clean,${MAKECMDGOALS}))
+override cleaning := 1
+override undefine not_cleaning
+else
+override undefine cleaning
+override not_cleaning := 1
+include ${BUILD_ROOT}/system_config.mk
+endif
+
+################################################################################################################################
+
+colors := $(shell echo "\033[97m \033[0m")
+c7 := $(word 1,${colors})
+c0 := $(word 2,${colors})
+
+log_src := $(firstword ${MAKEFILE_LIST})
+log = $(info ${log_src}: ${c7}${1}${c0})
+log_kv = $(let head tail,${1},$(call log,$(head)=$(value $(head)))$(and $(tail),$(call log_kv,$(tail))))
+
+n_cpus := $(or $(subst -j,,$(filter -j%,${MAKEFLAGS})),1)
 
 ################################################################################################################################
 # Boiler-plate begin.
@@ -73,8 +106,8 @@ mutli_toolset := $(intcmp $(words ${toolsets}),2,,1)
 all :
 .SECONDEXPANSION :
 
+################################################################################################################################
 ifeq (,${mutli_toolset}) # Build with a single toolset.
-
 build_dir := ${BUILD_ROOT}/${BUILD}/${TOOLSET}
 
 cxx.gcc := g++
@@ -111,7 +144,7 @@ cxxflags.gcc := -march=native -f{no-plt,no-math-errno,finite-math-only,message-l
 ldflags.gcc.sanitize := ${ldflags.gcc.debug} -fsanitize=thread
 ldflags.gcc.sanitize2 := ${ldflags.gcc.debug} -fsanitize=undefined,address
 # ldflags.gcc := -fuse-ld=${use-ld.gcc} -Wl,--compress-debug-sections=zstd,-O2,--gc-sections ${ldflags.gcc.${BUILD}}
-ldflags.gcc := -fuse-ld=gold ${ldflags.gcc.${BUILD}}
+ldflags.gcc := -g ${use_ld} ${ldflags.gcc.${BUILD}}
 
 # clang-14 for arm doesn't support -march=native.
 has_native := $(if $(and $(findstring clang,${CXX}), $(findstring aarch64,$(shell uname -m)), $(shell ${CXX} -march=native -c -xc++ -o/dev/null /dev/null 2>&1)),,1)
@@ -123,12 +156,12 @@ cxxflags.clang := -stdlib=libstdc++ -f{no-plt,no-math-errno,finite-math-only,mes
 ldflags.clang.debug := -latomic # A work-around for clang bug.
 ldflags.clang.sanitize := ${ldflags.clang.debug} -fsanitize=thread
 ldflags.clang.sanitize2 := ${ldflags.clang.debug} -fsanitize=undefined,address
-ldflags.clang := -stdlib=libstdc++ ${ldflags.clang.${BUILD}}
+ldflags.clang := -g ${use_ld} -stdlib=libstdc++ ${ldflags.clang.${BUILD}}
 
 # Additional CPPFLAGS, CXXFLAGS, LDLIBS, LDFLAGS can come from the command line, e.g. make CPPFLAGS='-I<my-include-dir>', or from environment variables.
 cxxflags := -std=c++14 -pthread -g $(call toolset_flags,cxxflags) ${cxxflags.${uname_m}} ${CXXFLAGS}
 cppflags := -Iinclude ${CPPFLAGS}
-ldflags := -pthread -g $(call toolset_flags,ldflags) ${LDFLAGS}
+ldflags := -pthread $(call toolset_flags,ldflags) -Wl,-z,norelro,-z,now,-z,max-page-size=0x200000,-z,common-page-size=0x200000,-z,separate-code,--build-id=none ${LDFLAGS}
 ldlibs := -lrt ${LDLIBS}
 
 cppflags.tbb :=
@@ -179,7 +212,6 @@ ${build_dir}/benchmarks : ldlibs += ${ldlibs.tbb} ${ldlibs.moodycamel} ${ldlibs.
 # Boiler-plate begin.
 
 all : ${exes}
-	@:
 
 auto_generated_header_d :=
 
@@ -192,18 +224,19 @@ ${exes} : % : ${build_dir}/%
 .PHONY : ${exes}
 # for t in gcc gcc clang clang; do make -C ~/src/atomic_queue -rj$(($(nproc)/2)) BUILD=debug TOOLSET=$t; done
 
+
 ${exes:%=${build_dir}/%} : ${build_dir}/% : ${relink} | $$(dir $$@)
-	$(call strip2,${LINK.EXE})
+	${J}$(call strip2,${LINK.EXE})
 
 ${build_dir}/%.so : cxxflags += -fPIC
 ${build_dir}/%.so : ${relink} | $$(dir $$@)
-	$(call strip2,${LINK.SO})
+	${J}$(call strip2,${LINK.SO})
 
 ${build_dir}/%.a : ${relink} | $$(dir $$@)
-	$(call strip2,${LINK.A})
+	${J}$(call strip2,${LINK.A})
 
 ${build_dir}/%.o : src/%.cc ${recompile} | $$(dir $$@)
-	$(call strip2,${COMPILE.CXX})
+	${J}$(call strip2,${COMPILE.CXX})
 
 ################################################################################################################################
 # Compiler and linker options tracking.
@@ -267,16 +300,19 @@ env2 : env
 
 .PHONY : update_env_txt env versions run_benchmarks clean all compile_commands compile_commands.json TAGS run_tests run_benchmarks_n run_benchmarks_perf env2
 
+ifeq (,$(findstring clean,${MAKECMDGOALS})) # Not cleanining.
+-include $(sort ${auto_generated_header_d}) # Remove duplicates and include.
+endif # Not cleanining.
+
 endif # Build with a single toolset.
 
 ################################################################################################################################
 
 ifeq (,$(findstring clean,${MAKECMDGOALS})) # Not cleanining.
-include ${BUILD_ROOT}/chrt.mk
-${BUILD_ROOT}/chrt.mk : | $$(dir $$@)
-	{ echo "chrt_fifo := $$(chrt -f 50 printf 'chrt' || printf 'sudo chrt') -f 50"; echo "uname_m := $$(uname -m)"; } > $@
 
--include $(sort ${auto_generated_header_d}) # Remove duplicates and include.
+${BUILD_ROOT}/system_config.mk : scripts/util.sh | $$(dir $$@)
+	source $< && create_system_config_mk > $@
+
 endif # Not cleanining.
 
 ################################################################################################################################
@@ -292,38 +328,58 @@ env :
 	uname --all
 	env | sort --ignore-case
 
-src/%.cc :;
-%.d :;
-Makefile :;
-
 # Prerequisites of .PHONY are always interpreted as literal target names, never as patterns (even if they contain ‘%’ characters). To always rebuild a pattern rule consider using a "force target".
 # If a rule has no prerequisites or recipe, and the target of the rule is a nonexistent file, then make imagines this target to have been updated whenever its rule is run. This implies that all targets depending on this one will always have their recipe run.
 force :
 
+# Tell make to never consider updating any of these:
+Makefile :;
+scripts/% :;
+include/% :;
+src/% :;
+%.d :;
+
+.SUFFIXES : # Disable the built-in GNU Make rules. make -R is still more efficient.
 .DELETE_ON_ERROR :
 .SECONDARY :
-.SUFFIXES :
+
+################################################################################################################################
+ifdef has_system_config
+
+targets := $(or ${MAKECMDGOALS},${.DEFAULT_GOAL})
+
+timestamp_usec = $(shell printf "%.0f" $${EPOCHREALTIME}e+6)
+t0 := ${timestamp_usec}
+
+all :
+	@printf "${log_src}: ${c7}%s made targets '%s' in %'.3f seconds.${c0}\n" "${TOOLSET}" "${targets}" "$$((${timestamp_usec} - ${t0}))"e-6
 
 ################################################################################################################################
 ifneq (,${mutli_toolset}) # Parallelize building with multiple toolsets.
 
-n_jobs := $(or $(subst -j,,$(filter -j%,${MAKEFLAGS})),1)
-# $(info n_jobs=${n_jobs})
-
-targets := $(or ${MAKECMDGOALS},all)
-log_src := $(firstword ${MAKEFILE_LIST})
-$(info ${log_src}: Build targets "${targets}" with toolsets "${toolsets}" in parallel using ${n_jobs} CPUs.)
-
-timestamp_usec = $(shell printf "%.0f" $${EPOCHREALTIME}e+6)
-export t0 := ${timestamp_usec}
+$(call log,Build targets "${targets}" with toolsets "${toolsets}" in parallel using up to ${n_cpus} CPUs.)
+$(intcmp ${MAKELEVEL},1,$(call log_kv,BUILD_ROOT))
 
 with-toolset-% :
-	${MAKE} -R --no-print-directory --output-sync TOOLSET=$* ${MAKECMDGOALS}
+	${MAKE} -R --no-print-directory --output-sync TOOLSET=$* with_toolset_sub_make=1 ${MAKECMDGOALS}
 
+# The last-resort rule. Must be the last in the Makefile.
 % : ${toolsets:%=with-toolset-%}
-	@printf "${log_src}: made targets '%s' with '%s', took %'.3f seconds.\n" "${targets}" "${toolsets}" "$$((${timestamp_usec} - ${t0}))"e-6
+	@printf "${log_src}: ${c7}%s made targets '%s' in %'.3f seconds.${c0}\n" "${TOOLSET}" "${targets}" "$$((${timestamp_usec} - ${t0}))"e-6
+
+################################################################################################################################
+else # Parallelize building with multiple toolsets.
+
+ifndef with_toolset_sub_make
+$(call log,Build targets "${targets}" with ${TOOLSET} using up to ${n_cpus} CPUs.)
+$(intcmp ${MAKELEVEL},1,$(call log_kv,BUILD_ROOT))
+endif
 
 endif # Parallelize building with multiple toolsets.
+################################################################################################################################
+
+endif # has_system_config
+################################################################################################################################
 
 # Local Variables:
 # compile-command: "/bin/time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) BUILD=debug run_tests"
