@@ -43,6 +43,20 @@ using namespace ::atomic_queue;
 
 namespace {
 
+struct BenchmarkOptions : EnvBits64 {
+    ATOMIC_QUEUE_INLINE constexpr auto       minimal() const noexcept { return bits & 1; };
+
+    ATOMIC_QUEUE_INLINE constexpr auto  no_ping_pong() const noexcept { return bits & 2; };
+    ATOMIC_QUEUE_INLINE constexpr auto no_throughput() const noexcept { return bits & 4; };
+
+    ATOMIC_QUEUE_INLINE constexpr auto no_variant_a() const noexcept { return bits & 8; };
+    ATOMIC_QUEUE_INLINE constexpr auto no_variant_b() const noexcept { return bits & 16; };
+    ATOMIC_QUEUE_INLINE constexpr auto no_variant_1() const noexcept { return bits & 32; };
+    ATOMIC_QUEUE_INLINE constexpr auto no_variant_2() const noexcept { return bits & 64; };
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 template<class T>
 using Type = std::common_type<T>; // Similar to boost::type<>.
 
@@ -327,68 +341,79 @@ void run_throughput_spsc_benchmark(char const* name, HugePages& hp, std::vector<
     run_throughput_benchmark<Queue>(name, hp, hw_thread_ids, N_TROUGHPUT_MESSAGES, 1, 1); // Special case for 1 producer and 1 consumer.
 }
 
-void run_throughput_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const& cpu_topology) {
+void run_throughput_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const& cpu_topology, BenchmarkOptions options) {
     auto hw_thread_ids = hw_thread_id(cpu_topology); // Sorted by hw_thread_id: avoid HT, same socket.
     std::printf("---- Running throughput benchmarks with up to %zu CPUs (higher is better) ----\n", hw_thread_ids.size() & -2);
 
     int constexpr SIZE = 65536;
 
-    run_throughput_spsc_benchmark("boost::lockfree::spsc_queue", hp, hw_thread_ids,
-                                  Type<BoostSpScAdapter<boost::lockfree::spsc_queue<unsigned, boost::lockfree::capacity<SIZE>>>>{});
-    run_throughput_mpmc_benchmark("boost::lockfree::queue", hp, hw_thread_ids,
-                                  Type<BoostQueueAdapter<boost::lockfree::queue<unsigned, BoostAllocator, boost::lockfree::capacity<SIZE - 2>>>>{});
+    if(ATOMIC_QUEUE_LIKELY(!options.minimal())) {
+        run_throughput_spsc_benchmark("boost::lockfree::spsc_queue", hp, hw_thread_ids,
+                                      Type<BoostSpScAdapter<boost::lockfree::spsc_queue<unsigned, boost::lockfree::capacity<SIZE>>>>{});
+        run_throughput_mpmc_benchmark("boost::lockfree::queue", hp, hw_thread_ids,
+                                      Type<BoostQueueAdapter<boost::lockfree::queue<unsigned, BoostAllocator, boost::lockfree::capacity<SIZE - 2>>>>{});
 
-    run_throughput_mpmc_benchmark("TicketSpinlock", hp, hw_thread_ids, Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, TicketSpinlock>>>{});
-    // run_throughput_mpmc_benchmark("UnfairSpinlock", hp, hw_thread_ids, Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, UnfairSpinlock>>>{});
+        run_throughput_mpmc_benchmark("TicketSpinlock", hp, hw_thread_ids, Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, TicketSpinlock>>>{});
+        // run_throughput_mpmc_benchmark("UnfairSpinlock", hp, hw_thread_ids, Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, UnfairSpinlock>>>{});
+        // run_throughput_mpmc_benchmark<RetryDecorator<AtomicQueueSpinlockHle<unsigned, SIZE>>>("SpinlockHle");
 
-    run_throughput_spsc_benchmark("moodycamel::ReaderWriterQueue", hp, hw_thread_ids, Type<MoodyCamelReaderWriterQueue<unsigned, SIZE>>{});
-    run_throughput_mpmc_benchmark("moodycamel::ConcurrentQueue", hp, hw_thread_ids, Type<MoodyCamelQueue<unsigned, SIZE>>{});
+        run_throughput_spsc_benchmark("moodycamel::ReaderWriterQueue", hp, hw_thread_ids, Type<MoodyCamelReaderWriterQueue<unsigned, SIZE>>{});
+        run_throughput_mpmc_benchmark("moodycamel::ConcurrentQueue", hp, hw_thread_ids, Type<MoodyCamelQueue<unsigned, SIZE>>{});
 
-    run_throughput_mpmc_benchmark("pthread_spinlock", hp, hw_thread_ids, Type<RetryDecorator<AtomicQueueSpinlock<unsigned, SIZE>>>{});
-    run_throughput_mpmc_benchmark("std::mutex", hp, hw_thread_ids, Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, std::mutex>>>{});
-    run_throughput_mpmc_benchmark("tbb::spin_mutex", hp, hw_thread_ids, Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, tbb::spin_mutex>>>{});
-    // run_throughput_mpmc_benchmark("adaptive_mutex", hp, hw_thread_ids, Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, AdaptiveMutex>>>{});
-    // run_throughput_mpmc_benchmark("tbb::speculative_spin_mutex", hp, hw_thread_ids,
-    //                               Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, tbb::speculative_spin_mutex>>>{});
-    run_throughput_mpmc_benchmark("tbb::concurrent_bounded_queue", hp, hw_thread_ids, Type<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, SIZE>>{});
+        run_throughput_mpmc_benchmark("pthread_spinlock", hp, hw_thread_ids, Type<RetryDecorator<AtomicQueueSpinlock<unsigned, SIZE>>>{});
+        run_throughput_mpmc_benchmark("std::mutex", hp, hw_thread_ids, Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, std::mutex>>>{});
+        run_throughput_mpmc_benchmark("tbb::spin_mutex", hp, hw_thread_ids, Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, tbb::spin_mutex>>>{});
+        // run_throughput_mpmc_benchmark("adaptive_mutex", hp, hw_thread_ids, Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, AdaptiveMutex>>>{});
+        // run_throughput_mpmc_benchmark("tbb::speculative_spin_mutex", hp, hw_thread_ids,
+        //                               Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, tbb::speculative_spin_mutex>>>{});
+        run_throughput_mpmc_benchmark("tbb::concurrent_bounded_queue", hp, hw_thread_ids, Type<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, SIZE>>{});
 
-    run_throughput_mpmc_benchmark("xenium::michael_scott_queue", hp, hw_thread_ids,
-        Type<XeniumQueueAdapter<xenium::michael_scott_queue<unsigned, xenium::policy::reclaimer<Reclaimer>>>>{});
-    run_throughput_mpmc_benchmark("xenium::ramalhete_queue", hp, hw_thread_ids,
-        Type<XeniumQueueAdapter<xenium::ramalhete_queue<unsigned, xenium::policy::reclaimer<Reclaimer>>>>{});
-    run_throughput_mpmc_benchmark("xenium::vyukov_bounded_queue", hp, hw_thread_ids,
-        Type<RetryDecorator<CapacityArgAdaptor<xenium::vyukov_bounded_queue<unsigned>, SIZE>>>{});
+        run_throughput_mpmc_benchmark("xenium::michael_scott_queue", hp, hw_thread_ids,
+            Type<XeniumQueueAdapter<xenium::michael_scott_queue<unsigned, xenium::policy::reclaimer<Reclaimer>>>>{});
+        run_throughput_mpmc_benchmark("xenium::ramalhete_queue", hp, hw_thread_ids,
+            Type<XeniumQueueAdapter<xenium::ramalhete_queue<unsigned, xenium::policy::reclaimer<Reclaimer>>>>{});
+        run_throughput_mpmc_benchmark("xenium::vyukov_bounded_queue", hp, hw_thread_ids,
+            Type<RetryDecorator<CapacityArgAdaptor<xenium::vyukov_bounded_queue<unsigned>, SIZE>>>{});
+    }
 
     using SPSC = QueueTypes<SIZE, true, false, false>;
     using MPMC = QueueTypes<SIZE, false, true, true>; // Enable MAXIMIZE_THROUGHPUT for 2 or more producers/consumers.
 
-    run_throughput_spsc_benchmark("AtomicQueue", hp, hw_thread_ids, SPSC::AtomicQueue{});
-    run_throughput_mpmc_benchmark("AtomicQueue", hp, hw_thread_ids, MPMC::AtomicQueue{}, 2);
+    if(ATOMIC_QUEUE_LIKELY(!options.no_variant_1())) {
+        if(ATOMIC_QUEUE_LIKELY(!options.no_variant_a())) {
+            run_throughput_spsc_benchmark("AtomicQueue", hp, hw_thread_ids, SPSC::AtomicQueue{});
+            run_throughput_mpmc_benchmark("AtomicQueue", hp, hw_thread_ids, MPMC::AtomicQueue{}, 2);
+            run_throughput_spsc_benchmark("OptimistAtomicQueue", hp, hw_thread_ids, SPSC::OptimistAtomicQueue{});
+            run_throughput_mpmc_benchmark("OptimistAtomicQueue", hp, hw_thread_ids, MPMC::OptimistAtomicQueue{}, 2);
+        }
 
-    run_throughput_spsc_benchmark("AtomicQueueB", hp, hw_thread_ids, SPSC::AtomicQueueB{});
-    run_throughput_mpmc_benchmark("AtomicQueueB", hp, hw_thread_ids, MPMC::AtomicQueueB{}, 2);
+        if(ATOMIC_QUEUE_LIKELY(!options.no_variant_b())) {
+            run_throughput_spsc_benchmark("AtomicQueueB", hp, hw_thread_ids, SPSC::AtomicQueueB{});
+            run_throughput_mpmc_benchmark("AtomicQueueB", hp, hw_thread_ids, MPMC::AtomicQueueB{}, 2);
+            run_throughput_spsc_benchmark("OptimistAtomicQueueB", hp, hw_thread_ids, SPSC::OptimistAtomicQueueB{});
+            run_throughput_mpmc_benchmark("OptimistAtomicQueueB", hp, hw_thread_ids, MPMC::OptimistAtomicQueueB{}, 2);
+        }
+    }
 
-    run_throughput_spsc_benchmark("OptimistAtomicQueue", hp, hw_thread_ids, SPSC::OptimistAtomicQueue{});
-    run_throughput_mpmc_benchmark("OptimistAtomicQueue", hp, hw_thread_ids, MPMC::OptimistAtomicQueue{}, 2);
+    if(ATOMIC_QUEUE_LIKELY(!options.no_variant_2())) {
+        if(ATOMIC_QUEUE_LIKELY(!options.no_variant_a())) {
+            run_throughput_spsc_benchmark("AtomicQueue2", hp, hw_thread_ids, SPSC::AtomicQueue2{});
+            run_throughput_mpmc_benchmark("AtomicQueue2", hp, hw_thread_ids, MPMC::AtomicQueue2{}, 2);
 
-    run_throughput_spsc_benchmark("OptimistAtomicQueueB", hp, hw_thread_ids, SPSC::OptimistAtomicQueueB{});
-    run_throughput_mpmc_benchmark("OptimistAtomicQueueB", hp, hw_thread_ids, MPMC::OptimistAtomicQueueB{}, 2);
+            run_throughput_spsc_benchmark("OptimistAtomicQueue2", hp, hw_thread_ids, SPSC::OptimistAtomicQueue2{});
+            run_throughput_mpmc_benchmark("OptimistAtomicQueue2", hp, hw_thread_ids, MPMC::OptimistAtomicQueue2{}, 2);
+        }
 
-    run_throughput_spsc_benchmark("AtomicQueue2", hp, hw_thread_ids, SPSC::AtomicQueue2{});
-    run_throughput_mpmc_benchmark("AtomicQueue2", hp, hw_thread_ids, MPMC::AtomicQueue2{}, 2);
+        if(ATOMIC_QUEUE_LIKELY(!options.no_variant_b())) {
+            run_throughput_spsc_benchmark("AtomicQueueB2", hp, hw_thread_ids, SPSC::AtomicQueueB2{});
+            run_throughput_mpmc_benchmark("AtomicQueueB2", hp, hw_thread_ids, MPMC::AtomicQueueB2{}, 2);
 
-    run_throughput_spsc_benchmark("AtomicQueueB2", hp, hw_thread_ids, SPSC::AtomicQueueB2{});
-    run_throughput_mpmc_benchmark("AtomicQueueB2", hp, hw_thread_ids, MPMC::AtomicQueueB2{}, 2);
+            run_throughput_spsc_benchmark("OptimistAtomicQueueB2", hp, hw_thread_ids, SPSC::OptimistAtomicQueueB2{});
+            run_throughput_mpmc_benchmark("OptimistAtomicQueueB2", hp, hw_thread_ids, MPMC::OptimistAtomicQueueB2{}, 2);
+        }
+    }
 
-    run_throughput_spsc_benchmark("OptimistAtomicQueue2", hp, hw_thread_ids, SPSC::OptimistAtomicQueue2{});
-    run_throughput_mpmc_benchmark("OptimistAtomicQueue2", hp, hw_thread_ids, MPMC::OptimistAtomicQueue2{}, 2);
-
-    run_throughput_spsc_benchmark("OptimistAtomicQueueB2", hp, hw_thread_ids, SPSC::OptimistAtomicQueueB2{});
-    run_throughput_mpmc_benchmark("OptimistAtomicQueueB2", hp, hw_thread_ids, MPMC::OptimistAtomicQueueB2{}, 2);
-
-    // run_throughput_mpmc_benchmark<RetryDecorator<AtomicQueueSpinlockHle<unsigned, SIZE>>>("SpinlockHle");
-
-    std::printf("\n");
+    std::puts("\n");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -478,9 +503,8 @@ void run_ping_pong_benchmark(char const* name, HugePages& hp, std::vector<unsign
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void run_ping_pong_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const& cpu_topology) {
+void run_ping_pong_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const& cpu_topology, BenchmarkOptions options) {
     auto hw_thread_ids = hw_thread_id(cpu_topology); // Sorted by hw_thread_id: avoid HT, same socket.
-
     std::printf("---- Running ping-pong benchmarks with 2 CPUs (lower is better) ----\n");
 
     // This benchmark doesn't require queue capacity greater than 1, however, capacity of 1 elides
@@ -488,43 +512,59 @@ void run_ping_pong_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const&
     // preclude aggressive optimizations.
     constexpr unsigned SIZE = 8;
 
-    run_ping_pong_benchmark<BoostSpScAdapter<boost::lockfree::spsc_queue<unsigned, boost::lockfree::capacity<SIZE>>>>("boost::lockfree::spsc_queue", hp,
-                                                                                                                      hw_thread_ids);
-    run_ping_pong_benchmark<BoostQueueAdapter<boost::lockfree::queue<unsigned, BoostAllocator, boost::lockfree::capacity<SIZE>>>>("boost::lockfree::queue", hp,
-                                                                                                                                  hw_thread_ids);
+    if(ATOMIC_QUEUE_LIKELY(!options.minimal())) {
+        run_ping_pong_benchmark<BoostSpScAdapter<boost::lockfree::spsc_queue<unsigned, boost::lockfree::capacity<SIZE>>>>("boost::lockfree::spsc_queue", hp,
+                                                                                                                          hw_thread_ids);
+        run_ping_pong_benchmark<BoostQueueAdapter<boost::lockfree::queue<unsigned, BoostAllocator, boost::lockfree::capacity<SIZE>>>>("boost::lockfree::queue", hp,
+                                                                                                                                      hw_thread_ids);
 
-    run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, TicketSpinlock>>>("TicketSpinlock", hp, hw_thread_ids);
-    // run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, UnfairSpinlock>>>("UnfairSpinlock", hp, hw_thread_ids);
+        run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, TicketSpinlock>>>("TicketSpinlock", hp, hw_thread_ids);
+        // run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, UnfairSpinlock>>>("UnfairSpinlock", hp, hw_thread_ids);
+        // run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinlockHle<unsigned, SIZE>>>("SpinlockHle");
 
-    run_ping_pong_benchmark<MoodyCamelReaderWriterQueue<unsigned, SIZE>>("moodycamel::ReaderWriterQueue", hp, hw_thread_ids);
-    run_ping_pong_benchmark<MoodyCamelQueue<unsigned, SIZE>>("moodycamel::ConcurrentQueue", hp, hw_thread_ids);
+        run_ping_pong_benchmark<MoodyCamelReaderWriterQueue<unsigned, SIZE>>("moodycamel::ReaderWriterQueue", hp, hw_thread_ids);
+        run_ping_pong_benchmark<MoodyCamelQueue<unsigned, SIZE>>("moodycamel::ConcurrentQueue", hp, hw_thread_ids);
 
-    run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinlock<unsigned, SIZE>>>("pthread_spinlock", hp, hw_thread_ids);
-    run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, std::mutex>>>("std::mutex", hp, hw_thread_ids);
-    run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, tbb::spin_mutex>>>("tbb::spin_mutex", hp, hw_thread_ids);
-    // run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, AdaptiveMutex>>>("adaptive_mutex", hp, hw_thread_ids);
-    // run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, tbb::speculative_spin_mutex>>>("tbb::speculative_spin_mutex", hp, hw_thread_ids);
-    run_ping_pong_benchmark<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, SIZE>>("tbb::concurrent_bounded_queue", hp, hw_thread_ids);
+        run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinlock<unsigned, SIZE>>>("pthread_spinlock", hp, hw_thread_ids);
+        run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, std::mutex>>>("std::mutex", hp, hw_thread_ids);
+        run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, tbb::spin_mutex>>>("tbb::spin_mutex", hp, hw_thread_ids);
+        // run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, AdaptiveMutex>>>("adaptive_mutex", hp, hw_thread_ids);
+        // run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, tbb::speculative_spin_mutex>>>("tbb::speculative_spin_mutex", hp, hw_thread_ids);
+        run_ping_pong_benchmark<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, SIZE>>("tbb::concurrent_bounded_queue", hp, hw_thread_ids);
 
-    run_ping_pong_benchmark<XeniumQueueAdapter<xenium::michael_scott_queue<unsigned, xenium::policy::reclaimer<Reclaimer>>>>("xenium::michael_scott_queue", hp, hw_thread_ids);
-    run_ping_pong_benchmark<XeniumQueueAdapter<xenium::ramalhete_queue<unsigned, xenium::policy::reclaimer<Reclaimer>>>>("xenium::ramalhete_queue", hp, hw_thread_ids);
-    run_ping_pong_benchmark<RetryDecorator<CapacityArgAdaptor<xenium::vyukov_bounded_queue<unsigned>, SIZE>>>("xenium::vyukov_bounded_queue", hp, hw_thread_ids);
+        run_ping_pong_benchmark<XeniumQueueAdapter<xenium::michael_scott_queue<unsigned, xenium::policy::reclaimer<Reclaimer>>>>("xenium::michael_scott_queue", hp, hw_thread_ids);
+        run_ping_pong_benchmark<XeniumQueueAdapter<xenium::ramalhete_queue<unsigned, xenium::policy::reclaimer<Reclaimer>>>>("xenium::ramalhete_queue", hp, hw_thread_ids);
+        run_ping_pong_benchmark<RetryDecorator<CapacityArgAdaptor<xenium::vyukov_bounded_queue<unsigned>, SIZE>>>("xenium::vyukov_bounded_queue", hp, hw_thread_ids);
+    }
 
     // Use MAXIMIZE_THROUGHPUT=false for better latency.
     using SPSC = QueueTypes<SIZE, true, false, false>;
 
-    run_ping_pong_benchmark<SPSC::AtomicQueue::type>("AtomicQueue", hp, hw_thread_ids);
-    run_ping_pong_benchmark<SPSC::AtomicQueueB::type>("AtomicQueueB", hp, hw_thread_ids);
-    run_ping_pong_benchmark<SPSC::OptimistAtomicQueue::type>("OptimistAtomicQueue", hp, hw_thread_ids);
-    run_ping_pong_benchmark<SPSC::OptimistAtomicQueueB::type>("OptimistAtomicQueueB", hp, hw_thread_ids);
-    run_ping_pong_benchmark<SPSC::AtomicQueue2::type>("AtomicQueue2", hp, hw_thread_ids);
-    run_ping_pong_benchmark<SPSC::AtomicQueueB2::type>("AtomicQueueB2", hp, hw_thread_ids);
-    run_ping_pong_benchmark<SPSC::OptimistAtomicQueue2::type>("OptimistAtomicQueue2", hp, hw_thread_ids);
-    run_ping_pong_benchmark<SPSC::OptimistAtomicQueueB2::type>("OptimistAtomicQueueB2", hp, hw_thread_ids);
+    if(ATOMIC_QUEUE_LIKELY(!options.no_variant_1())) {
+        if(ATOMIC_QUEUE_LIKELY(!options.no_variant_a())) {
+            run_ping_pong_benchmark<SPSC::AtomicQueue::type>("AtomicQueue", hp, hw_thread_ids);
+            run_ping_pong_benchmark<SPSC::OptimistAtomicQueue::type>("OptimistAtomicQueue", hp, hw_thread_ids);
+        }
 
-    // run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinlockHle<unsigned, SIZE>>>("SpinlockHle");
+        if(ATOMIC_QUEUE_LIKELY(!options.no_variant_b())) {
+            run_ping_pong_benchmark<SPSC::AtomicQueueB::type>("AtomicQueueB", hp, hw_thread_ids);
+            run_ping_pong_benchmark<SPSC::OptimistAtomicQueueB::type>("OptimistAtomicQueueB", hp, hw_thread_ids);
+        }
+    }
 
-    std::printf("\n");
+    if(ATOMIC_QUEUE_LIKELY(!options.no_variant_2())) {
+        if(ATOMIC_QUEUE_LIKELY(!options.no_variant_a())) {
+            run_ping_pong_benchmark<SPSC::AtomicQueue2::type>("AtomicQueue2", hp, hw_thread_ids);
+            run_ping_pong_benchmark<SPSC::OptimistAtomicQueue2::type>("OptimistAtomicQueue2", hp, hw_thread_ids);
+        }
+
+        if(ATOMIC_QUEUE_LIKELY(!options.no_variant_b())) {
+            run_ping_pong_benchmark<SPSC::AtomicQueueB2::type>("AtomicQueueB2", hp, hw_thread_ids);
+            run_ping_pong_benchmark<SPSC::OptimistAtomicQueueB2::type>("OptimistAtomicQueueB2", hp, hw_thread_ids);
+        }
+    }
+
+    std::puts("\n");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -544,11 +584,13 @@ void advise_hugeadm_2MB() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int main() {
+    BenchmarkOptions const options{"AQB"};
+
     std::setlocale(LC_NUMERIC, ""); // Enable thousand separator, if set in user's locale.
 
     TSC_TO_SECONDS = 1e-9 / cpu_base_frequency();
 
-    auto cpu_topology = get_available_cpu_topology_info();
+    auto const cpu_topology = get_available_cpu_topology_info();
     log_cpus(cpu_topology);
     if(cpu_topology.size() < 2)
         throw std::runtime_error("A CPU with at least 2 hardware threads is required.");
@@ -559,8 +601,10 @@ int main() {
     HugePages hp(HugePages::PAGE_1GB, 32 * MB); // Try allocating a 1GB huge page to minimize TLB misses.
     HugePageAllocatorBase::hp = &hp;
 
-    run_throughput_benchmarks(hp, cpu_topology);
-    run_ping_pong_benchmarks(hp, cpu_topology);
+    if(!options.no_throughput())
+        run_throughput_benchmarks(hp, cpu_topology, options);
+    if(!options.no_ping_pong())
+        run_ping_pong_benchmarks(hp, cpu_topology, options);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

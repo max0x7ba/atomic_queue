@@ -4,10 +4,13 @@
 
 #include "cpu_base_frequency.h"
 
+#include <stdexcept>
 #include <fstream>
 #include <tuple>
 #include <regex>
 #include <cstdio>
+#include <cstdlib>
+#include <climits>
 #include <string>
 #include <thread>
 #include <system_error>
@@ -208,6 +211,24 @@ int pthread_create(pthread_t* newthread,
         ::pthread_attr_destroy(&attr2);
 
     return r;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+EnvBits64::EnvBits64(char const* env_name)
+    : bits{}
+{
+    if(char const* value_beg = std::getenv(env_name)) {
+        // strtoull auto-detects base-8, base-10, base-16 from the prefix. But not base-2.
+        // Enable parsing base-2 values with 0b prefix.
+        int const base2 = 2 * (value_beg[0] == '0' && value_beg[1] == 'b');
+        value_beg += base2;
+
+        char* value_end = 0;
+        bits = std::strtoull(value_beg, &value_end, base2);
+        if(!value_end || *value_end || (ULLONG_MAX == bits && ERANGE == errno))
+            throw std::out_of_range(value_beg);
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
