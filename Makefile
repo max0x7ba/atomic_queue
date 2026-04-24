@@ -7,6 +7,7 @@
 #   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 BUILD=debug run_tests
 #   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=clang-20 BUILD=debug run_tests
 #   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 run_benchmarks_n
+#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 throughput_asm
 #   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=clang-20 run_benchmarks_n
 #   taskset -c 0,1,2,3 time make -C ~/src/atomic_queue -Rj4 T=1 TOOLSET=gcc-14 run_benchmarks_n N=2
 #   taskset -c 0,2,4,6 time make -C ~/src/atomic_queue -Rj4 T=1 TOOLSET=gcc-14 run_benchmarks_n N=2
@@ -238,6 +239,8 @@ ${build_dir}/%.a : ${relink} | $$(dir $$@)
 ${build_dir}/%.o : src/%.cc ${recompile} | $$(dir $$@)
 	${J}$(call strip2,${COMPILE.CXX})
 
+
+
 ################################################################################################################################
 # Compiler and linker options tracking.
 
@@ -298,11 +301,15 @@ ${build_dir}/ : | ${build_dir}/.make/ ;
 
 env2 : env
 
-.PHONY : update_env_txt env versions run_benchmarks clean all compile_commands compile_commands.json TAGS run_tests run_benchmarks_n run_benchmarks_perf env2
-
 ifeq (,$(findstring clean,${MAKECMDGOALS})) # Not cleanining.
+
+throughput_asm : ${build_dir}/benchmarks scripts/util.sh
+	source scripts/util.sh && disassemble-symbol "throughput_(consumer|producer)<atomic_queue::AtomicQueue2" ${build_dir}/benchmarks.o
+
 -include $(sort ${auto_generated_header_d}) # Remove duplicates and include.
 endif # Not cleanining.
+
+.PHONY : update_env_txt env versions run_benchmarks clean all compile_commands compile_commands.json TAGS run_tests run_benchmarks_n run_benchmarks_perf env2 throughput_asm
 
 endif # Build with a single toolset.
 

@@ -13,19 +13,31 @@ namespace atomic_queue {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 class Barrier {
-    std::atomic<unsigned> counter_ = {};
+    std::atomic<int> counter_ = {};
 
 public:
-    void wait() noexcept {
-        counter_.fetch_add(1, std::memory_order_acquire);
-        while(counter_.load(std::memory_order_relaxed))
+    ATOMIC_QUEUE_INLINE void wait() noexcept {
+        counter_.fetch_add(1, X);
+        while(counter_.load(A))
             spin_loop_pause();
     }
 
-    void release(unsigned expected_counter) noexcept {
-        while(expected_counter != counter_.load(std::memory_order_relaxed))
+    ATOMIC_QUEUE_INLINE void release(int expected_counter) noexcept {
+        while(expected_counter != counter_.load(X))
             spin_loop_pause();
-        counter_.store(0, std::memory_order_release);
+        counter_.store(0, R);
+    }
+
+    ATOMIC_QUEUE_INLINE void wait_or_release(int release_counter) noexcept {
+#if ATOMIC_QUEUE_FULL_THROTTLE
+        asm("":"+r"(release_counter)); // Disable constant propagation for release_counter.
+#endif
+        int c = (counter_.fetch_add(1, A) + 1) - release_counter;
+        if(ATOMIC_QUEUE_LIKELY(c < 0))
+            while(counter_.load(A))
+                spin_loop_pause();
+        else
+            counter_.store(c, R);
     }
 };
 

@@ -191,8 +191,8 @@ struct QueueTypes {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<class Queue>
-void throughput_producer(unsigned N, Queue* queue, std::atomic<cycles_t>* t0, Barrier* barrier) {
-    barrier->wait();
+void throughput_producer(unsigned N, Queue* queue, std::atomic<cycles_t>* t0, Barrier* barrier, unsigned n_release) {
+    barrier->wait_or_release(n_release);
 
     // The first producer saves the start time.
     cycles_t expected = 0;
@@ -205,12 +205,14 @@ void throughput_producer(unsigned N, Queue* queue, std::atomic<cycles_t>* t0, Ba
 }
 
 template<class Queue>
-void throughput_consumer_impl(unsigned N, Queue* queue, sum_t* consumer_sum, std::atomic<unsigned>* last_consumer, cycles_t* t1) {
+void throughput_consumer(unsigned N, Queue* queue, sum_t* consumer_sum, std::atomic<unsigned>* last_consumer, cycles_t* t1, Barrier* barrier, unsigned n_release) {
     unsigned const stop = N + 1;
     sum_t sum = 0;
 
     region_guard_t<Queue> guard;
     ConsumerOf<Queue> consumer{*queue};
+
+    barrier->wait_or_release(n_release);
     for(;;) {
         unsigned n = consumer.pop(*queue);
         if(n == stop)
@@ -227,12 +229,6 @@ void throughput_consumer_impl(unsigned N, Queue* queue, sum_t* consumer_sum, std
 }
 
 template<class Queue>
-void throughput_consumer(unsigned N, Queue* queue, sum_t* consumer_sum, std::atomic<unsigned>* last_consumer, cycles_t* t1, Barrier* barrier) {
-    barrier->wait();
-    throughput_consumer_impl(N, queue, consumer_sum, last_consumer, t1);
-}
-
-template<class Queue>
 cycles_t benchmark_throughput(HugePages& hp, std::vector<unsigned> const& hw_thread_ids, unsigned N, unsigned thread_count, bool alternative_placement, sum_t* consumer_sums) {
     set_thread_affinity(hw_thread_ids[thread_count * 2 - 1]); // Use this thread for the last consumer.
     unsigned cpu_idx = 0;
@@ -244,28 +240,27 @@ cycles_t benchmark_throughput(HugePages& hp, std::vector<unsigned> const& hw_thr
 
     Barrier barrier;
     std::vector<std::thread> threads(thread_count * 2 - 1);
+    unsigned const n_release = thread_count * 2;
     if(alternative_placement) {
         for(unsigned i = 0; i < thread_count; ++i) {
             set_default_thread_affinity(hw_thread_ids[cpu_idx++]);
-            threads[i] = std::thread(throughput_producer<Queue>, N, queue.get(), &t0, &barrier);
+            threads[i] = std::thread(throughput_producer<Queue>, N, queue.get(), &t0, &barrier, n_release);
             if(i != thread_count - 1) { // This thread is the last consumer.
                 set_default_thread_affinity(hw_thread_ids[cpu_idx++]);
-                threads[thread_count + i] = std::thread(throughput_consumer<Queue>, N, queue.get(), consumer_sums + i, &last_consumer, &t1, &barrier);
+                threads[thread_count + i] = std::thread(throughput_consumer<Queue>, N, queue.get(), consumer_sums + i, &last_consumer, &t1, &barrier, n_release);
             }
         }
     } else {
         for(unsigned i = 0; i < thread_count; ++i) {
             set_default_thread_affinity(hw_thread_ids[cpu_idx++]);
-            threads[i] = std::thread(throughput_producer<Queue>, N, queue.get(), &t0, &barrier);
+            threads[i] = std::thread(throughput_producer<Queue>, N, queue.get(), &t0, &barrier, n_release);
         }
         for(unsigned i = 0; i < thread_count - 1; ++i) { // This thread is the last consumer.
             set_default_thread_affinity(hw_thread_ids[cpu_idx++]);
-            threads[thread_count + i] = std::thread(throughput_consumer<Queue>, N, queue.get(), consumer_sums + i, &last_consumer, &t1, &barrier);
+            threads[thread_count + i] = std::thread(throughput_consumer<Queue>, N, queue.get(), consumer_sums + i, &last_consumer, &t1, &barrier, n_release);
         }
     }
-
-    barrier.release(thread_count * 2 - 1);
-    throughput_consumer_impl(N, queue.get(), consumer_sums + (thread_count - 1), &last_consumer, &t1); // Use this thread for the last consumer.
+    throughput_consumer(N, queue.get(), consumer_sums + (thread_count - 1), &last_consumer, &t1, &barrier, n_release); // Use this thread for the last consumer.
 
     for(auto& t : threads)
         t.join();

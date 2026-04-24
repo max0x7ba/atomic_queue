@@ -121,6 +121,24 @@ auto constexpr AR = std::memory_order_acq_rel;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+ATOMIC_QUEUE_INLINE static constexpr signed char as_signed(unsigned char c) noexcept { return c; }
+ATOMIC_QUEUE_INLINE static constexpr signed char as_signed(signed char c) noexcept { return c; }
+ATOMIC_QUEUE_INLINE static constexpr signed char as_signed(char c) noexcept { return c; }
+ATOMIC_QUEUE_INLINE static constexpr unsigned char as_unsigned(unsigned char c) noexcept { return c; }
+ATOMIC_QUEUE_INLINE static constexpr unsigned char as_unsigned(signed char c) noexcept { return c; }
+ATOMIC_QUEUE_INLINE static constexpr unsigned char as_unsigned(char c) noexcept { return c; }
+
+ATOMIC_QUEUE_INLINE static constexpr int as_signed(unsigned c) noexcept { return c; }
+ATOMIC_QUEUE_INLINE static constexpr int as_signed(int c) noexcept { return c; }
+ATOMIC_QUEUE_INLINE static constexpr unsigned as_unsigned(unsigned c) noexcept { return c; }
+ATOMIC_QUEUE_INLINE static constexpr unsigned as_unsigned(int c) noexcept { return c; }
+
+// Disable implict integer conversions for non-exact matches.
+template<class T> T as_signed(T) noexcept = delete;
+template<class T> T as_unsigned(T) noexcept = delete;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 } // namespace atomic_queue
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
