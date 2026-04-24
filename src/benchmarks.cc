@@ -190,84 +190,102 @@ struct QueueTypes {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+struct ThroughputContext {
+    // These remain constant.
+    alignas(CACHE_LINE_SIZE)
+    unsigned const N;
+    unsigned const n_release;
+
+    // These are modified at the start.
+    alignas(CACHE_LINE_SIZE)
+    Barrier barrier;
+    std::atomic<cycles_t> t0{0};
+
+    // These are modified at the end.
+    std::atomic<cycles_t> t1{0};
+    std::atomic<unsigned> last_consumer{0};
+
+    ThroughputContext(unsigned n, unsigned thread_count) noexcept
+        : N(n)
+        , n_release(thread_count * 2)
+        , last_consumer(thread_count)
+    {}
+};
+
 template<class Queue>
-void throughput_producer(unsigned N, Queue* queue, std::atomic<cycles_t>* t0, Barrier* barrier, unsigned n_release) {
-    barrier->wait_or_release(n_release);
+ATOMIC_QUEUE_NOINLINE void throughput_producer(Queue* queue, ThroughputContext* ctx) {
+    ctx->barrier.wait_or_release(ctx->n_release);
 
     // The first producer saves the start time.
     cycles_t expected = 0;
-    t0->compare_exchange_strong(expected, cycles(), std::memory_order_acq_rel, std::memory_order_relaxed);
+    auto t0 = cycles();
+    ctx->t0.compare_exchange_strong(expected, t0, A, X);
 
     region_guard_t<Queue> guard;
     ProducerOf<Queue> producer{*queue};
-    for(unsigned n = 1, stop = N + 1; n <= stop; ++n)
+    for(unsigned n = 1, stop = ctx->N + 1; n <= stop; ++n)
         producer.push(*queue, n);
 }
 
 template<class Queue>
-void throughput_consumer(unsigned N, Queue* queue, sum_t* consumer_sum, std::atomic<unsigned>* last_consumer, cycles_t* t1, Barrier* barrier, unsigned n_release) {
-    unsigned const stop = N + 1;
+ATOMIC_QUEUE_NOINLINE void throughput_consumer(Queue* queue, ThroughputContext* ctx, sum_t* consumer_sum) {
+    unsigned const stop = ctx->N + 1;
     sum_t sum = 0;
 
     region_guard_t<Queue> guard;
     ConsumerOf<Queue> consumer{*queue};
 
-    barrier->wait_or_release(n_release);
+    ctx->barrier.wait_or_release(ctx->n_release);
     for(;;) {
         unsigned n = consumer.pop(*queue);
         if(n == stop)
             break;
         sum += n;
     }
+    *consumer_sum = sum;
 
     // The last consumer saves the end time.
     auto t = cycles();
-    if(1 == last_consumer->fetch_sub(1, std::memory_order_acq_rel))
-        *t1 = t;
-
-    *consumer_sum = sum;
+    if(1 == ctx->last_consumer.fetch_sub(1, AR))
+        ctx->t1 = t;
 }
 
 template<class Queue>
 cycles_t benchmark_throughput(HugePages& hp, std::vector<unsigned> const& hw_thread_ids, unsigned N, unsigned thread_count, bool alternative_placement, sum_t* consumer_sums) {
     set_thread_affinity(hw_thread_ids[thread_count * 2 - 1]); // Use this thread for the last consumer.
-    unsigned cpu_idx = 0;
 
-    auto queue = hp.create_unique_ptr<Queue>(ContextOf<Queue>{thread_count, thread_count});
-    std::atomic<cycles_t> t0{0};
-    cycles_t t1 = 0;
-    std::atomic<unsigned> last_consumer{thread_count};
-
-    Barrier barrier;
     std::vector<std::thread> threads(thread_count * 2 - 1);
-    unsigned const n_release = thread_count * 2;
+    auto queue = hp.create_unique_ptr<Queue>(ContextOf<Queue>{thread_count, thread_count});
+    ThroughputContext ctx{N, thread_count};
+
+    unsigned cpu_idx = 0;
     if(alternative_placement) {
         for(unsigned i = 0; i < thread_count; ++i) {
             set_default_thread_affinity(hw_thread_ids[cpu_idx++]);
-            threads[i] = std::thread(throughput_producer<Queue>, N, queue.get(), &t0, &barrier, n_release);
+            threads[i] = std::thread(throughput_producer<Queue>, queue.get(), &ctx);
             if(i != thread_count - 1) { // This thread is the last consumer.
                 set_default_thread_affinity(hw_thread_ids[cpu_idx++]);
-                threads[thread_count + i] = std::thread(throughput_consumer<Queue>, N, queue.get(), consumer_sums + i, &last_consumer, &t1, &barrier, n_release);
+                threads[thread_count + i] = std::thread(throughput_consumer<Queue>, queue.get(), &ctx, consumer_sums + i);
             }
         }
     } else {
         for(unsigned i = 0; i < thread_count; ++i) {
             set_default_thread_affinity(hw_thread_ids[cpu_idx++]);
-            threads[i] = std::thread(throughput_producer<Queue>, N, queue.get(), &t0, &barrier, n_release);
+            threads[i] = std::thread(throughput_producer<Queue>, queue.get(), &ctx);
         }
         for(unsigned i = 0; i < thread_count - 1; ++i) { // This thread is the last consumer.
             set_default_thread_affinity(hw_thread_ids[cpu_idx++]);
-            threads[thread_count + i] = std::thread(throughput_consumer<Queue>, N, queue.get(), consumer_sums + i, &last_consumer, &t1, &barrier, n_release);
+            threads[thread_count + i] = std::thread(throughput_consumer<Queue>, queue.get(), &ctx, consumer_sums + i);
         }
     }
-    throughput_consumer(N, queue.get(), consumer_sums + (thread_count - 1), &last_consumer, &t1, &barrier, n_release); // Use this thread for the last consumer.
+    throughput_consumer(queue.get(), &ctx, consumer_sums + (thread_count - 1)); // Use this thread for the last consumer.
 
     for(auto& t : threads)
         t.join();
 
     reset_thread_affinity();
 
-    return t1 - t0.load(std::memory_order_relaxed);
+    return ctx.t1.load(X) - ctx.t0.load(X);
 }
 
 template<class Queue>
@@ -413,61 +431,74 @@ void run_throughput_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+struct LatencyContext {
+    // These remain constant.
+    alignas(CACHE_LINE_SIZE)
+    unsigned const N;
+    unsigned const n_release;
+
+    // These are modified at the start.
+    alignas(CACHE_LINE_SIZE)
+    Barrier barrier;
+
+    // These are modified at the end.
+    std::array<cycles_t, 2> times;
+
+    LatencyContext(unsigned n, unsigned thread_count) noexcept
+        : N(n)
+        , n_release(thread_count * 2)
+    {}
+};
+
 template<class Queue>
-void ping_pong_thread_impl(Queue* q1, Queue* q2, unsigned N, cycles_t* time, std::false_type /*sender*/) {
+ATOMIC_QUEUE_NOINLINE void ping_pong_thread_receiver(Queue* q1, Queue* q2, LatencyContext* ctx) {
+    ctx->barrier.wait_or_release(ctx->n_release);
+
     cycles_t t0 = cycles();
     region_guard_t<Queue> guard;
     ConsumerOf<Queue> consumer_q1{*q1};
     ProducerOf<Queue> producer_q2{*q2};
-    for(unsigned i = 1, j = 0; j < N; ++i) {
-        j = consumer_q1.pop(*q1);
+    for(unsigned i = 1, N = ctx->N; i < N; ++i) {
+        i = consumer_q1.pop(*q1);
         producer_q2.push(*q2, i);
     }
     cycles_t t1 = cycles();
-    *time = t1 - t0;
+
+    ctx->times[1] = t1 - t0;
 }
 
 template<class Queue>
-void ping_pong_thread_impl(Queue* q1, Queue* q2, unsigned N, cycles_t* time, std::true_type /*sender*/) {
+ATOMIC_QUEUE_NOINLINE void ping_pong_thread_sender(Queue* q1, Queue* q2, LatencyContext* ctx) {
+    ctx->barrier.wait_or_release(ctx->n_release);
+
     cycles_t t0 = cycles();
     region_guard_t<Queue> guard;
     ProducerOf<Queue> producer_q1{*q1};
     ConsumerOf<Queue> consumer_q2{*q2};
-    for(unsigned i = 1, j = 0; j < N; ++i) {
-        producer_q1.push(*q1, i);
+    for(unsigned j = 1, N = ctx->N; j < N; ++j) {
+        producer_q1.push(*q1, j);
         j = consumer_q2.pop(*q2);
     }
     cycles_t t1 = cycles();
-    *time = t1 - t0;
-}
 
-template<class Queue>
-inline void ping_pong_thread_receiver(Barrier* barrier, Queue* q1, Queue* q2, unsigned N, cycles_t* time) {
-    barrier->wait();
-    std::false_type constexpr sender;
-    ping_pong_thread_impl<Queue>(q1, q2, N, time, sender);
-}
-
-template<class Queue>
-inline void ping_pong_thread_sender(Barrier* barrier, Queue* q1, Queue* q2, unsigned N, cycles_t* time) {
-    barrier->release(1);
-    std::true_type constexpr sender;
-    ping_pong_thread_impl<Queue>(q1, q2, N, time, sender);
+    ctx->times[0] = t1 - t0;
 }
 
 template<class Queue>
 inline std::array<cycles_t, 2> ping_pong_benchmark(unsigned N, HugePages& hp, unsigned const (&cpus)[2]) {
     set_thread_affinity(cpus[0]); // This thread is the sender.
-    ContextOf<Queue> const ctx{1, 1};
-    auto q1 = hp.create_unique_ptr<Queue>(ctx);
-    auto q2 = hp.create_unique_ptr<Queue>(ctx);
-    Barrier barrier;
-    std::array<cycles_t, 2> times;
     set_default_thread_affinity(cpus[1]);
-    std::thread receiver(ping_pong_thread_receiver<Queue>, &barrier, q1.get(), q2.get(), N, &times[0]);
-    ping_pong_thread_sender<Queue>(&barrier, q1.get(), q2.get(), N, &times[1]);
+
+    ContextOf<Queue> const queue_ctx{1, 1};
+    auto q1 = hp.create_unique_ptr<Queue>(queue_ctx);
+    auto q2 = hp.create_unique_ptr<Queue>(queue_ctx);
+
+    LatencyContext ctx{N, 1};
+    std::thread receiver(ping_pong_thread_receiver<Queue>, q1.get(), q2.get(), &ctx);
+    ping_pong_thread_sender<Queue>(q1.get(), q2.get(), &ctx);
+
     receiver.join();
-    return times;
+    return ctx.times;
 }
 
 template<class Queue>

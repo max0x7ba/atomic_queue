@@ -306,6 +306,9 @@ ifeq (,$(findstring clean,${MAKECMDGOALS})) # Not cleanining.
 throughput_asm : ${build_dir}/benchmarks scripts/util.sh
 	source scripts/util.sh && disassemble-symbol "throughput_(consumer|producer)<atomic_queue::AtomicQueue2" ${build_dir}/benchmarks.o
 
+latency_asm : ${build_dir}/benchmarks scripts/util.sh
+	source scripts/util.sh && disassemble-symbol "ping_pong_thread_(receiver|sender)<atomic_queue::AtomicQueue2" ${build_dir}/benchmarks.o
+
 -include $(sort ${auto_generated_header_d}) # Remove duplicates and include.
 endif # Not cleanining.
 
