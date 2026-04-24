@@ -2,7 +2,7 @@ name: Makefile Continuous Integrations
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, maxim ]
     paths:
       - '!**'
       - '**.h'
