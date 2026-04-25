@@ -245,7 +245,15 @@ ATOMIC_QUEUE_INLINE static void copy_relaxed(std::atomic<T>& a, std::atomic<T> c
 
 using State = unsigned char;
 using AtomicState = std::atomic<State>;
-enum StateE : State { EMPTY, STORING = 1, LOADING = 4, STORED = 128 };
+
+enum StateE : State {
+    EMPTY,
+    STORED = 1,
+    STORING = 2,
+    LOADING = 4
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<class Derived>
 class AtomicQueueCommon {
@@ -333,37 +341,37 @@ protected:
             return element;
         }
         else {
-            // for(;;) {
-            //     unsigned char expected = STORED;
-            //     if(ATOMIC_QUEUE_LIKELY(state.compare_exchange_weak(expected, LOADING, A, X))) {
-            //         T element{std::move(q_element)};
-            //         state.store(EMPTY, R);
-            //         return element;
-            //     }
-            //     // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
-            //     do
-            //         spin_loop_pause();
-            //     while(Derived::maximize_throughput_ && state.load(X) != STORED);
-            // }
-
-            // Faster code-path without compare_exchange_weak. Not ideal yet.
-            // do_pop#1 may wait on do_push#1, while do_push#1 might wait on do_pop#0.
-            State constexpr M = LOADING * 3 | STORED;
-            while(ATOMIC_QUEUE_UNLIKELY(State(state.fetch_add(LOADING, A) & M) != STORED))
+            for(;;) {
+                State expected = STORED;
+                if(ATOMIC_QUEUE_LIKELY(state.compare_exchange_weak(expected, LOADING, A, X))) {
+                    T element{std::move(q_element)};
+                    state.store(EMPTY, R);
+                    return element;
+                }
                 // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
                 do
                     spin_loop_pause();
-                while(State(state.load(X) & M) != STORED);
+                while(Derived::maximize_throughput_ && state.load(X) != STORED);
+            }
 
-            T element{std::move(q_element)};
-
-            State e = EMPTY;
-#if ATOMIC_QUEUE_FULL_THROTTLE
-            asm("":"+r"(e));
-#endif
-            state.store(e, R);
-
-            return element;
+            // Faster code-path without compare_exchange_weak. Not ideal yet.
+            // do_pop#1 may wait on do_push#1, while do_push#1 might wait on do_pop#0.
+//             State constexpr M = STORED | MASK_LOADING;
+//             for(;;) {
+//                 State prev_state = state.fetch_add(LOADING, A) & M;
+//                 if(ATOMIC_QUEUE_LIKELY(STORED == prev_state)) {
+//                     T element{std::move(q_element)};
+// // #if ATOMIC_QUEUE_FULL_THROTTLE
+// //                     asm("":"+r"(prev_state));
+// // #endif
+//                     state.store(STORED, R);
+//                     return element;
+//                 }
+//                 // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
+//                 do
+//                     spin_loop_pause();
+//                 while(!(state.load(X) & STORED));
+//             }
         }
     }
 
@@ -377,37 +385,38 @@ protected:
             state.store(STORED, R);
         }
         else {
-            // for(;;) {
-            //     unsigned char expected = EMPTY;
-            //     if(ATOMIC_QUEUE_LIKELY(state.compare_exchange_weak(expected, STORING, A, X))) {
-            //         q_element = std::forward<U>(element);
-            //         state.store(STORED, R);
-            //         return;
-            //     }
-            //     // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
-            //     do
-            //         spin_loop_pause();
-            //     while(Derived::maximize_throughput_ && state.load(X) != EMPTY);
-            // }
-
-            // Faster code-path without compare_exchange_weak. Not ideal yet.
-            // do_push#1 might wait on do_pop#0.
-            State constexpr M = STORING * 3 | STORED;
-            State s;
-            while(ATOMIC_QUEUE_UNLIKELY((s = State(state.fetch_add(STORING, A) & M))))
+            for(;;) {
+                State expected = EMPTY;
+                if(ATOMIC_QUEUE_LIKELY(state.compare_exchange_weak(expected, STORING, A, X))) {
+                    q_element = std::forward<U>(element);
+                    state.store(STORED, R);
+                    return;
+                }
                 // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
                 do
                     spin_loop_pause();
-                while(State(state.load(X) & M));
+                while(Derived::maximize_throughput_ && state.load(X) != EMPTY);
+            }
 
-            q_element = std::forward<U>(element);
-
-            // s is 0 here; (or s, STORED) is cheaper than (mov s, STORED).
-#if ATOMIC_QUEUE_FULL_THROTTLE
-            asm("":"+r"(s));
-#endif
-            s |= STORED;
-            state.store(s, R);
+            // Faster code-path without compare_exchange_weak. Not ideal yet.
+            // do_push#1 might wait on do_pop#0.
+//             State constexpr M = STORED | MASK_STORING;
+//             for(;;) {
+//                 State prev_state = state.fetch_add(STORING, A) & M;
+//                 if(ATOMIC_QUEUE_LIKELY(EMPTY == prev_state)) {
+//                     q_element = std::forward<U>(element);
+// #if ATOMIC_QUEUE_FULL_THROTTLE
+//                     asm("":"+r"(prev_state));
+// #endif
+//                     prev_state ^= STORED;
+//                     state.store(prev_state, R);
+//                     return;
+//                 }
+//                 // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
+//                 do
+//                     spin_loop_pause();
+//                 while(state.load(X) & STORED);
+//             }
         }
     }
 
