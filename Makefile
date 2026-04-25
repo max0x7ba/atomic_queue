@@ -7,7 +7,7 @@
 #   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 BUILD=debug run_tests
 #   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=clang-20 BUILD=debug run_tests
 #   AQB=1 time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 run_benchmarks_n
-#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 throughput_asm
+#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 asm_throughput asm_latency
 #   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=clang-20 run_benchmarks_n
 #   AQB=1 taskset -c 0,1,2,3 time make -C ~/src/atomic_queue -Rj4 T=1 TOOLSET=gcc-14 run_benchmarks_n N=2 TAG=5825u-smt1
 #   AQB=1 taskset -c 0,2,4,6 time make -C ~/src/atomic_queue -Rj4 T=1 TOOLSET=gcc-14 run_benchmarks_n N=2 TAG=5825u-smt0
@@ -301,24 +301,24 @@ ${build_dir}/ : | ${build_dir}/.make/ ;
 
 env2 : env
 
-ifeq (,$(findstring clean,${MAKECMDGOALS})) # Not cleanining.
+ifdef not_cleaning # Not cleanining.
 
-throughput_asm : ${build_dir}/benchmarks scripts/util.sh
-	source scripts/util.sh && disassemble-symbol "throughput_(consumer|producer)<atomic_queue::AtomicQueue2" ${build_dir}/benchmarks.o
+asm_throughput : private symbol_regex = "throughput_(consumer|producer)<atomic_queue::AtomicQueue2"
+asm_latency : private symbol_regex = "ping_pong_(receiver|sender)<atomic_queue::AtomicQueue2"
 
-latency_asm : ${build_dir}/benchmarks scripts/util.sh
-	source scripts/util.sh && disassemble-symbol "ping_pong_thread_(receiver|sender)<atomic_queue::AtomicQueue2" ${build_dir}/benchmarks.o
+asm_% : scripts/util.sh ${build_dir}/benchmarks $$(if $${symbol_regex},force,$$(error $$@ is not defined))
+	source $< && disassemble-symbol ${symbol_regex} ${build_dir}/benchmarks.o
 
 -include $(sort ${auto_generated_header_d}) # Remove duplicates and include.
 endif # Not cleanining.
 
-.PHONY : update_env_txt env versions run_benchmarks clean all compile_commands compile_commands.json TAGS run_tests run_benchmarks_n run_benchmarks_perf env2 throughput_asm
+.PHONY : update_env_txt env versions run_benchmarks clean all compile_commands compile_commands.json TAGS run_tests run_benchmarks_n run_benchmarks_perf env2
 
 endif # Build with a single toolset.
 
 ################################################################################################################################
 
-ifeq (,$(findstring clean,${MAKECMDGOALS})) # Not cleanining.
+ifdef not_cleaning # Not cleanining.
 
 ${BUILD_ROOT}/system_config.mk : scripts/util.sh | $$(dir $$@)
 	source $< && create_system_config_mk > $@
@@ -371,7 +371,7 @@ $(call log,Build targets "${targets}" with toolsets "${toolsets}" in parallel us
 $(intcmp ${MAKELEVEL},1,$(call log_kv,BUILD_ROOT))
 
 with-toolset-% :
-	${MAKE} -R --no-print-directory --output-sync TOOLSET=$* with_toolset_sub_make=1 ${MAKECMDGOALS}
+	${MAKE} -R --no-print-directory --output-sync TOOLSET=$* with-toolset-submake=1 ${MAKECMDGOALS}
 
 # The last-resort rule. Must be the last in the Makefile.
 % : ${toolsets:%=with-toolset-%}
@@ -380,7 +380,7 @@ with-toolset-% :
 ################################################################################################################################
 else # Parallelize building with multiple toolsets.
 
-ifndef with_toolset_sub_make
+ifndef with-toolset-submake
 $(call log,Build targets "${targets}" with ${TOOLSET} using up to ${n_cpus} CPUs.)
 $(intcmp ${MAKELEVEL},1,$(call log_kv,BUILD_ROOT))
 endif

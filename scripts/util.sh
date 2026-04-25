@@ -12,7 +12,7 @@ function disassemble-symbol {(
     paste <(nm -jU "$obj") <(nm -jUC "$obj") | egrep -e "$re_symbol" | while IFS=$'\t' read c_symbol cxx_symbol; do
         out="${out_prefix}${c_symbol}.S"
         ( (( ${V:-0} < 1 )) || set -x; ${objdump[@]} --disassemble="$cxx_symbol" "$obj" ) | egrep -ve "$re_filter_out" > "$out"
-        echo "$out: $cxx_symbol"
+        echo "$out: ${cxx_symbol//(anonymous namespace)::}"
     done
 )}
 
