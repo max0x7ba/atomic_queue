@@ -49,10 +49,10 @@ struct BenchmarkOptions : EnvBits64 {
     ATOMIC_QUEUE_INLINE constexpr auto  no_ping_pong() const noexcept { return bits & 2; };
     ATOMIC_QUEUE_INLINE constexpr auto no_throughput() const noexcept { return bits & 4; };
 
-    ATOMIC_QUEUE_INLINE constexpr auto no_variant_a() const noexcept { return bits & 8; };
-    ATOMIC_QUEUE_INLINE constexpr auto no_variant_b() const noexcept { return bits & 16; };
-    ATOMIC_QUEUE_INLINE constexpr auto no_variant_1() const noexcept { return bits & 32; };
-    ATOMIC_QUEUE_INLINE constexpr auto no_variant_2() const noexcept { return bits & 64; };
+    ATOMIC_QUEUE_INLINE constexpr auto  no_variant_a() const noexcept { return bits & 8; };
+    ATOMIC_QUEUE_INLINE constexpr auto  no_variant_b() const noexcept { return bits & 16; };
+    ATOMIC_QUEUE_INLINE constexpr auto  no_variant_1() const noexcept { return bits & 32; };
+    ATOMIC_QUEUE_INLINE constexpr auto  no_variant_2() const noexcept { return bits & 64; };
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -195,6 +195,7 @@ struct ThroughputContext {
     alignas(CACHE_LINE_SIZE)
     unsigned const N;
     unsigned const n_release;
+    sum_t* ATOMIC_QUEUE_RESTRICT const consumer_sums;
 
     // These are modified at the start.
     alignas(CACHE_LINE_SIZE)
@@ -205,49 +206,53 @@ struct ThroughputContext {
     std::atomic<cycles_t> t1{0};
     std::atomic<unsigned> last_consumer{0};
 
-    ATOMIC_QUEUE_INLINE ThroughputContext(unsigned n, unsigned thread_count) noexcept
+    ATOMIC_QUEUE_INLINE ThroughputContext(unsigned n, unsigned thread_count, sum_t* ATOMIC_QUEUE_RESTRICT consumer_sums) noexcept
         : N(n)
         , n_release(thread_count * 2)
+        , consumer_sums(consumer_sums)
         , last_consumer(thread_count)
     {}
 };
 
 template<class Queue>
 ATOMIC_QUEUE_NOINLINE void throughput_producer(Queue* queue, ThroughputContext* ctx) {
+    region_guard_t<Queue> guard;
+    ProducerOf<Queue> producer{*queue};
+
     ctx->barrier.wait_or_release(ctx->n_release);
 
     // The first producer saves the start time.
-    cycles_t expected = 0;
     auto t0 = cycles();
+    cycles_t expected = 0;
     ctx->t0.compare_exchange_strong(expected, t0, A, X);
 
-    region_guard_t<Queue> guard;
-    ProducerOf<Queue> producer{*queue};
-    for(unsigned n = 1, stop = ctx->N + 1; n <= stop; ++n)
+    unsigned n = ctx->N;
+    do
         producer.push(*queue, n);
+    while(--n);
 }
 
 template<class Queue>
-ATOMIC_QUEUE_NOINLINE void throughput_consumer(Queue* queue, ThroughputContext* ctx, sum_t* consumer_sum) {
-    unsigned const stop = ctx->N + 1;
-    sum_t sum = 0;
-
+ATOMIC_QUEUE_NOINLINE void throughput_consumer(Queue* queue, ThroughputContext* ctx) {
     region_guard_t<Queue> guard;
     ConsumerOf<Queue> consumer{*queue};
 
     ctx->barrier.wait_or_release(ctx->n_release);
-    for(;;) {
-        unsigned n = consumer.pop(*queue);
-        if(n == stop)
-            break;
-        sum += n;
-    }
-    *consumer_sum = sum;
+
+    sum_t sum = 0;
+    unsigned n;
+    do {
+        n = consumer.pop(*queue);
+        sum += n; // Includes stop value.
+    } while(n != 1);
+    auto t = cycles();
+
+    auto const consumer_idx = ctx->last_consumer.fetch_sub(1, X) - 1;
+    ctx->consumer_sums[consumer_idx] = sum;
 
     // The last consumer saves the end time.
-    auto t = cycles();
-    if(1 == ctx->last_consumer.fetch_sub(1, AR))
-        ctx->t1 = t;
+    if(ATOMIC_QUEUE_LIKELY(!consumer_idx)) // 1 return with likely.
+        ctx->t1.store(t, X);
 }
 
 template<class Queue>
@@ -255,37 +260,38 @@ ATOMIC_QUEUE_INLINE cycles_t time_throughput_once(HugePages& hp, std::vector<uns
     set_thread_affinity(hw_thread_ids[thread_count * 2 - 1]); // Use this thread for the last consumer.
 
     std::vector<std::thread> threads(thread_count * 2 - 1);
+
+    auto ctx = hp.create_unique_ptr<ThroughputContext>(N, thread_count, consumer_sums);
     auto queue = hp.create_unique_ptr<Queue>(ContextOf<Queue>{thread_count, thread_count});
-    ThroughputContext ctx{N, thread_count};
 
     unsigned cpu_idx = 0;
     if(alternative_placement) {
         for(unsigned i = 0; i < thread_count; ++i) {
             set_default_thread_affinity(hw_thread_ids[cpu_idx++]);
-            threads[i] = std::thread(throughput_producer<Queue>, queue.get(), &ctx);
+            threads[i] = std::thread(throughput_producer<Queue>, queue.get(), ctx.get());
             if(i != thread_count - 1) { // This thread is the last consumer.
                 set_default_thread_affinity(hw_thread_ids[cpu_idx++]);
-                threads[thread_count + i] = std::thread(throughput_consumer<Queue>, queue.get(), &ctx, consumer_sums + i);
+                threads[thread_count + i] = std::thread(throughput_consumer<Queue>, queue.get(), ctx.get());
             }
         }
     } else {
         for(unsigned i = 0; i < thread_count; ++i) {
             set_default_thread_affinity(hw_thread_ids[cpu_idx++]);
-            threads[i] = std::thread(throughput_producer<Queue>, queue.get(), &ctx);
+            threads[i] = std::thread(throughput_producer<Queue>, queue.get(), ctx.get());
         }
         for(unsigned i = 0; i < thread_count - 1; ++i) { // This thread is the last consumer.
             set_default_thread_affinity(hw_thread_ids[cpu_idx++]);
-            threads[thread_count + i] = std::thread(throughput_consumer<Queue>, queue.get(), &ctx, consumer_sums + i);
+            threads[thread_count + i] = std::thread(throughput_consumer<Queue>, queue.get(), ctx.get());
         }
     }
-    throughput_consumer(queue.get(), &ctx, consumer_sums + (thread_count - 1)); // Use this thread for the last consumer.
+    throughput_consumer(queue.get(), ctx.get()); // Use this thread for the last consumer.
 
     for(auto& t : threads)
         t.join();
 
     reset_thread_affinity();
 
-    return ctx.t1.load(X) - ctx.t0.load(X);
+    return ctx->t1.load(X) - ctx->t0.load(X);
 }
 
 template<class Queue>
@@ -452,34 +458,40 @@ struct LatencyContext {
 };
 
 template<class Queue>
-ATOMIC_QUEUE_NOINLINE void ping_pong_sender(Queue* q1, Queue* q2, LatencyContext* ctx) {
-    ctx->barrier.wait_or_release(ctx->n_release);
-    cycles_t t0 = cycles();
-
+ATOMIC_QUEUE_NOINLINE void ping_pong_receiver(Queue* q1, Queue* q2, LatencyContext* ctx) {
     region_guard_t<Queue> guard;
     ConsumerOf<Queue> consumer_q1{*q1};
     ProducerOf<Queue> producer_q2{*q2};
-    for(unsigned i = 1, N = ctx->N; i < N; ++i) {
+
+    ctx->barrier.wait_or_release(ctx->n_release);
+
+    cycles_t t0 = cycles();
+
+    unsigned N = ctx->N, i;
+    do {
         i = consumer_q1.pop(*q1);
         producer_q2.push(*q2, i);
-    }
+    } while(++i < N);
 
     cycles_t t1 = cycles();
     ctx->times[1] = t1 - t0;
 }
 
 template<class Queue>
-ATOMIC_QUEUE_NOINLINE void ping_pong_receiver(Queue* q1, Queue* q2, LatencyContext* ctx) {
-    ctx->barrier.wait_or_release(ctx->n_release);
-    cycles_t t0 = cycles();
-
+ATOMIC_QUEUE_NOINLINE void ping_pong_sender(Queue* q1, Queue* q2, LatencyContext* ctx) {
     region_guard_t<Queue> guard;
     ProducerOf<Queue> producer_q1{*q1};
     ConsumerOf<Queue> consumer_q2{*q2};
-    for(unsigned j = 1, N = ctx->N; j < N; ++j) {
+
+    ctx->barrier.wait_or_release(ctx->n_release);
+
+    cycles_t t0 = cycles();
+
+    unsigned N = ctx->N, j = 1;
+    do {
         producer_q1.push(*q1, j);
         j = consumer_q2.pop(*q2);
-    }
+    } while(++j < N);
 
     cycles_t t1 = cycles();
     ctx->times[0] = t1 - t0;
@@ -490,16 +502,17 @@ ATOMIC_QUEUE_INLINE std::array<cycles_t, 2> time_ping_pong_once(unsigned N, Huge
     set_thread_affinity(cpus[0]); // This thread is the sender.
     set_default_thread_affinity(cpus[1]);
 
+    auto ctx = hp.create_unique_ptr<LatencyContext>(N, 1u);
+
     ContextOf<Queue> const queue_ctx{1, 1};
     auto q1 = hp.create_unique_ptr<Queue>(queue_ctx);
     auto q2 = hp.create_unique_ptr<Queue>(queue_ctx);
 
-    LatencyContext ctx{N, 1};
-    std::thread receiver(ping_pong_sender<Queue>, q1.get(), q2.get(), &ctx);
-    ping_pong_receiver<Queue>(q1.get(), q2.get(), &ctx);
+    std::thread receiver(ping_pong_receiver<Queue>, q1.get(), q2.get(), ctx.get());
+    ping_pong_sender<Queue>(q1.get(), q2.get(), ctx.get());
 
     receiver.join();
-    return ctx.times;
+    return ctx->times;
 }
 
 template<class Queue>

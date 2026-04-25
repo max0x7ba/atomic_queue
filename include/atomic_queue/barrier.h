@@ -29,15 +29,14 @@ public:
     }
 
     ATOMIC_QUEUE_INLINE void wait_or_release(int release_counter) noexcept {
-#if ATOMIC_QUEUE_FULL_THROTTLE
-        asm("":"+r"(release_counter)); // Disable constant propagation for release_counter.
-#endif
-        int c = (counter_.fetch_add(1, A) + 1) - release_counter;
-        if(ATOMIC_QUEUE_LIKELY(c < 0))
-            while(counter_.load(A))
+        release_counter = counter_.fetch_add(1, A) - release_counter;
+        ++release_counter;
+        if(ATOMIC_QUEUE_LIKELY(release_counter < 0))
+            do
                 spin_loop_pause();
+            while(counter_.load(A));
         else
-            counter_.store(c, R);
+            counter_.store(release_counter, R);
     }
 };
 
