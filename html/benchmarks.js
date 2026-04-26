@@ -229,8 +229,8 @@ $(function() {
     };
 
     plot_scalability('scalability-9900KS-5GHz', scalability_9900KS, 60e6, 1000e6);
-    plot_scalability('smt-scalability-ryzen-5825u', smt_scalability_ryzen_5825u, 40e6, 1000e6);
-    plot_scalability('cc-scalability-ryzen-5825u', cc_scalability_ryzen_5825u, 40e6, 1000e6);
+    plot_scalability('smt-scalability-ryzen-5825u', smt_scalability_ryzen_5825u, 60e6, 1000e6);
+    plot_scalability('cc-scalability-ryzen-5825u', cc_scalability_ryzen_5825u, 60e6, 1000e6);
     plot_scalability('scalability-xeon-gold-6132', scalability_xeon_gold_6132, 15e6, 300e6);
     plot_scalability('scalability-ryzen-5950x', scalability_ryzen_5950x, 20e6, 500e6);
     plot_latency('latency-9900KS-5GHz', latency_9900KS);
