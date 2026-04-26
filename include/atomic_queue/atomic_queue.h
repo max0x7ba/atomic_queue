@@ -353,25 +353,6 @@ protected:
                     spin_loop_pause();
                 while(Derived::maximize_throughput_ && state.load(X) != STORED);
             }
-
-            // Faster code-path without compare_exchange_weak. Not ideal yet.
-            // do_pop#1 may wait on do_push#1, while do_push#1 might wait on do_pop#0.
-//             State constexpr M = STORED | MASK_LOADING;
-//             for(;;) {
-//                 State prev_state = state.fetch_add(LOADING, A) & M;
-//                 if(ATOMIC_QUEUE_LIKELY(STORED == prev_state)) {
-//                     T element{std::move(q_element)};
-// // #if ATOMIC_QUEUE_FULL_THROTTLE
-// //                     asm("":"+r"(prev_state));
-// // #endif
-//                     state.store(STORED, R);
-//                     return element;
-//                 }
-//                 // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
-//                 do
-//                     spin_loop_pause();
-//                 while(!(state.load(X) & STORED));
-//             }
         }
     }
 
@@ -397,26 +378,6 @@ protected:
                     spin_loop_pause();
                 while(Derived::maximize_throughput_ && state.load(X) != EMPTY);
             }
-
-            // Faster code-path without compare_exchange_weak. Not ideal yet.
-            // do_push#1 might wait on do_pop#0.
-//             State constexpr M = STORED | MASK_STORING;
-//             for(;;) {
-//                 State prev_state = state.fetch_add(STORING, A) & M;
-//                 if(ATOMIC_QUEUE_LIKELY(EMPTY == prev_state)) {
-//                     q_element = std::forward<U>(element);
-// #if ATOMIC_QUEUE_FULL_THROTTLE
-//                     asm("":"+r"(prev_state));
-// #endif
-//                     prev_state ^= STORED;
-//                     state.store(prev_state, R);
-//                     return;
-//                 }
-//                 // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
-//                 do
-//                     spin_loop_pause();
-//                 while(state.load(X) & STORED);
-//             }
         }
     }
 
@@ -425,13 +386,13 @@ public:
     ATOMIC_QUEUE_INLINE bool try_push(T&& element) noexcept {
         auto head = head_.load(X);
         if(Derived::spsc_) {
-            if(static_cast<int>(head - tail_.load(X)) >= static_cast<int>(downcast().size_))
+            if(as_signed(head - tail_.load(X)) >= as_signed(downcast().size_))
                 return false;
             head_.store(head + 1, X);
         }
         else {
             do {
-                if(static_cast<int>(head - tail_.load(X)) >= static_cast<int>(downcast().size_))
+                if(as_signed(head - tail_.load(X)) >= as_signed(downcast().size_))
                     return false;
             } while(ATOMIC_QUEUE_UNLIKELY(!head_.compare_exchange_weak(head, head + 1, X, X))); // This loop is not FIFO.
         }
@@ -444,13 +405,13 @@ public:
     ATOMIC_QUEUE_INLINE bool try_pop(T& element) noexcept {
         auto tail = tail_.load(X);
         if(Derived::spsc_) {
-            if(static_cast<int>(head_.load(X) - tail) <= 0)
+            if(as_signed(head_.load(X) - tail) <= 0)
                 return false;
             tail_.store(tail + 1, X);
         }
         else {
             do {
-                if(static_cast<int>(head_.load(X) - tail) <= 0)
+                if(as_signed(head_.load(X) - tail) <= 0)
                     return false;
             } while(ATOMIC_QUEUE_UNLIKELY(!tail_.compare_exchange_weak(tail, tail + 1, X, X))); // This loop is not FIFO.
         }
@@ -497,7 +458,7 @@ public:
     ATOMIC_QUEUE_INLINE unsigned was_size() const noexcept {
         // tail_ can be greater than head_ because of consumers doing pop, rather that try_pop, when the queue is empty.
         unsigned n{head_.load(X) - tail_.load(X)};
-        return static_cast<int>(n) < 0 ? 0 : n; // Windows headers break std::min/max by default. Do std::max<int>(n, 0) the hard way here.
+        return as_signed(n) < 0 ? 0 : n; // Windows headers break std::min/max by default. Do std::max<int>(n, 0) the hard way here.
     }
 
     ATOMIC_QUEUE_INLINE unsigned capacity() const noexcept {
