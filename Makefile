@@ -200,13 +200,12 @@ exes := example tests benchmarks
 example_src := example.cc
 
 tests_src := tests.cc
-${build_dir}/tests : cppflags += -DBOOST_TEST_DYN_LINK=1
 ${build_dir}/tests : ldlibs += -lboost_unit_test_framework
 
 benchmarks_src := benchmarks.cc cpu_base_frequency.cc huge_pages.cc
-${build_dir}/benchmarks : cppflags += ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium}
-${build_dir}/benchmarks : cxxflags += ${cxxflags.tbb} ${cxxflags.moodycamel} ${cxxflags.xenium}
-${build_dir}/benchmarks : ldlibs += ${ldlibs.tbb} ${ldlibs.moodycamel} ${ldlibs.xenium} -ldl
+${build_dir}/benchmarks.o : cppflags += ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium}
+${build_dir}/benchmarks.o : cxxflags += ${cxxflags.tbb} ${cxxflags.moodycamel} ${cxxflags.xenium}
+${build_dir}/benchmarks   : ldlibs += ${ldlibs.tbb} ${ldlibs.moodycamel} ${ldlibs.xenium} -ldl
 
 # Build targets definitions end.
 ################################################################################################################################
