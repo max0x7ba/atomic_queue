@@ -211,7 +211,9 @@ struct ThroughputContext {
         , n_release(thread_count * 2)
         , consumer_sums(consumer_sums)
         , last_consumer(thread_count)
-    {}
+    {
+        assert(is_suitably_aligned(this));
+    }
 };
 
 template<class Queue>
@@ -454,7 +456,9 @@ struct LatencyContext {
     ATOMIC_QUEUE_INLINE LatencyContext(unsigned n, unsigned thread_count) noexcept
         : N(n)
         , n_release(thread_count * 2)
-    {}
+    {
+        assert(is_suitably_aligned(this));
+    }
 };
 
 template<class Queue>

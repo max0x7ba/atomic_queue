@@ -7,6 +7,7 @@
 #include <new>
 #include <memory>
 #include <utility>
+#include <cassert>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -150,7 +151,9 @@ struct HugePageAllocator : HugePageAllocatorBase
     {}
 
     T* allocate(size_t n) const {
-        return static_cast<T*>(hp->allocate(n * sizeof(T)));
+        T* p = static_cast<T*>(hp->allocate(n * sizeof(T)));
+        assert(is_suitably_aligned(p));
+        return p;
     }
 
     void deallocate(T* p, size_t n) const {

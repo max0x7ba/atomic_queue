@@ -5,6 +5,7 @@
 // Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file LICENSE.
 
 #include <atomic>
+#include <cstdint>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -126,9 +127,16 @@ ATOMIC_QUEUE_INLINE static constexpr int as_signed(int c) noexcept { return c; }
 ATOMIC_QUEUE_INLINE static constexpr unsigned as_unsigned(unsigned c) noexcept { return c; }
 ATOMIC_QUEUE_INLINE static constexpr unsigned as_unsigned(int c) noexcept { return c; }
 
-// Disable implict integer conversions for non-exact matches.
+// Do not allow integral promotion, numeric conversions or any other conversions for arguments of as_signed and as_unsigned.
 template<class T> T as_signed(T) noexcept = delete;
 template<class T> T as_unsigned(T) noexcept = delete;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+template<class T>
+ATOMIC_QUEUE_INLINE static constexpr bool is_suitably_aligned(T* p) noexcept {
+    return !(reinterpret_cast<std::uintptr_t>(p) % alignof(T));
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

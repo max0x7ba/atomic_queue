@@ -9,7 +9,6 @@
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
-#include <cstdint>
 #include <memory>
 #include <utility>
 
@@ -17,12 +16,14 @@
 
 namespace atomic_queue {
 
-using std::uint32_t;
-using std::uint64_t;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 namespace details {
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+using std::uint32_t;
+using std::uint64_t;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -257,9 +258,8 @@ enum StateE : State {
 
 template<class Derived>
 class AtomicQueueCommon {
-    ATOMIC_QUEUE_INLINE constexpr Derived& downcast() noexcept {
-        return static_cast<Derived&>(*this);
-    }
+    ATOMIC_QUEUE_INLINE constexpr auto& downcast() noexcept { return static_cast<Derived&>(*this); }
+    ATOMIC_QUEUE_INLINE constexpr auto& downcast() const noexcept { return static_cast<Derived const&>(*this); }
 
 protected:
     // Put these on different cache lines to avoid false sharing between readers and writers.
@@ -268,11 +268,16 @@ protected:
 
     // The special member functions are not thread-safe.
 
-    AtomicQueueCommon() noexcept = default;
+    AtomicQueueCommon() noexcept {
+        assert(is_suitably_aligned(&downcast()));
+    }
 
     AtomicQueueCommon(AtomicQueueCommon const& b) noexcept
         : head_(b.head_.load(X))
-        , tail_(b.tail_.load(X)) {}
+        , tail_(b.tail_.load(X))
+    {
+        assert(is_suitably_aligned(&downcast()));
+    }
 
     AtomicQueueCommon& operator=(AtomicQueueCommon const& b) noexcept {
         details::copy_relaxed(head_, b.head_);
@@ -462,7 +467,7 @@ public:
     }
 
     ATOMIC_QUEUE_INLINE unsigned capacity() const noexcept {
-        return static_cast<Derived const&>(*this).size_;
+        return downcast().size_;
     }
 
     ATOMIC_QUEUE_INLINE static constexpr bool is_spsc() noexcept {
@@ -682,7 +687,7 @@ class AtomicQueueB2 : private std::allocator_traits<A>::template rebind_alloc<un
     template<class U>
     U* allocate_() {
         U* p = reinterpret_cast<U*>(StorageAllocator::allocate(size_ * sizeof(U)));
-        assert(reinterpret_cast<uintptr_t>(p) % alignof(U) == 0); // Allocated storage must be suitably aligned for U.
+        assert(is_suitably_aligned(p)); // Allocated storage must be suitably aligned for U.
         return p;
     }
 
