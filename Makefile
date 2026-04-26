@@ -382,7 +382,7 @@ else # Parallelize building with multiple toolsets.
 
 ifndef with-toolset-submake
 $(call log,Build targets "${targets}" with ${TOOLSET} using up to ${n_cpus} CPUs.)
-$(intcmp ${MAKELEVEL},1,$(call log_kv,BUILD_ROOT))
+# $(intcmp ${MAKELEVEL},1,$(call log_kv,BUILD_ROOT))
 endif
 
 endif # Parallelize building with multiple toolsets.

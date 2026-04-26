@@ -27,3 +27,21 @@ uname_m := $(uname -m)
 use_ld := -fuse-ld=$(type -p lld &> /dev/null && echo -n lld || echo -n bfd)
 EOF
 )}
+
+function benchmark_ryzen_5825u {
+    local -i smt=1
+    local c
+    for c in 0-15 0,2,4,6,8,10,12,14 ; do
+        taskset -c $c time make -Rj8 T=1 TOOLSET=gcc-14 run_benchmarks_n N=33 TAG=5825u-f469caa-smt$smt
+        ((--smt))
+    done
+}
+
+function benchmark_ryzen_5950x {
+    local -i smt=1
+    local c
+    for c in 0-31 0-15 ; do
+        taskset -c $c time make -Rj8 T=1 TOOLSET=gcc-14 run_benchmarks_n N=33 TAG=5950x-f469caa-smt$smt
+        ((--smt))
+    done
+}
