@@ -20,6 +20,8 @@
 #include "cpu_base_frequency.h"
 #include "huge_pages.h"
 #include "moodycamel.h"
+#include "benchmarks.h"
+
 
 #include <algorithm>
 #include <clocale>
@@ -190,72 +192,92 @@ struct QueueTypes {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+struct Times {
+    std::atomic<cycles_t> t[2] = {};
+
+    ATOMIC_QUEUE_INLINE void set(unsigned i) noexcept {
+        auto* p = t + i;
+        auto now = cycles();
+        p->store(now, std::memory_order_seq_cst);
+    }
+};
+
+struct alignas(CACHE_LINE_SIZE) ThroughputThread {
+    Times times;
+    std::atomic<sum_t> sum = {};
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct ThroughputContext {
     // These remain constant.
     alignas(CACHE_LINE_SIZE)
+    void* queue{};
     unsigned const N;
-    sum_t* ATOMIC_QUEUE_RESTRICT const consumer_sums;
+    ThroughputThread* ATOMIC_QUEUE_RESTRICT const consumers;
+    ThroughputThread* ATOMIC_QUEUE_RESTRICT const producers;
 
     // These are modified at the start.
     alignas(CACHE_LINE_SIZE)
     Barrier2 barrier;
-    std::atomic<unsigned> last_consumer;
 
-    alignas(CACHE_LINE_SIZE)
-    std::atomic<cycles_t> t0{0};
-    // These are modified at the end.
-    std::atomic<cycles_t> t1{0};
-
-    ATOMIC_QUEUE_INLINE ThroughputContext(unsigned n, unsigned thread_count, sum_t* ATOMIC_QUEUE_RESTRICT consumer_sums) noexcept
-        : N(n)
-        , consumer_sums(consumer_sums)
+    ATOMIC_QUEUE_INLINE ThroughputContext(unsigned N, unsigned thread_count, ThroughputThread* ATOMIC_QUEUE_RESTRICT consumer_sums) noexcept
+        : N(N)
+        , consumers(consumer_sums)
+        , producers(consumer_sums + thread_count)
         , barrier{thread_count * 2}
-        , last_consumer(thread_count)
     {
         assert(is_suitably_aligned(this));
+    }
+
+    ATOMIC_QUEUE_NOINLINE cycles_t duration() const noexcept {
+        unsigned thread_count = (producers - consumers) * 2;
+        unsigned i = 0;
+        auto t0 = consumers[i].times.t[0].load(X);
+        auto t1 = consumers[i].times.t[1].load(X);
+        while(++i < thread_count) {
+            t0 = std::min(t0, consumers[i].times.t[0].load(X));
+            t1 = std::max(t1, consumers[i].times.t[1].load(X));
+        }
+        return t1 - t0;
     }
 };
 
 template<class Queue>
-ATOMIC_QUEUE_NOINLINE void throughput_producer(Queue* queue, ThroughputContext* ctx) {
+ATOMIC_QUEUE_NOINLINE void throughput_producer(ThroughputContext* ctx, ThroughputThread* thread) {
     region_guard_t<Queue> guard;
+    Queue* const queue = static_cast<Queue*>(ctx->queue);
     ProducerOf<Queue> producer{*queue};
     unsigned n = ctx->N;
 
     ctx->barrier.countdown();
-
-    // The first producer saves the start time.
-    cycles_t expected = 0;
-    auto t0 = cycles();
-    ctx->t0.compare_exchange_strong(expected, t0, std::memory_order_seq_cst, std::memory_order_seq_cst);
+    thread->times.set(0);
 
     do
         producer.push(*queue, n);
     while(--n);
+
+    thread->times.set(1);
 }
 
 template<class Queue>
-ATOMIC_QUEUE_NOINLINE void throughput_consumer(Queue* queue, ThroughputContext* ctx) {
+ATOMIC_QUEUE_NOINLINE void throughput_consumer(ThroughputContext* ctx, ThroughputThread* thread) {
     region_guard_t<Queue> guard;
+    Queue* const queue = static_cast<Queue*>(ctx->queue);
     ConsumerOf<Queue> consumer{*queue};
     sum_t sum = 0;
     unsigned n;
 
     ctx->barrier.countdown();
+    thread->times.set(0);
 
     do {
         n = consumer.pop(*queue);
         sum += n; // Includes stop value.
     } while(n > 1);
 
-    auto const consumer_idx = --ctx->last_consumer; // std::memory_order_seq_cst
-    ctx->consumer_sums[consumer_idx] = sum;
-
-    auto t = cycles();
-
-    // The last consumer saves the end time.
-    if(ATOMIC_QUEUE_LIKELY(!consumer_idx)) // 1 return with likely.
-        ctx->t1.store(t); // std::memory_order_seq_cst
+    thread->sum.store(sum, std::memory_order_seq_cst);
+    thread->times.set(1);
 }
 
 struct PinnedThreads {
@@ -282,36 +304,38 @@ struct PinnedThreads {
 };
 
 template<class Queue>
-ATOMIC_QUEUE_INLINE cycles_t time_throughput_once(HugePages& hp, std::vector<unsigned> const& hw_thread_ids, unsigned N, unsigned thread_count, bool alternative_placement, sum_t* consumer_sums) {
+ATOMIC_QUEUE_INLINE cycles_t time_throughput_once(HugePages& hp, std::vector<unsigned> const& hw_thread_ids, unsigned N, unsigned thread_count, bool alternative_placement, ThroughputThread* consumer_sums) {
     set_thread_affinity(hw_thread_ids[0]); // Use this thread#0 for the first producer. Pin to the same CPU.
     PinnedThreads threads{thread_count * 2 - 1, hw_thread_ids.data() + 1};
 
     auto ctx = hp.create_unique_ptr<ThroughputContext>(N, thread_count, consumer_sums);
     auto queue = hp.create_unique_ptr<Queue>(ContextOf<Queue>{thread_count, thread_count});
+    ctx->queue = queue.get();
 
     if(alternative_placement) {
         for(unsigned i = 0; i < thread_count; ++i) {
             if(i) // This thread#0 is the first producer.
-                threads.create(throughput_producer<Queue>, queue.get(), ctx.get());
-            threads.create(throughput_consumer<Queue>, queue.get(), ctx.get());
+                threads.create(throughput_producer<Queue>, ctx.get(), ctx->producers + i);
+            threads.create(throughput_consumer<Queue>, ctx.get(), ctx->consumers + i);
         }
     } else {
         for(unsigned i = 1; i < thread_count; ++i)  // This thread#0 is the first producer.
-            threads.create(throughput_producer<Queue>, queue.get(), ctx.get());
+            threads.create(throughput_producer<Queue>, ctx.get(), ctx->producers + i);
         for(unsigned i = 0; i < thread_count; ++i)
-            threads.create(throughput_consumer<Queue>, queue.get(), ctx.get());
+            threads.create(throughput_consumer<Queue>, ctx.get(), ctx->consumers + i);
     }
-    throughput_producer(queue.get(), ctx.get()); // Use this thread#0 for the last consumer.
+    throughput_producer<Queue>(ctx.get(), ctx->producers + 0); // Use this thread#0 for the first producer.
+
     threads.join();
 
     // reset_thread_affinity();
-    return ctx->t1.load(X) - ctx->t0.load(X);
+    return ctx->duration();
 }
 
 template<class Queue>
 ATOMIC_QUEUE_NOINLINE void time_throughput(char const* name, HugePages& hp, std::vector<unsigned> const& hw_thread_ids, unsigned M, unsigned thread_count_min, unsigned thread_count_max) {
     int constexpr RUNS = 3;
-    std::vector<sum_t> consumer_sums(thread_count_max);
+    using ThroughputThreads = std::vector<ThroughputThread, HugePageAllocator<ThroughputThread>>;
 
     for(unsigned threads = thread_count_min; threads <= thread_count_max; ++threads) {
         unsigned const N = M / threads;
@@ -322,28 +346,28 @@ ATOMIC_QUEUE_NOINLINE void time_throughput(char const* name, HugePages& hp, std:
             cycles_t min_time = CYCLES_MAX;
 
             for(unsigned run = RUNS; run--;) {
-                cycles_t time = time_throughput_once<Queue>(hp, hw_thread_ids, N, threads, alternative_placement, consumer_sums.data());
-                min_time = std::min(min_time, time);
+                {
+                    ThroughputThreads consumer_sums(threads * 2);
+                    cycles_t time = time_throughput_once<Queue>(hp, hw_thread_ids, N, threads, alternative_placement, consumer_sums.data());
+                    min_time = std::min(min_time, time);
 
-                check_huge_pages_leaks(name, hp);
+                    // Calculate the checksum.
+                    sum_t total_sum = 0;
+                    for(unsigned i = 0; i < threads; ++i) {
+                        auto consumer_sum = consumer_sums[i].sum.load(X);
+                        total_sum += consumer_sum;
 
-                // Calculate the checksum.
-                sum_t total_sum = 0;
-                for(unsigned i = 0; i < threads; ++i) {
-                    auto consumer_sum = consumer_sums[i];
-                    total_sum += consumer_sum;
+                        // Verify that no consumer was starved.
+                        auto consumer_sum_frac = consumer_sum * expected_sum_inv;
+                        if(consumer_sum_frac < .1)
+                            std::fprintf(stderr, "%s: producers: %u: consumer %u received too few messages: %.2lf%% of expected.\n", name, threads, i, consumer_sum_frac);
+                    }
 
-                    // Verify that no consumer was starved.
-                    auto consumer_sum_frac = consumer_sum * expected_sum_inv;
-                    if(consumer_sum_frac < .1)
-                        std::fprintf(stderr, "%s: producers: %u: consumer %u received too few messages: %.2lf%% of expected.\n", name, threads, i,
-                                     consumer_sum_frac);
+                    // Verify that all messages were received exactly once: no duplicates, no omissions.
+                    if(auto diff = total_sum - expected_sum * threads)
+                        std::fprintf(stderr, "%s: wrong checksum error: producers: %u, expected_sum: %'lld, diff: %'lld.\n", name, threads, expected_sum * threads, diff);
                 }
-
-                // Verify that all messages were received exactly once: no duplicates, no omissions.
-                if(auto diff = total_sum - expected_sum * threads)
-                    std::fprintf(stderr, "%s: wrong checksum error: producers: %u, expected_sum: %'lld, diff: %'lld.\n", name, threads, expected_sum * threads,
-                                 diff);
+                check_huge_pages_leaks(name, hp);
             }
 
             double min_seconds = to_seconds(min_time);
@@ -452,20 +476,6 @@ ATOMIC_QUEUE_NOINLINE void run_throughput_benchmarks(HugePages& hp, std::vector<
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct Times {
-    std::atomic<cycles_t> times[2] = {};
-
-    ATOMIC_QUEUE_INLINE void set(bool i) noexcept {
-        auto* p = &times[i];
-        auto now = cycles();
-        p->store(now, std::memory_order_seq_cst);
-    }
-
-    ATOMIC_QUEUE_INLINE cycles_t duration() const noexcept {
-        return {times[1].load(X) - times[0].load(X)};
-    }
-};
-
 struct LatencyContext {
     // These remain constant.
     alignas(CACHE_LINE_SIZE)
@@ -481,8 +491,13 @@ struct LatencyContext {
     alignas(CACHE_LINE_SIZE)
     Times receiver;
 
-    // // These are modified at the end.
-    // std::array<cycles_t, 2> times;
+    ATOMIC_QUEUE_INLINE cycles_t duration() const noexcept {
+        auto st0 = sender.t[0].load(X);
+        auto rt0 = sender.t[0].load(X);
+        auto st1 = sender.t[1].load(X);
+        auto rt1 = sender.t[1].load(X);
+        return std::max(st1, rt1) - std::min(st0, rt0);
+    }
 
     ATOMIC_QUEUE_INLINE LatencyContext(unsigned n, unsigned thread_count) noexcept
         : N(n)
@@ -497,15 +512,15 @@ ATOMIC_QUEUE_NOINLINE void ping_pong_receiver(Queue* q1, Queue* q2, LatencyConte
     region_guard_t<Queue> guard;
     ConsumerOf<Queue> consumer_q1{*q1};
     ProducerOf<Queue> producer_q2{*q2};
-    unsigned N = ctx->N, i;
 
     ctx->barrier.countdown();
     ctx->receiver.set(0);
 
+    unsigned n;
     do {
-        i = consumer_q1.pop(*q1);
-        producer_q2.push(*q2, i);
-    } while(ATOMIC_QUEUE_LIKELY(++i < N));
+        n = consumer_q1.pop(*q1) - 1;
+        producer_q2.push(*q2, n);
+    } while(ATOMIC_QUEUE_LIKELY(n > 1));
 
     ctx->receiver.set(1);
 }
@@ -515,21 +530,21 @@ ATOMIC_QUEUE_NOINLINE void ping_pong_sender(Queue* q1, Queue* q2, LatencyContext
     region_guard_t<Queue> guard;
     ProducerOf<Queue> producer_q1{*q1};
     ConsumerOf<Queue> consumer_q2{*q2};
-    unsigned N = ctx->N, j = 1;
+    unsigned n = ctx->N;
 
     ctx->barrier.countdown();
     ctx->sender.set(0);
 
     do {
-        producer_q1.push(*q1, j);
-        j = consumer_q2.pop(*q2);
-    } while(++j < N);
+        producer_q1.push(*q1, n);
+        n = consumer_q2.pop(*q2);
+    } while(as_signed(--n) > 0);
 
     ctx->sender.set(1);
 }
 
 template<class Queue>
-ATOMIC_QUEUE_INLINE std::array<cycles_t, 2> time_ping_pong_once(unsigned N, HugePages& hp, unsigned const (&cpus)[2]) {
+ATOMIC_QUEUE_INLINE cycles_t time_ping_pong_once(unsigned N, HugePages& hp, unsigned const (&cpus)[2]) {
     set_thread_affinity(cpus[0]); // This thread#0 is the sender.
     set_default_thread_affinity(cpus[1]);
 
@@ -543,7 +558,7 @@ ATOMIC_QUEUE_INLINE std::array<cycles_t, 2> time_ping_pong_once(unsigned N, Huge
     ping_pong_sender<Queue>(q1.get(), q2.get(), ctx.get());
     receiver.join();
 
-    return {ctx->sender.duration(), ctx->receiver.duration()};
+    return ctx->duration();
 }
 
 template<class Queue>
@@ -552,24 +567,22 @@ ATOMIC_QUEUE_NOINLINE void time_ping_pong(char const* name, HugePages& hp, std::
     int constexpr RUNS = 3;
 
     // Select the best times of RUNS runs.
-    std::array<cycles_t, 2> best_times = {CYCLES_MAX, CYCLES_MAX};
+    cycles_t best_duration = CYCLES_MAX;
 
-    // Ping-pong between the first available CPU and every othery other power-of-2.
+    // Ping-pong between the first available CPU and every othery next power-of-2 to find its SMT sibling, if any.
     unsigned const n_cpus = hw_thread_ids.size();
     for(unsigned cpu2 = 1; cpu2 < n_cpus; cpu2 *= 2) {
-    // for(unsigned cpu2 = 1; cpu2 < n_cpus; ++cpu2) {
         unsigned const cpus[2] = {hw_thread_ids[0], hw_thread_ids[cpu2]};
         for(unsigned run = RUNS; run--;) {
-            auto times = time_ping_pong_once<Queue>(N_PING_PONG_MESSAGES, hp, cpus);
-            if(best_times[0] + best_times[1] > times[0] + times[1])
-                best_times = times;
+            auto duration = time_ping_pong_once<Queue>(N_PING_PONG_MESSAGES, hp, cpus);
+            if(duration < best_duration)
+                best_duration = duration;
 
             check_huge_pages_leaks(name, hp);
         }
     }
 
-    auto avg_time = to_seconds((best_times[0] + best_times[1]) / 2);
-    auto round_trip_time = avg_time / N_PING_PONG_MESSAGES;
+    auto round_trip_time = to_seconds(best_duration) / N_PING_PONG_MESSAGES;
     std::printf("%32s: %.9f sec/round-trip\n", name, round_trip_time);
 }
 
