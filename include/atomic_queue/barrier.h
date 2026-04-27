@@ -43,14 +43,14 @@ public:
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct Barrier2 {
-    std::atomic<int> counter = {};
+    std::atomic<unsigned> counter = {};
 
-    ATOMIC_QUEUE_INLINE int countdown() noexcept {
+    ATOMIC_QUEUE_INLINE unsigned countdown() noexcept {
         // All callers execute the same code path.
-        int caller_idx = counter.fetch_sub(1, std::memory_order_seq_cst) - 1;
+        unsigned caller_idx = --counter; // std::memory_order_seq_cst
         do
             spin_loop_pause();
-        while(counter.load(std::memory_order_seq_cst));
+        while(counter.load()); // std::memory_order_seq_cst
         return caller_idx;
     }
 };

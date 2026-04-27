@@ -199,7 +199,7 @@ struct ThroughputContext {
     // These are modified at the start.
     alignas(CACHE_LINE_SIZE)
     Barrier2 barrier;
-    std::atomic<int> last_consumer;
+    std::atomic<unsigned> last_consumer;
 
     alignas(CACHE_LINE_SIZE)
     std::atomic<cycles_t> t0{0};
@@ -224,9 +224,9 @@ ATOMIC_QUEUE_NOINLINE void throughput_producer(Queue* queue, ThroughputContext* 
     ctx->barrier.countdown();
 
     // The first producer saves the start time.
-    auto t0 = cycles();
     cycles_t expected = 0;
-    ctx->t0.compare_exchange_strong(expected, t0, AR, AR);
+    auto t0 = cycles();
+    ctx->t0.compare_exchange_strong(expected, t0, std::memory_order_seq_cst, std::memory_order_seq_cst);
 
     unsigned n = ctx->N;
     do
@@ -247,14 +247,15 @@ ATOMIC_QUEUE_NOINLINE void throughput_consumer(Queue* queue, ThroughputContext* 
         n = consumer.pop(*queue);
         sum += n; // Includes stop value.
     } while(n > 1);
-    auto t = cycles();
 
-    auto const consumer_idx = ctx->last_consumer.fetch_sub(1, std::memory_order_seq_cst) - 1;
+    auto const consumer_idx = --ctx->last_consumer; // std::memory_order_seq_cst
     ctx->consumer_sums[consumer_idx] = sum;
+
+    auto t = cycles();
 
     // The last consumer saves the end time.
     if(ATOMIC_QUEUE_LIKELY(!consumer_idx)) // 1 return with likely.
-        ctx->t1.store(t, R);
+        ctx->t1.store(t); // std::memory_order_seq_cst
 }
 
 struct PinnedThreads {
