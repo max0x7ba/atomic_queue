@@ -257,42 +257,53 @@ ATOMIC_QUEUE_NOINLINE void throughput_consumer(Queue* queue, ThroughputContext* 
         ctx->t1.store(t, X);
 }
 
+struct PinnedThreads {
+    std::vector<std::thread> threads;
+    unsigned const* const hw_thread_ids;
+    int cur_idx = 0;
+
+    ATOMIC_QUEUE_NOINLINE PinnedThreads(unsigned n_threads, unsigned const* hw_thread_ids)
+        : threads(n_threads)
+        , hw_thread_ids(hw_thread_ids)
+    {}
+
+    template<class... Args>
+    void create(Args... args) {
+        set_default_thread_affinity(hw_thread_ids[cur_idx]);
+        threads[cur_idx] = std::thread(args...);
+        ++cur_idx;
+    }
+
+    ATOMIC_QUEUE_NOINLINE void join() {
+        for(auto& t : threads)
+            t.join();
+    }
+};
+
 template<class Queue>
 ATOMIC_QUEUE_INLINE cycles_t time_throughput_once(HugePages& hp, std::vector<unsigned> const& hw_thread_ids, unsigned N, unsigned thread_count, bool alternative_placement, sum_t* consumer_sums) {
-    set_thread_affinity(hw_thread_ids[thread_count * 2 - 1]); // Use this thread for the last consumer.
-
-    std::vector<std::thread> threads(thread_count * 2 - 1);
+    set_thread_affinity(hw_thread_ids[0]); // Use this thread#0 for the first producer. Pin to the same CPU.
+    PinnedThreads threads{thread_count * 2 - 1, hw_thread_ids.data() + 1};
 
     auto ctx = hp.create_unique_ptr<ThroughputContext>(N, thread_count, consumer_sums);
     auto queue = hp.create_unique_ptr<Queue>(ContextOf<Queue>{thread_count, thread_count});
 
-    unsigned cpu_idx = 0;
     if(alternative_placement) {
         for(unsigned i = 0; i < thread_count; ++i) {
-            set_default_thread_affinity(hw_thread_ids[cpu_idx++]);
-            threads[i] = std::thread(throughput_producer<Queue>, queue.get(), ctx.get());
-            if(i != thread_count - 1) { // This thread is the last consumer.
-                set_default_thread_affinity(hw_thread_ids[cpu_idx++]);
-                threads[thread_count + i] = std::thread(throughput_consumer<Queue>, queue.get(), ctx.get());
-            }
+            if(i) // This thread#0 is the first producer.
+                threads.create(throughput_producer<Queue>, queue.get(), ctx.get());
+            threads.create(throughput_consumer<Queue>, queue.get(), ctx.get());
         }
     } else {
-        for(unsigned i = 0; i < thread_count; ++i) {
-            set_default_thread_affinity(hw_thread_ids[cpu_idx++]);
-            threads[i] = std::thread(throughput_producer<Queue>, queue.get(), ctx.get());
-        }
-        for(unsigned i = 0; i < thread_count - 1; ++i) { // This thread is the last consumer.
-            set_default_thread_affinity(hw_thread_ids[cpu_idx++]);
-            threads[thread_count + i] = std::thread(throughput_consumer<Queue>, queue.get(), ctx.get());
-        }
+        for(unsigned i = 1; i < thread_count; ++i)  // This thread#0 is the first producer.
+            threads.create(throughput_producer<Queue>, queue.get(), ctx.get());
+        for(unsigned i = 0; i < thread_count; ++i)
+            threads.create(throughput_consumer<Queue>, queue.get(), ctx.get());
     }
-    throughput_consumer(queue.get(), ctx.get()); // Use this thread for the last consumer.
+    throughput_producer(queue.get(), ctx.get()); // Use this thread#0 for the last consumer.
+    threads.join();
 
-    for(auto& t : threads)
-        t.join();
-
-    reset_thread_affinity();
-
+    // reset_thread_affinity();
     return ctx->t1.load(X) - ctx->t0.load(X);
 }
 
@@ -503,7 +514,7 @@ ATOMIC_QUEUE_NOINLINE void ping_pong_sender(Queue* q1, Queue* q2, LatencyContext
 
 template<class Queue>
 ATOMIC_QUEUE_INLINE std::array<cycles_t, 2> time_ping_pong_once(unsigned N, HugePages& hp, unsigned const (&cpus)[2]) {
-    set_thread_affinity(cpus[0]); // This thread is the sender.
+    set_thread_affinity(cpus[0]); // This thread#0 is the sender.
     set_default_thread_affinity(cpus[1]);
 
     auto ctx = hp.create_unique_ptr<LatencyContext>(N, 1u);
@@ -514,8 +525,8 @@ ATOMIC_QUEUE_INLINE std::array<cycles_t, 2> time_ping_pong_once(unsigned N, Huge
 
     std::thread receiver(ping_pong_receiver<Queue>, q1.get(), q2.get(), ctx.get());
     ping_pong_sender<Queue>(q1.get(), q2.get(), ctx.get());
-
     receiver.join();
+
     return ctx->times;
 }
 
@@ -637,6 +648,8 @@ int main() {
     log_cpus(cpu_topology);
     if(cpu_topology.size() < 2)
         throw std::runtime_error("A CPU with at least 2 hardware threads is required.");
+
+    set_thread_affinity(cpu_topology[0].hw_thread_id); // Pin the main thread#0 to CPU#0 prior to allocating memory.
 
     HugePages::warn_no_1GB_pages = advise_hugeadm_1GB;
     HugePages::warn_no_2MB_pages = advise_hugeadm_2MB;
