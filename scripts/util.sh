@@ -32,7 +32,9 @@ EOF
 
 # cd ~/src/atomic_queue; source ./scripts/util.sh; benchmark ryzen_5825u
 # cd ~/src/atomic_queue; source ./scripts/util.sh; N=2 benchmark ryzen_5825u_4
-function benchmark {
+function benchmark {(
+    set -eu
+
     local commit="$(git rev-parse --short HEAD)"
     local N=${N:-1}
     local benchmark_cmd=(make -R -j8 T=2 TOOLSET=gcc-14)
@@ -50,15 +52,13 @@ function benchmark {
         [smt0]=0-15
     )
 
-    for target in clean "all run_tests"; do
+    for target in clean "run_tests all"; do
         ${benchmark_cmd[@]} $target
     done
 
     local cpu_name="$1" name cpu_list target
     local -n cpu_lists=$1
     for name in "${!cpu_lists[@]}"; do
-        cpu_list="${cpu_lists[$name]}"
-        # echo "$name is $cpu_list"
-        taskset -c $cpu_list time ${benchmark_cmd[@]} run_benchmarks_n N=$N TAG=${commit}.${cpu_name}.${name}
+        taskset -c "${cpu_lists[$name]}" time ${benchmark_cmd[@]} run_benchmarks_n N=$N TAG=${commit}.${cpu_name}.${name}
     done
-}
+)}
