@@ -50,8 +50,8 @@ function benchmark {
         [smt0]=0-15
     )
 
-    for target in clean all; do
-        ${benchmark_cmd[@]} -n $target
+    for target in clean "all run_tests"; do
+        ${benchmark_cmd[@]} $target
     done
 
     local cpu_name="$1" name cpu_list target
