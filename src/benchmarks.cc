@@ -375,7 +375,7 @@ ATOMIC_QUEUE_NOINLINE void run_throughput_benchmarks(HugePages& hp, std::vector<
         time_throughput_mpmc("boost::lockfree::queue", hp, hw_thread_ids,
                                       Type<BoostQueueAdapter<boost::lockfree::queue<unsigned, BoostAllocator, boost::lockfree::capacity<SIZE - 2>>>>{});
 
-        time_throughput_mpmc("TicketSpinlock", hp, hw_thread_ids, Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, TicketSpinlock>>>{});
+        // time_throughput_mpmc("TicketSpinlock", hp, hw_thread_ids, Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, TicketSpinlock>>>{});
         // run_throughput_mpmc_benchmark("UnfairSpinlock", hp, hw_thread_ids, Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, UnfairSpinlock>>>{});
         // run_throughput_mpmc_benchmark<RetryDecorator<AtomicQueueSpinlockHle<unsigned, SIZE>>>("SpinlockHle");
 
@@ -561,7 +561,7 @@ void run_ping_pong_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const&
         time_ping_pong<BoostQueueAdapter<boost::lockfree::queue<unsigned, BoostAllocator, boost::lockfree::capacity<SIZE>>>>("boost::lockfree::queue", hp,
                                                                                                                                       hw_thread_ids);
 
-        time_ping_pong<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, TicketSpinlock>>>("TicketSpinlock", hp, hw_thread_ids);
+        // time_ping_pong<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, TicketSpinlock>>>("TicketSpinlock", hp, hw_thread_ids);
         // run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, UnfairSpinlock>>>("UnfairSpinlock", hp, hw_thread_ids);
         // run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinlockHle<unsigned, SIZE>>>("SpinlockHle");
 
