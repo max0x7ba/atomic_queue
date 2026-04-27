@@ -5,6 +5,7 @@
 #   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2))
 #   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) all run_tests
 #   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 BUILD=debug run_tests
+#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 BUILD=debug run_tests run_benchmarks_quick
 #   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=clang-20 BUILD=debug run_tests
 #   AQB=1 time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 run_benchmarks_n
 #   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 asm_throughput asm_latency
@@ -274,8 +275,8 @@ run_benchmarks_n : results/$${new_filename}.${N}.txt
 run_benchmarks_perf : perf/$${new_filename}.txt
 	@printf "%(%F %T)T $@ saved \e[32m$(abspath $<)\e[0m\n\n"
 
-run_benchmarks : ${build_dir}/benchmarks
-	@echo -n "$@ "; set -x; scripts/benchmark.sh ${chrt_fifo} $<
+run_benchmarks_quick : ${build_dir}/benchmarks
+	@echo -n "$@ "; set -x; AQB=1 taskset -c 4-7 ${chrt_fifo} $<
 
 run_tests : ${build_dir}/tests
 	@echo -n "$@ "; set -x; $< --log_level=unit_scope --report_level=short
@@ -311,7 +312,7 @@ asm_% : scripts/util.sh ${build_dir}/benchmarks $$(if $${symbol_regex},force,$$(
 -include $(sort ${auto_generated_header_d}) # Remove duplicates and include.
 endif # Not cleanining.
 
-.PHONY : update_env_txt env versions run_benchmarks clean all compile_commands compile_commands.json TAGS run_tests run_benchmarks_n run_benchmarks_perf env2
+.PHONY : update_env_txt env versions run_benchmarks_quick clean all compile_commands compile_commands.json TAGS run_tests run_benchmarks_n run_benchmarks_perf env2
 
 endif # Build with a single toolset.
 
