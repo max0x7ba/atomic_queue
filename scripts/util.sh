@@ -28,11 +28,14 @@ use_ld := -fuse-ld=$(type -p lld &> /dev/null && echo -n lld || echo -n bfd)
 EOF
 )}
 
+benchmark_prefix=(make -R -j8 T=2 TOOLSET=gcc-14)
+
 function benchmark_ryzen_5825u {
     local -i smt=1
     local c
+    ${benchmark_prefix[@]} clean
     for c in 0-15 0,2,4,6,8,10,12,14 ; do
-        taskset -c $c time make -Rj8 T=1 TOOLSET=gcc-14 run_benchmarks_n N=33 TAG=5825u-f469caa-smt$smt
+        taskset -c $c time ${benchmark_prefix[@]} run_benchmarks_n N=33 TAG=5825u-61d91e9-smt$smt
         ((--smt))
     done
 }
@@ -40,8 +43,9 @@ function benchmark_ryzen_5825u {
 function benchmark_ryzen_5950x {
     local -i smt=1
     local c
+    ${benchmark_prefix[@]} clean
     for c in 0-31 0-15 ; do
-        taskset -c $c time make -Rj8 T=1 TOOLSET=gcc-14 run_benchmarks_n N=33 TAG=5950x-f469caa-smt$smt
+        taskset -c $c time ${benchmark_prefix[@]} run_benchmarks_n N=33 TAG=5950x-61d91e9-smt$smt
         ((--smt))
     done
 }
