@@ -199,11 +199,12 @@ struct ThroughputContext {
     // These are modified at the start.
     alignas(CACHE_LINE_SIZE)
     Barrier2 barrier;
-    std::atomic<cycles_t> t0{0};
+    std::atomic<int> last_consumer;
 
+    alignas(CACHE_LINE_SIZE)
+    std::atomic<cycles_t> t0{0};
     // These are modified at the end.
     std::atomic<cycles_t> t1{0};
-    std::atomic<unsigned> last_consumer{0};
 
     ATOMIC_QUEUE_INLINE ThroughputContext(unsigned n, unsigned thread_count, sum_t* ATOMIC_QUEUE_RESTRICT consumer_sums) noexcept
         : N(n)
@@ -245,10 +246,10 @@ ATOMIC_QUEUE_NOINLINE void throughput_consumer(Queue* queue, ThroughputContext* 
     do {
         n = consumer.pop(*queue);
         sum += n; // Includes stop value.
-    } while(n != 1);
+    } while(n > 1);
     auto t = cycles();
 
-    auto const consumer_idx = ctx->last_consumer.fetch_sub(1, AR) - 1;
+    auto const consumer_idx = ctx->last_consumer.fetch_sub(1, std::memory_order_seq_cst) - 1;
     ctx->consumer_sums[consumer_idx] = sum;
 
     // The last consumer saves the end time.
@@ -450,6 +451,20 @@ ATOMIC_QUEUE_NOINLINE void run_throughput_benchmarks(HugePages& hp, std::vector<
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+struct Times {
+    std::atomic<cycles_t> times[2] = {};
+
+    ATOMIC_QUEUE_INLINE void set(bool i) noexcept {
+        auto* p = &times[i];
+        auto now = cycles();
+        p->store(now, std::memory_order_seq_cst);
+    }
+
+    ATOMIC_QUEUE_INLINE cycles_t duration() const noexcept {
+        return {times[1].load(X) - times[0].load(X)};
+    }
+};
+
 struct LatencyContext {
     // These remain constant.
     alignas(CACHE_LINE_SIZE)
@@ -459,8 +474,14 @@ struct LatencyContext {
     alignas(CACHE_LINE_SIZE)
     Barrier2 barrier;
 
-    // These are modified at the end.
-    std::array<cycles_t, 2> times;
+    alignas(CACHE_LINE_SIZE)
+    Times sender;
+
+    alignas(CACHE_LINE_SIZE)
+    Times receiver;
+
+    // // These are modified at the end.
+    // std::array<cycles_t, 2> times;
 
     ATOMIC_QUEUE_INLINE LatencyContext(unsigned n, unsigned thread_count) noexcept
         : N(n)
@@ -478,16 +499,15 @@ ATOMIC_QUEUE_NOINLINE void ping_pong_receiver(Queue* q1, Queue* q2, LatencyConte
 
     ctx->barrier.countdown();
 
-    cycles_t t0 = cycles();
+    ctx->receiver.set(0);
 
     unsigned N = ctx->N, i;
     do {
         i = consumer_q1.pop(*q1);
         producer_q2.push(*q2, i);
-    } while(++i < N);
+    } while(ATOMIC_QUEUE_LIKELY(++i < N));
 
-    cycles_t t1 = cycles();
-    ctx->times[1] = t1 - t0;
+    ctx->receiver.set(1);
 }
 
 template<class Queue>
@@ -498,7 +518,7 @@ ATOMIC_QUEUE_NOINLINE void ping_pong_sender(Queue* q1, Queue* q2, LatencyContext
 
     ctx->barrier.countdown();
 
-    cycles_t t0 = cycles();
+    ctx->sender.set(0);
 
     unsigned N = ctx->N, j = 1;
     do {
@@ -506,8 +526,7 @@ ATOMIC_QUEUE_NOINLINE void ping_pong_sender(Queue* q1, Queue* q2, LatencyContext
         j = consumer_q2.pop(*q2);
     } while(++j < N);
 
-    cycles_t t1 = cycles();
-    ctx->times[0] = t1 - t0;
+    ctx->sender.set(1);
 }
 
 template<class Queue>
@@ -525,7 +544,7 @@ ATOMIC_QUEUE_INLINE std::array<cycles_t, 2> time_ping_pong_once(unsigned N, Huge
     ping_pong_sender<Queue>(q1.get(), q2.get(), ctx.get());
     receiver.join();
 
-    return ctx->times;
+    return {ctx->sender.duration(), ctx->receiver.duration()};
 }
 
 template<class Queue>
@@ -536,9 +555,10 @@ ATOMIC_QUEUE_NOINLINE void time_ping_pong(char const* name, HugePages& hp, std::
     // Select the best times of RUNS runs.
     std::array<cycles_t, 2> best_times = {CYCLES_MAX, CYCLES_MAX};
 
-    // Ping-pong between the first available CPU and every other.
+    // Ping-pong between the first available CPU and every othery other power-of-2.
     unsigned const n_cpus = hw_thread_ids.size();
-    for(unsigned cpu2 = 1; cpu2 < n_cpus; ++cpu2) {
+    for(unsigned cpu2 = 1; cpu2 < n_cpus; cpu2 *= 2) {
+    // for(unsigned cpu2 = 1; cpu2 < n_cpus; ++cpu2) {
         unsigned const cpus[2] = {hw_thread_ids[0], hw_thread_ids[cpu2]};
         for(unsigned run = RUNS; run--;) {
             auto times = time_ping_pong_once<Queue>(N_PING_PONG_MESSAGES, hp, cpus);

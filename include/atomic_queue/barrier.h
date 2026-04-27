@@ -50,7 +50,7 @@ struct Barrier2 {
         int caller_idx = counter.fetch_sub(1, std::memory_order_seq_cst) - 1;
         do
             spin_loop_pause();
-        while(ATOMIC_QUEUE_LIKELY(counter.load(std::memory_order_seq_cst)));
+        while(counter.load(std::memory_order_seq_cst));
         return caller_idx;
     }
 };
