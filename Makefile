@@ -201,7 +201,8 @@ exes := example tests benchmarks
 example_src := example.cc
 
 tests_src := tests.cc
-${build_dir}/tests : ldlibs += -lboost_unit_test_framework
+${build_dir}/tests.o : cppflags += -DBOOST_TEST_DYN_LINK=1
+${build_dir}/tests :   ldlibs += -lboost_unit_test_framework
 
 benchmarks_src := benchmarks.cc cpu_base_frequency.cc huge_pages.cc
 ${build_dir}/benchmarks.o : cppflags += ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium}
