@@ -194,12 +194,11 @@ struct ThroughputContext {
     // These remain constant.
     alignas(CACHE_LINE_SIZE)
     unsigned const N;
-    unsigned const n_release;
     sum_t* ATOMIC_QUEUE_RESTRICT const consumer_sums;
 
     // These are modified at the start.
     alignas(CACHE_LINE_SIZE)
-    Barrier barrier;
+    Barrier2 barrier;
     std::atomic<cycles_t> t0{0};
 
     // These are modified at the end.
@@ -208,8 +207,8 @@ struct ThroughputContext {
 
     ATOMIC_QUEUE_INLINE ThroughputContext(unsigned n, unsigned thread_count, sum_t* ATOMIC_QUEUE_RESTRICT consumer_sums) noexcept
         : N(n)
-        , n_release(thread_count * 2)
         , consumer_sums(consumer_sums)
+        , barrier{thread_count * 2}
         , last_consumer(thread_count)
     {
         assert(is_suitably_aligned(this));
@@ -221,7 +220,7 @@ ATOMIC_QUEUE_NOINLINE void throughput_producer(Queue* queue, ThroughputContext* 
     region_guard_t<Queue> guard;
     ProducerOf<Queue> producer{*queue};
 
-    ctx->barrier.wait_or_release(ctx->n_release);
+    ctx->barrier.countdown();
 
     // The first producer saves the start time.
     auto t0 = cycles();
@@ -239,7 +238,7 @@ ATOMIC_QUEUE_NOINLINE void throughput_consumer(Queue* queue, ThroughputContext* 
     region_guard_t<Queue> guard;
     ConsumerOf<Queue> consumer{*queue};
 
-    ctx->barrier.wait_or_release(ctx->n_release);
+    ctx->barrier.countdown();
 
     sum_t sum = 0;
     unsigned n;
@@ -455,18 +454,17 @@ struct LatencyContext {
     // These remain constant.
     alignas(CACHE_LINE_SIZE)
     unsigned const N;
-    unsigned const n_release;
 
     // These are modified at the start.
     alignas(CACHE_LINE_SIZE)
-    Barrier barrier;
+    Barrier2 barrier;
 
     // These are modified at the end.
     std::array<cycles_t, 2> times;
 
     ATOMIC_QUEUE_INLINE LatencyContext(unsigned n, unsigned thread_count) noexcept
         : N(n)
-        , n_release(thread_count * 2)
+        , barrier{thread_count * 2}
     {
         assert(is_suitably_aligned(this));
     }
@@ -478,7 +476,7 @@ ATOMIC_QUEUE_NOINLINE void ping_pong_receiver(Queue* q1, Queue* q2, LatencyConte
     ConsumerOf<Queue> consumer_q1{*q1};
     ProducerOf<Queue> producer_q2{*q2};
 
-    ctx->barrier.wait_or_release(ctx->n_release);
+    ctx->barrier.countdown();
 
     cycles_t t0 = cycles();
 
@@ -498,7 +496,7 @@ ATOMIC_QUEUE_NOINLINE void ping_pong_sender(Queue* q1, Queue* q2, LatencyContext
     ProducerOf<Queue> producer_q1{*q1};
     ConsumerOf<Queue> consumer_q2{*q2};
 
-    ctx->barrier.wait_or_release(ctx->n_release);
+    ctx->barrier.countdown();
 
     cycles_t t0 = cycles();
 
