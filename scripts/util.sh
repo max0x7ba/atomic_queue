@@ -1,3 +1,5 @@
+#!/bin/bash
+
 function disassemble-symbol {(
     set -eu
     local re_symbol="$1" obj="$2"
@@ -28,24 +30,35 @@ use_ld := -fuse-ld=$(type -p lld &> /dev/null && echo -n lld || echo -n bfd)
 EOF
 )}
 
-benchmark_prefix=(make -R -j8 T=2 TOOLSET=gcc-14)
+# cd ~/src/atomic_queue; source ./scripts/util.sh; benchmark ryzen_5825u
+# cd ~/src/atomic_queue; source ./scripts/util.sh; N=2 benchmark ryzen_5825u_4
+function benchmark {
+    local commit="$(git rev-parse --short HEAD)"
+    local N=${N:-1}
+    local benchmark_cmd=(make -R -j8 T=2 TOOLSET=gcc-14)
 
-function benchmark_ryzen_5825u {
-    local -i smt=1
-    local c
-    ${benchmark_prefix[@]} clean
-    for c in 0-15 0,2,4,6,8,10,12,14 ; do
-        taskset -c $c time ${benchmark_prefix[@]} run_benchmarks_n N=33 TAG=5825u-61d91e9-smt$smt
-        ((--smt))
+    local -A ryzen_5825u=(
+        [smt1]=0-15
+        [smt0]=0-15:2
+    )
+    local -A ryzen_5825u_4=(
+        [smt1]=0-3
+        [smt0]=0-7:2
+    )
+    local -A ryzen_5950x=(
+        [smt1]=0-31
+        [smt0]=0-15
+    )
+
+    for target in clean all; do
+        ${benchmark_cmd[@]} -n $target
     done
-}
 
-function benchmark_ryzen_5950x {
-    local -i smt=1
-    local c
-    ${benchmark_prefix[@]} clean
-    for c in 0-31 0-15 ; do
-        taskset -c $c time ${benchmark_prefix[@]} run_benchmarks_n N=33 TAG=5950x-61d91e9-smt$smt
-        ((--smt))
+    local cpu_name="$1" name cpu_list target
+    local -n cpu_lists=$1
+    for name in "${!cpu_lists[@]}"; do
+        cpu_list="${cpu_lists[$name]}"
+        # echo "$name is $cpu_list"
+        taskset -c $cpu_list time ${benchmark_cmd[@]} run_benchmarks_n N=$N TAG=${commit}.${cpu_name}.${name}
     done
 }
