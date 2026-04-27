@@ -220,6 +220,7 @@ template<class Queue>
 ATOMIC_QUEUE_NOINLINE void throughput_producer(Queue* queue, ThroughputContext* ctx) {
     region_guard_t<Queue> guard;
     ProducerOf<Queue> producer{*queue};
+    unsigned n = ctx->N;
 
     ctx->barrier.countdown();
 
@@ -228,7 +229,6 @@ ATOMIC_QUEUE_NOINLINE void throughput_producer(Queue* queue, ThroughputContext* 
     auto t0 = cycles();
     ctx->t0.compare_exchange_strong(expected, t0, std::memory_order_seq_cst, std::memory_order_seq_cst);
 
-    unsigned n = ctx->N;
     do
         producer.push(*queue, n);
     while(--n);
@@ -238,11 +238,11 @@ template<class Queue>
 ATOMIC_QUEUE_NOINLINE void throughput_consumer(Queue* queue, ThroughputContext* ctx) {
     region_guard_t<Queue> guard;
     ConsumerOf<Queue> consumer{*queue};
+    sum_t sum = 0;
+    unsigned n;
 
     ctx->barrier.countdown();
 
-    sum_t sum = 0;
-    unsigned n;
     do {
         n = consumer.pop(*queue);
         sum += n; // Includes stop value.
@@ -497,12 +497,11 @@ ATOMIC_QUEUE_NOINLINE void ping_pong_receiver(Queue* q1, Queue* q2, LatencyConte
     region_guard_t<Queue> guard;
     ConsumerOf<Queue> consumer_q1{*q1};
     ProducerOf<Queue> producer_q2{*q2};
+    unsigned N = ctx->N, i;
 
     ctx->barrier.countdown();
-
     ctx->receiver.set(0);
 
-    unsigned N = ctx->N, i;
     do {
         i = consumer_q1.pop(*q1);
         producer_q2.push(*q2, i);
@@ -516,12 +515,11 @@ ATOMIC_QUEUE_NOINLINE void ping_pong_sender(Queue* q1, Queue* q2, LatencyContext
     region_guard_t<Queue> guard;
     ProducerOf<Queue> producer_q1{*q1};
     ConsumerOf<Queue> consumer_q2{*q2};
+    unsigned N = ctx->N, j = 1;
 
     ctx->barrier.countdown();
-
     ctx->sender.set(0);
 
-    unsigned N = ctx->N, j = 1;
     do {
         producer_q1.push(*q1, j);
         j = consumer_q2.pop(*q2);
