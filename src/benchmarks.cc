@@ -226,7 +226,7 @@ ATOMIC_QUEUE_NOINLINE void throughput_producer(Queue* queue, ThroughputContext* 
     // The first producer saves the start time.
     auto t0 = cycles();
     cycles_t expected = 0;
-    ctx->t0.compare_exchange_strong(expected, t0, A, X);
+    ctx->t0.compare_exchange_strong(expected, t0, AR, AR);
 
     unsigned n = ctx->N;
     do
@@ -249,29 +249,29 @@ ATOMIC_QUEUE_NOINLINE void throughput_consumer(Queue* queue, ThroughputContext* 
     } while(n != 1);
     auto t = cycles();
 
-    auto const consumer_idx = ctx->last_consumer.fetch_sub(1, X) - 1;
+    auto const consumer_idx = ctx->last_consumer.fetch_sub(1, AR) - 1;
     ctx->consumer_sums[consumer_idx] = sum;
 
     // The last consumer saves the end time.
     if(ATOMIC_QUEUE_LIKELY(!consumer_idx)) // 1 return with likely.
-        ctx->t1.store(t, X);
+        ctx->t1.store(t, R);
 }
 
 struct PinnedThreads {
     std::vector<std::thread> threads;
     unsigned const* const hw_thread_ids;
-    int cur_idx = 0;
 
     ATOMIC_QUEUE_NOINLINE PinnedThreads(unsigned n_threads, unsigned const* hw_thread_ids)
-        : threads(n_threads)
-        , hw_thread_ids(hw_thread_ids)
-    {}
+        : hw_thread_ids(hw_thread_ids)
+    {
+        threads.reserve(n_threads);
+    }
 
     template<class... Args>
-    void create(Args... args) {
-        set_default_thread_affinity(hw_thread_ids[cur_idx]);
-        threads[cur_idx] = std::thread(args...);
-        ++cur_idx;
+    ATOMIC_QUEUE_NOINLINE void create(Args... args) {
+        auto thread_idx = threads.size();
+        set_default_thread_affinity(hw_thread_ids[thread_idx]);
+        threads.emplace_back(args...);
     }
 
     ATOMIC_QUEUE_NOINLINE void join() {

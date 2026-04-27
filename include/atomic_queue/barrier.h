@@ -29,7 +29,7 @@ public:
     }
 
     ATOMIC_QUEUE_INLINE void wait_or_release(int release_counter) noexcept {
-        release_counter = counter_.fetch_add(1, A) - release_counter;
+        release_counter = counter_.fetch_add(1, AR) - release_counter;
         ++release_counter;
         if(ATOMIC_QUEUE_LIKELY(release_counter < 0))
             do
