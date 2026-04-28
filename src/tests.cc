@@ -293,6 +293,10 @@ BOOST_AUTO_TEST_CASE(size) {
     BOOST_CHECK(!q.was_full());
 }
 
+// BOOST_AUTO_TEST_CASE(exper) {
+//     BOOST_CHECK_EQUAL(sizeof(std::thread), 1);
+// }
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 BOOST_AUTO_TEST_CASE(power_of_2) {
