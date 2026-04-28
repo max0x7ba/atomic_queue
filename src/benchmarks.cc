@@ -585,22 +585,22 @@ ATOMIC_QUEUE_NOINLINE void time_ping_pong(char const* name, HugePages& hp, std::
     int constexpr RUNS = 3;
 
     // Select the best times of RUNS runs.
-    cycles_t best_duration = CYCLES_MAX;
+    cycles_t shortest_total_time = CYCLES_MAX;
 
     // Ping-pong between the first available CPU and every othery next power-of-2 to find its SMT sibling, if any.
     unsigned const n_cpus = hw_thread_ids.size();
     for(unsigned cpu2 = 1; cpu2 < n_cpus; cpu2 *= 2) {
         unsigned const cpus[2] = {hw_thread_ids[0], hw_thread_ids[cpu2]};
         for(unsigned run = RUNS; run--;) {
-            auto duration = time_ping_pong_once<Queue>(N_PING_PONG_MESSAGES, hp, cpus);
-            if(best_duration > duration)
-                best_duration = duration;
+            auto total_time = time_ping_pong_once<Queue>(N_PING_PONG_MESSAGES, hp, cpus);
+            if(shortest_total_time > total_time)
+                shortest_total_time = total_time;
 
             hp.check_huge_pages_leaks(name);
         }
     }
 
-    auto round_trip_time = to_seconds(best_duration) / (N_PING_PONG_MESSAGES / 2);
+    auto round_trip_time = to_seconds(shortest_total_time) / (N_PING_PONG_MESSAGES / 2);
     printf("%32s: %.9f sec/round-trip\n", name, round_trip_time);
 }
 
