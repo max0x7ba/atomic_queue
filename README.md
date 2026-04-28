@@ -128,7 +128,7 @@ GNU Make command line options with the greatest impact on built time:
 * `-R` disables GNU Make legacy built-in variables and rules for at least +25% faster dependency checking. `make -R` is the right default invocation for GNU Make. Not specifying `-R` command line option for GNU Make is wasting time and energy for no good reason. (`ninja` docs never mention `make -R` because `ninja` is unable to build as fast as `make -R` does.)
 
 #### Build and run unit-tests
-Building and running the unit-tests require Boost.Test library (e.g. `libboost-test-dev` on Debian/Ubuntu).
+Building and running the unit-tests require Boost.Test library (e.g. `libboost-test-dev` on Debian/Ubuntu). Installing the complete set of Boost development libraries is the easiest (e.g. `libboost-all-dev` on Debian/Ubuntu).
 
 ```bash
 git clone https://github.com/max0x7ba/atomic_queue.git
@@ -144,8 +144,10 @@ make -R -j$(($(nproc)/2)) BUILD=debug TOOLSET=gcc,gcc-14,clang,clang-20 run_test
 ```
 
 #### Build and run benchmarks
-Building and running the benchmarks require a few other Boost libraries. Installing the complete set of Boost development libraries is the easiest (e.g. `libboost-all-dev` on Debian/Ubuntu).
-The benchmarks require several third-party libraries to be cloned as sibling directories, as well as Intel TBB:
+Building and running the benchmarks require additional third-party libraries:
+* Boost.Lockfree library. Installing the complete set of Boost development libraries is the easiest (e.g. `libboost-all-dev` on Debian/Ubuntu).
+* Intel TBB library (e.g. `libtbb-dev` on Debian/Ubuntu). When Intel TBB library is installed elsewhere, you may like to specify that location in `cppflags.tbb` and `ldlibs.tbb` in `Makefile`.
+* Several other third-party libraries are expected to be cloned into sibling directories:
 
 ```bash
 git clone https://github.com/cameron314/concurrentqueue.git
@@ -155,8 +157,6 @@ git clone https://github.com/mpoeter/xenium.git
 git clone https://github.com/max0x7ba/atomic_queue.git
 cd atomic_queue
 ```
-
-The benchmarks also require Intel TBB library to be available. It assumes that it is installed in `/usr/local/include` and `/usr/local/lib`. If it is installed elsewhere you may like to modify `cppflags.tbb` and `ldlibs.tbb` in `Makefile`.
 
 After succeeding the above commands,
 
@@ -247,9 +247,12 @@ While the atomic queues can be used with any moveable element types (including `
 
 These queues anticipate that a thread doing `push` or `pop` may complete step 1 and then be preempted before completing step 2.
 
-When a thread completes step 1 and terminates (for any reason) without completing step 2, the queue slot remains locked and deadlocks the next thread attempting to `try_pop`/`try_push`/`pop`/`push` from/into that slot. A thread can be terminated by the OS (e.g., oomkiller), or throw/crash in the user-defined copy/move constructor/assignment of queue element (if any). Should that happen, the game is over, and the best course of action is to terminate as soon as possible and address the root cause of one's threads crashing.
+When a thread completes step 1 and terminates (for any reason) without completing step 2, the queue slot remains locked and deadlocks the next thread attempting to `try_pop`/`try_push`/`pop`/`push` from/into that slot. A thread can be terminated by the OS (e.g., `oomkiller`), or throw/crash in the user-defined copy/move constructor/assignment of queue element (if any). Should that happen, the game is over, and the best course of action is to terminate the process as soon as possible and address the root cause of one's threads crashing.
 
-Once constructed/allocated, queue objects maintain their invariants and never throw exceptions, provided queue elements copy/move constructor/assignment never throw, and threads don't terminate half-way through `push`/`pop`.
+Once constructed/allocated, queue objects maintain their invariants and never throw exceptions, provided that:
+* Queue elements copy/move constructor/assignment never throw.
+* Threads don't terminate half-way through `push`/`pop`.
+* Thread preemption half-way through `push`/`pop` is not great, not terrible. Real-time FIFO threads with real-time thread throttling disabled are required for best results.
 
 An algorithm is *lock-free* if there is guaranteed system-wide progress. These queues guarantee system-wide progress by the following properties:
 
@@ -277,6 +280,11 @@ C++20 introduced blocking `std::atomic::wait` which uses Linux futex for atomic 
 
 On Intel CPUs one could use [the 4 debug control registers][6] to monitor the spinlock memory region for write access and wait on it using `select` (and its friends) or `sigwait` (see [`perf_event_open`][7] and [`uapi/linux/hw_breakpoint.h`][8] for more details). A spinlock waiter could suspend itself with `select` or `sigwait` until the spinlock state has been updated. But there are only 4 of these registers, so that such a solution wouldn't scale.
 
+### Huge pages
+Using huge pages improves performance of memory intensive applications dramatically. The benchmark tries allocating 1GB or 2MB huge pages first, and falls back to allocating the default tiny pages (4kB on x86_64). The benchmark results are reproducible only when it succeeds allocating one 1GB huge page.
+
+Using smaller pages cripple CPU performance with TLB cache misses.
+
 ## Benchmarks
 [View throughput and latency benchmarks charts][1].
 
@@ -295,9 +303,9 @@ I only have access to a few x86-64 machines. If you have access to different har
 When huge pages are available the benchmarks use 1x1GB or 16x2MB huge pages for the queues to minimise TLB misses. To enable huge pages do one of:
 ```bash
 sudo hugeadm --pool-pages-min 1GB:1
-sudo hugeadm --pool-pages-min 2MB:16
+sudo hugeadm --pool-pages-min 2MB:32
 ```
-Alternatively, you may like to enable [transparent hugepages][15] in your system and use a hugepage-aware allocator, such as [tcmalloc][14].
+Alternatively, you may like to enable [transparent hugepages][15] in your system and/or use a hugepage-aware allocator. [thp-usage][14] provides more information.
 
 #### Real-time thread throttling
 By default, Linux scheduler throttles real-time threads from consuming 100% of CPU and that is detrimental to benchmarking. Full details can be found in [Real-Time group scheduling][2]. To disable real-time thread throttling do:
@@ -306,42 +314,30 @@ echo -1 | sudo tee /proc/sys/kernel/sched_rt_runtime_us >/dev/null
 ```
 
 ### Throughput and scalability benchmark
-N producer threads push a 4-byte integer into one same queue, N consumer threads pop the integers from the queue. All producers posts 1,000,000 messages in total. Total time to send and receive all the messages is measured. The benchmark is run for from 1 producer and 1 consumer up to `(total-number-of-cpus / 2)` producers/consumers to measure the scalability of different queues.
+N producer threads push a 4-byte integer into one same queue, N consumer threads pop the integers from the queue. Each producer posts 1,000,000 messages. Total time taken to send and receive all these messages is measured.
+
+With SMT threads, the benchmark is run for from 1 producer and 1 consumer up to `(total-number-of-cpus / 2)` producers/consumers to measure the scalability of different queues. Without using SMT threads (cross-core communication only) -- up to `(total-number-of-cpus / 4)` producers/consumers.
+
+A benchmark run reports the best msg/sec throughput out of 10 tries for each queue.
+
+The charts report mean, stdev, min and max of msg/sec throughput across 33 benchmark runs.
 
 ### Ping-pong benchmark
-One thread posts an integer to another thread through one queue and waits for a reply from another queue (2 queues in total). The benchmarks measures the total time of 1,000,000 ping-pongs, best of 10 runs. Contention is minimal here (1-producer-1-consumer, 1 element in the queue) to be able to achieve and measure the lowest latency. Reports the average round-trip time.
+One thread posts an integer to another thread through one queue and waits for a reply from another queue, 2 queues and 2 threads, in total. Each thread pings or pongs 500,000 messages into its egress queue.
 
-## Benchmarks observations
+Contention is minimal here (1-producer-1-consumer, 1 element in the queue) in order to be able to achieve the lowest possible latency a queue can provide.
 
-The lowest latency for cross-thread communication is achieved when both threads run on the **same CPU core** (2 SMT threads). Moving communication to a different core adds noticeable latency, and crossing CCX boundaries or CPU sockets increases it further.
+This benchmark measures the total time taken to post 500,000 messages and receive 500,000 replies.
 
-### Ping-Pong Latency Benchmark
+A benchmark run reports the best sec/round-trip latency (time taken to `push` a message and `pop` its reply) out of 10 tries for each queue.
 
-In the round-trip latency benchmark, **every tested queue** achieves its best latency only when the producer and consumer threads share the same CPU core.
+The charts report mean, stdev, min and max of sec/round-trip latency across 33 benchmark runs.
+
+## Benchmarks Notes
+- The lowest latency for cross-thread communication is achieved when both threads run on the **same CPU core** (2 SMT threads). Moving communication to a different core adds noticeable latency, and crossing CCX boundaries or CPU sockets increases it further.
+- In the round-trip latency benchmark, **every tested queue** achieves its best latency only when the producer and consumer threads share the same CPU core.
 When the threads run on **different cores**, latency increases by **3× or more**.
-
-**Example** (AMD Ryzen 5825U):
-- `boost::lockfree::spsc_queue`: **111 ns** (same core) vs **332 ns** (different cores)
-
-### Throughput Benchmark
-
-When producer and consumer threads run on different cores, **all queues** show **at least 1.5× lower** throughput.
-The ~3× higher latency of cross-core communication compounds with every atomic operation, making throughput highly sensitive to the number and cost of atomic instructions.
-
-#### Exceptions
-
-- **`boost::lockfree::spsc_queue`**
-  Uses the cheapest atomic load/store instructions. Its cross-core throughput remains roughly **equal** to its within-core throughput (neither better nor worse).
-
-- **`xenium::vyukov_bounded_queue`**, **`OptimistAtomicQueue`**/**`OptimistAtomicQueueB`** (atomic elements, static/dynamic buffers)
-  These are the **only** implementations that achieve **≥1.5× higher** throughput across cores compared to within-core in **SPSC** (1-producer / 1-consumer) mode.
-  **`OptimistAtomicQueue`**/**`OptimistAtomicQueueB`** use the same minimal atomic instructions as `boost::lockfree::spsc_queue`, but deliver **~10× higher** absolute throughput thanks to superior implementation quality.
-
-All other queues bottleneck cross-core performance by using more frequent or more expensive atomic operations.
-
-### Notes
-
-- Running the full benchmark suite with 4 threads takes approximately **17 seconds** when all 4 threads are placed within 2 cores, and **~25 seconds** when spread across 4 different cores (AMD Ryzen 5825U).
+- When producer and consumer threads run on different cores, **all queues** show **at least 1.5× lower** throughput.
 - The numbers shown for each queue reflect the **best-case** result across within-core, cross-core, and cross-CCX/socket scenarios.
 - **Important**: These scenarios behave very differently in practice. Excellent performance with two SMT threads on a single core is often irrelevant for real-world use cases where threads must run on different cores.
 - **Recommendation**: Always benchmark your specific thread placement (same core vs. different cores vs. different CCX) for latency-critical or throughput-critical applications.
@@ -368,7 +364,7 @@ Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file L
 [10]: https://en.cppreference.com/w/cpp/atomic/atomic/is_lock_free
 [11]: https://en.cppreference.com/w/cpp/language/type
 [13]: https://en.cppreference.com/w/cpp/error/assert
-[14]: https://google.github.io/tcmalloc/temeraire.html
+[14]: https://github.com/max0x7ba/thp-usage
 [15]: https://www.kernel.org/doc/html/latest/admin-guide/mm/transhuge.html
 [16]: https://en.cppreference.com/w/cpp/atomic/atomic/is_always_lock_free
 [17]: https://en.cppreference.com/w/cpp/atomic/memory_order
