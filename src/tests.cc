@@ -56,12 +56,12 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(stress, Queue, stress_queues) {
     using T = typename Queue::value_type;
 
     Queue q;
-    Barrier barrier;
+    Barrier2 barrier = {{PRODUCERS + CONSUMERS}};
 
     std::thread producers[PRODUCERS];
     for(unsigned i = 0; i < PRODUCERS; ++i)
         producers[i] = std::thread([&q, &barrier]() {
-            barrier.wait();
+            barrier.countdown();
             for(T n = N_STRESS_MSG; n; --n)
                 q.push(n);
         });
@@ -70,14 +70,13 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(stress, Queue, stress_queues) {
     std::thread consumers[CONSUMERS];
     for(unsigned i = 0; i < CONSUMERS; ++i)
         consumers[i] = std::thread([&q, &barrier, &r = results[i]]() {
-            barrier.wait();
+            barrier.countdown();
             uint64_t result = 0;
             for(T n; (n = q.pop()) != static_cast<T>(STOP_MSG);)
                 result += n;
             r = result;
         });
 
-    barrier.release(PRODUCERS + CONSUMERS);
     for(auto& t : producers)
         t.join();
     for(int i = CONSUMERS; i--;)

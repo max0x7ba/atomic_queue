@@ -27,17 +27,6 @@ public:
             spin_loop_pause();
         counter_.store(0, R);
     }
-
-    ATOMIC_QUEUE_INLINE void wait_or_release(int release_counter) noexcept {
-        release_counter = counter_.fetch_add(1, AR) - release_counter;
-        ++release_counter;
-        if(ATOMIC_QUEUE_LIKELY(release_counter < 0))
-            do
-                spin_loop_pause();
-            while(counter_.load(A));
-        else
-            counter_.store(release_counter, R);
-    }
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -46,11 +35,12 @@ struct Barrier2 {
     std::atomic<unsigned> counter = {};
 
     ATOMIC_QUEUE_INLINE unsigned countdown() noexcept {
-        // All callers execute the same code path.
         unsigned caller_idx = --counter; // std::memory_order_seq_cst
-        do
-            spin_loop_pause();
+
+        // All callers execute the same code path.
+        do spin_loop_pause();
         while(counter.load()); // std::memory_order_seq_cst
+
         return caller_idx;
     }
 };
