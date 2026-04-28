@@ -321,8 +321,8 @@ struct SharedState {
     ATOMIC_QUEUE_NOINLINE cycles_t max_duration() const noexcept {
         cycles_t t0 = CYCLES_MAX, t1 = 0;
         for(auto& thr : as_range(threads, n_threads * 2)) {
-            t0 = std::min(t0, thr.times.get(0));
-            t1 = std::max(t1, thr.times.get(1));
+            t0 = min_value(t0, thr.times.get(0));
+            t1 = max_value(t1, thr.times.get(1));
         }
 
         if(ATOMIC_QUEUE_UNLIKELY(t0 == CYCLES_MAX || !t1)) // Must never happen.
@@ -424,7 +424,7 @@ ATOMIC_QUEUE_NOINLINE void time_throughput(char const* name, HugePages& hp, std:
             for(unsigned run = RUNS; run--;) {
                 ThreadStates consumer_sums(threads * 2);
                 cycles_t time = time_throughput_once<Queue>(hp, hw_thread_ids, N, threads, alternative_placement, consumer_sums.data());
-                min_time = std::min(min_time, time);
+                min_time = min_value(min_time, time);
 
                 // Calculate the checksum.
                 sum_t total_sum = 0;

@@ -463,7 +463,7 @@ public:
     ATOMIC_QUEUE_INLINE unsigned was_size() const noexcept {
         // tail_ can be greater than head_ because of consumers doing pop, rather that try_pop, when the queue is empty.
         unsigned n{head_.load(X) - tail_.load(X)};
-        return as_signed(n) < 0 ? 0 : n; // Windows headers break std::min/max by default. Do std::max<int>(n, 0) the hard way here.
+        return max_value(as_signed(n), 0);
     }
 
     ATOMIC_QUEUE_INLINE unsigned capacity() const noexcept {
@@ -598,7 +598,7 @@ public:
 
     AtomicQueueB(unsigned size, A const& allocator = A{})
         : AllocatorElements(allocator)
-        , size_(std::max(details::round_up_to_power_of_2(size), 1u << (SHUFFLE_BITS * 2)))
+        , size_(max_value(details::round_up_to_power_of_2(size), 1u << (SHUFFLE_BITS * 2)))
         , elements_(AllocatorElements::allocate(size_)) {
         assert(std::atomic<T>{NIL}.is_lock_free()); // Queue element type T is not atomic. Use AtomicQueue2/AtomicQueueB2 for such element types.
         std::uninitialized_fill_n(elements_, size_, NIL);
@@ -704,7 +704,7 @@ public:
 
     AtomicQueueB2(unsigned size, A const& allocator = A{})
         : StorageAllocator(allocator)
-        , size_(std::max(details::round_up_to_power_of_2(size), 1u << (SHUFFLE_BITS * 2)))
+        , size_(max_value(details::round_up_to_power_of_2(size), 1u << (SHUFFLE_BITS * 2)))
         , states_(allocate_<AtomicState>())
         , elements_(allocate_<T>()) {
         std::uninitialized_fill_n(states_, size_, EMPTY);

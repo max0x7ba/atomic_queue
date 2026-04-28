@@ -132,6 +132,24 @@ template<class T> T as_signed(T) noexcept = delete;
 template<class T> T as_unsigned(T) noexcept = delete;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// std::min/max reference parameters may require spilling registers to stack in order to make a value addressable/referencable.
+// These take by value only, no conversions.
+
+template<class T>
+ATOMIC_QUEUE_INLINE static T min_value(T a, T b) noexcept {
+    return b < a ? b : a;
+}
+
+template<class T>
+ATOMIC_QUEUE_INLINE static T max_value(T a, T b) noexcept {
+    return a < b ? b : a;
+}
+
+// Let the caller resolve any ambiguity.
+template<class T, class U> T min_value(T a, T b) noexcept = delete;
+template<class T, class U> T max_value(T a, T b) noexcept = delete;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<class T>
 ATOMIC_QUEUE_INLINE static constexpr bool is_suitably_aligned(T* p) noexcept {
