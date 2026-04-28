@@ -48,6 +48,12 @@ using namespace ::atomic_queue;
 
 namespace {
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+int constexpr N_PING_PONG_MESSAGES = 1'000'000;
+int constexpr N_TROUGHPUT_MESSAGES = 1'000'000;
+int constexpr RUNS = 3;
+
 struct BenchmarkOptions : EnvBits64 {
     ATOMIC_QUEUE_INLINE constexpr auto       minimal() const noexcept { return bits & 1; };
 
@@ -71,20 +77,13 @@ using sum_t = long long;
 
 template<class P>
 struct Range {
-    P p,q;
+    P p, q;
     auto begin() const noexcept { return p; }
     auto end() const noexcept { return q; }
 };
 
-template<class P>
-Range<P> as_range(P p, P q) noexcept {
-    return {p,q};
-}
-
-template<class P>
-Range<P> as_range(P p, size_t n) noexcept {
-    return {p, p +n };
-}
+template<class P> Range<P> as_range(P p, P q) noexcept { return {p, q}; }
+template<class P> Range<P> as_range(P p, size_t n) noexcept { return {p, p + n}; }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -230,6 +229,7 @@ struct ThreadState {
 
     std::thread thread;
 };
+using ThreadStates = std::vector<ThreadState, HugePageAllocator<ThreadState>>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -375,11 +375,8 @@ ATOMIC_QUEUE_INLINE cycles_t time_throughput_once(HugePages& hp, std::vector<uns
 
 template<class Queue>
 ATOMIC_QUEUE_NOINLINE void time_throughput(char const* name, HugePages& hp, std::vector<unsigned> const& hw_thread_ids, unsigned M, unsigned n_thread_min, unsigned n_thread_max) {
-    int constexpr RUNS = 3;
-    using ThreadStates = std::vector<ThreadState, HugePageAllocator<ThreadState>>;
-
-    for(unsigned threads = n_thread_min; threads <= n_thread_max; ++threads) {
-        unsigned const N = M / threads;
+    for(unsigned n_threads = n_thread_min; n_threads <= n_thread_max; ++n_threads) {
+        unsigned const N = M / n_threads;
         sum_t const expected_sum = (N + 1) / 2. * N;
         double const expected_sum_inv = 1. / expected_sum;
 
@@ -387,14 +384,15 @@ ATOMIC_QUEUE_NOINLINE void time_throughput(char const* name, HugePages& hp, std:
             cycles_t min_time = CYCLES_MAX;
 
             for(unsigned run = RUNS; run--;) {
-                ThreadStates consumer_sums(threads * 2);
-                cycles_t time = time_throughput_once<Queue>(hp, hw_thread_ids, N, threads, alternative_placement, consumer_sums.data());
+                ThreadStates threads(n_threads * 2);
+                cycles_t time = time_throughput_once<Queue>(hp, hw_thread_ids, N, n_threads, alternative_placement, threads.data());
                 min_time = min_value(min_time, time);
 
                 // Calculate the checksum.
                 sum_t total_sum = 0;
-                for(unsigned i = 0, j = 0; j < threads * 2; ++j) {
-                    auto consumer_sum = consumer_sums[j].sum.load(X);
+                unsigned i = 0;
+                for(auto& thr : threads) {
+                    auto consumer_sum = thr.sum.load(X);
                     // Set sums are +1 biased.
                     if(consumer_sum--) {
                         total_sum += consumer_sum;
@@ -402,28 +400,26 @@ ATOMIC_QUEUE_NOINLINE void time_throughput(char const* name, HugePages& hp, std:
                         auto consumer_sum_frac = consumer_sum * expected_sum_inv;
                         if(consumer_sum_frac < .1)
                             fprintf(stderr, "%s: producers: %u: consumer %u received too few messages: %.2lf%% of expected.\n",
-                                    name, threads, i, consumer_sum_frac);
+                                    name, n_threads, i, consumer_sum_frac);
                         ++i;
                     }
                 }
 
-                consumer_sums = ThreadStates(); // Deallocate memory.
+                threads = ThreadStates(); // Deallocate memory.
                 hp.check_huge_pages_leaks(name);
 
                 // Verify that all messages were received exactly once: no duplicates, no omissions.
-                if(auto diff = total_sum - expected_sum * threads)
+                if(auto diff = total_sum - expected_sum * n_threads)
                     fprintf(stderr, "%s: wrong checksum error: producers: %u, expected_sum: %'lld, diff: %'lld.\n",
-                            name, threads, expected_sum * threads, diff);
+                            name, n_threads, expected_sum * n_threads, diff);
             }
 
             double min_seconds = to_seconds(min_time);
-            unsigned msg_per_sec = N * threads / min_seconds;
-            printf("%32s,%2u,%c: %'11u msg/sec\n", name, threads, alternative_placement ? 'i' : 's', msg_per_sec);
+            unsigned msg_per_sec = N * n_threads / min_seconds;
+            printf("%32s,%2u,%c: %'11u msg/sec\n", name, n_threads, alternative_placement ? 'i' : 's', msg_per_sec);
         }
     }
 }
-
-constexpr int N_TROUGHPUT_MESSAGES = 1'000'000;
 
 template<class Queue>
 ATOMIC_QUEUE_INLINE void time_throughput_mpmc(char const* name, HugePages& hp, std::vector<unsigned> const& hw_thread_ids, Type<Queue>, unsigned thread_count_min = 1) {
@@ -581,9 +577,6 @@ ATOMIC_QUEUE_INLINE cycles_t time_ping_pong_once(unsigned N, HugePages& hp, unsi
 
 template<class Queue>
 ATOMIC_QUEUE_NOINLINE void time_ping_pong(char const* name, HugePages& hp, std::vector<unsigned> const& hw_thread_ids) {
-    int constexpr N_PING_PONG_MESSAGES = 1'000'000;
-    int constexpr RUNS = 3;
-
     // Select the best times of RUNS runs.
     cycles_t shortest_total_time = CYCLES_MAX;
 
