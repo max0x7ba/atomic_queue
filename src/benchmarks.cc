@@ -331,7 +331,7 @@ ATOMIC_QUEUE_NOINLINE void throughput_consumer(SharedState* ctx, ThreadState* th
     region_guard_t<Queue> guard;
     Queue* const queue = static_cast<Queue*>(ctx->queue0);
     ConsumerOf<Queue> consumer{*queue};
-    sum_t sum = 0;
+    sum_t sum = 1; // Set sums are +1 biased.
     unsigned n;
 
     ctx->barrier.countdown();
@@ -340,9 +340,8 @@ ATOMIC_QUEUE_NOINLINE void throughput_consumer(SharedState* ctx, ThreadState* th
     do {
         n = consumer.pop(*queue);
         sum += n; // Includes stop value.
-    } while(n >= 2);
+    } while(n > 1);
 
-    sum += n < 2;
     thread->sum = sum; // memory_order_seq_cst
     thread->times.set(1);
 }
