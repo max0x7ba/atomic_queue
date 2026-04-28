@@ -39,6 +39,9 @@
 using std::uint64_t;
 using std::int64_t;
 
+using std::printf;
+using std::fprintf;
+
 using namespace ::atomic_queue;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -181,7 +184,7 @@ using BoostAllocator = boost::lockfree::allocator<Allocator>;
 
 void check_huge_pages_leaks(char const* name, HugePages& hp) {
     if(!hp.empty()) {
-        std::fprintf(stderr, "%s: %zu bytes of HugePages memory leaked.\n", name, hp.used());
+        fprintf(stderr, "%s: %zu bytes of HugePages memory leaked.\n", name, hp.used());
         hp.reset();
     }
 }
@@ -439,8 +442,8 @@ ATOMIC_QUEUE_NOINLINE void time_throughput(char const* name, HugePages& hp, std:
                         // Verify that no consumer was starved.
                         auto consumer_sum_frac = consumer_sum * expected_sum_inv;
                         if(consumer_sum_frac < .1)
-                            std::fprintf(stderr, "%s: producers: %u: consumer %u received too few messages: %.2lf%% of expected.\n",
-                                         name, threads, i, consumer_sum_frac);
+                            fprintf(stderr, "%s: producers: %u: consumer %u received too few messages: %.2lf%% of expected.\n",
+                                    name, threads, i, consumer_sum_frac);
                         ++i;
                     }
                 }
@@ -450,13 +453,13 @@ ATOMIC_QUEUE_NOINLINE void time_throughput(char const* name, HugePages& hp, std:
 
                 // Verify that all messages were received exactly once: no duplicates, no omissions.
                 if(auto diff = total_sum - expected_sum * threads)
-                    std::fprintf(stderr, "%s: wrong checksum error: producers: %u, expected_sum: %'lld, diff: %'lld.\n",
-                                 name, threads, expected_sum * threads, diff);
+                    fprintf(stderr, "%s: wrong checksum error: producers: %u, expected_sum: %'lld, diff: %'lld.\n",
+                            name, threads, expected_sum * threads, diff);
             }
 
             double min_seconds = to_seconds(min_time);
             unsigned msg_per_sec = N * threads / min_seconds;
-            std::printf("%32s,%2u,%c: %'11u msg/sec\n", name, threads, alternative_placement ? 'i' : 's', msg_per_sec);
+            printf("%32s,%2u,%c: %'11u msg/sec\n", name, threads, alternative_placement ? 'i' : 's', msg_per_sec);
         }
     }
 }
@@ -483,7 +486,7 @@ ATOMIC_QUEUE_INLINE void time_throughput_spsc(char const* name, HugePages& hp, s
 
 ATOMIC_QUEUE_NOINLINE void run_throughput_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const& cpu_topology, BenchmarkOptions options) {
     auto hw_thread_ids = hw_thread_id(cpu_topology); // Sorted by hw_thread_id: avoid HT, same socket.
-    std::printf("---- Running throughput benchmarks with up to %zu CPUs (higher is better) ----\n", hw_thread_ids.size() & -2);
+    printf("---- Running throughput benchmarks with up to %zu CPUs (higher is better) ----\n", hw_thread_ids.size() & -2);
 
     int constexpr SIZE = 65536;
 
@@ -645,12 +648,12 @@ ATOMIC_QUEUE_NOINLINE void time_ping_pong(char const* name, HugePages& hp, std::
     }
 
     auto round_trip_time = to_seconds(best_duration) / N_PING_PONG_MESSAGES;
-    std::printf("%32s: %.9f sec/round-trip\n", name, round_trip_time);
+    printf("%32s: %.9f sec/round-trip\n", name, round_trip_time);
 }
 
 void run_ping_pong_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const& cpu_topology, BenchmarkOptions options) {
     auto hw_thread_ids = hw_thread_id(cpu_topology); // Sorted by hw_thread_id: avoid HT, same socket.
-    std::printf("---- Running ping-pong benchmarks with 2 CPUs (lower is better) ----\n");
+    printf("---- Running ping-pong benchmarks with 2 CPUs (lower is better) ----\n");
 
     // This benchmark doesn't require queue capacity greater than 1, however, capacity of 1 elides
     // some instructions completely because of (x % 1) is always 0. Use something greater than 1 to
@@ -715,16 +718,6 @@ void run_ping_pong_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const&
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void advise_hugeadm_1GB() {
-    std::fprintf(stderr, "Warning: Failed to allocate 1GB huge pages. Run \"sudo hugeadm --pool-pages-min 1GB:1 --pool-pages-max 1GB:1\".\n");
-}
-
-void advise_hugeadm_2MB() {
-    std::fprintf(stderr, "Warning: Failed to allocate 2MB huge pages. Run \"sudo hugeadm --pool-pages-min 2MB:16 --pool-pages-max 2MB:16\".\n");
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 } // namespace
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -743,8 +736,6 @@ int main() {
 
     set_thread_affinity(cpu_topology[0].hw_thread_id); // Pin the main thread#0 to CPU#0 prior to allocating memory.
 
-    HugePages::warn_no_1GB_pages = advise_hugeadm_1GB;
-    HugePages::warn_no_2MB_pages = advise_hugeadm_2MB;
     size_t constexpr MB = 1024 * 1024;
     HugePages hp(HugePages::PAGE_1GB, 32 * MB); // Try allocating a 1GB huge page to minimize TLB misses.
     HugePageAllocatorBase::hp = &hp;

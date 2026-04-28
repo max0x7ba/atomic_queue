@@ -2,6 +2,7 @@
 #include "huge_pages.h"
 
 #include <system_error>
+#include <cstdio>
 
 #include <unistd.h>
 #include <sys/mman.h>
@@ -12,10 +13,22 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-size_t const default_page_size = ::sysconf(_SC_PAGESIZE);
+using std::fprintf;
 
-atomic_queue::HugePages::WarnFn* atomic_queue::HugePages::warn_no_1GB_pages = 0;
-atomic_queue::HugePages::WarnFn* atomic_queue::HugePages::warn_no_2MB_pages = 0;
+static void default_advise_hugeadm_1GB() noexcept {
+    fprintf(stderr, "Warning: Failed to allocate 1GB huge pages. Run \"sudo hugeadm --pool-pages-min 1GB:1 --pool-pages-max 1GB:1\".\n");
+}
+
+static void default_advise_hugeadm_2MB() noexcept {
+    fprintf(stderr, "Warning: Failed to allocate 2MB huge pages. Run \"sudo hugeadm --pool-pages-min 2MB:16 --pool-pages-max 2MB:16\".\n");
+}
+
+atomic_queue::HugePages::WarnFn* atomic_queue::HugePages::warn_no_1GB_pages = default_advise_hugeadm_1GB;
+atomic_queue::HugePages::WarnFn* atomic_queue::HugePages::warn_no_2MB_pages = default_advise_hugeadm_2MB;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+size_t const default_page_size = ::sysconf(_SC_PAGESIZE);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
