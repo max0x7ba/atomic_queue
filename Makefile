@@ -148,7 +148,7 @@ ldflags.gcc.sanitize2 := ${ldflags.gcc.debug} -fsanitize=undefined,address
 ldflags.gcc := -g ${use_ld} ${ldflags.gcc.${BUILD}}
 
 # clang-14 for arm doesn't support -march=native.
-has_native := $(if $(and $(findstring clang,${CXX}), $(findstring aarch64,$(shell uname -m)), $(shell ${CXX} -march=native -c -xc++ -o/dev/null /dev/null 2>&1)),,1)
+has_native := $(if $(and $(findstring clang,${CXX}), $(findstring aarch64,${uname_m}), $(shell ${CXX} -march=native -c -xc++ -o/dev/null /dev/null 2>&1)),,1)
 cxxflags.clang.debug := -O0 -fstack-protector-all $(and ${has_native},-march=native)
 cxxflags.clang.release := -O3 -f{no-stack-protector,align-functions=64} -DNDEBUG $(and ${has_native},-march=native -mtune=native)
 cxxflags.clang.sanitize := ${cxxflags.clang.debug} -fsanitize=thread
