@@ -136,9 +136,9 @@ AR := $(call toolset_exe,ar,ar)
 
 cxxflags.x86_64 := -fcf-protection=none -masm=intel
 
-cxxflags.gcc.asm.1 := -save-temps=obj -fverbose-asm -fno-{stack-protector,stack-clash-protection}
+cxxflags.gcc.asm.1 := -save-temps=obj -fverbose-asm
 cxxflags.gcc.debug := -Og -f{stack-protector-all,no-omit-frame-pointer} # -D_GLIBCXX_DEBUG
-cxxflags.gcc.release := -O3 -mtune=native -f{no-stack-protector,align-functions=64} -DNDEBUG ${cxxflags.gcc.asm.${ASM}}
+cxxflags.gcc.release := -O3 -mtune=native -fno-{stack-protector,stack-clash-protection} -falign-functions=64 -DNDEBUG ${cxxflags.gcc.asm.${ASM}}
 cxxflags.gcc.sanitize := ${cxxflags.gcc.debug} -fsanitize=thread
 cxxflags.gcc.sanitize2 := ${cxxflags.gcc.debug} -fsanitize=undefined,address
 cxxflags.gcc := -march=native -f{no-plt,no-math-errno,finite-math-only,message-length=0} -W{all,extra,error,no-{array-bounds,maybe-uninitialized,unused-variable,unused-function,unused-local-typedefs}} ${cxxflags.gcc.${BUILD}}
