@@ -317,10 +317,9 @@ struct SharedState {
     }
 
     ATOMIC_QUEUE_NOINLINE void join() {
-        for(auto& thr : as_thread_range()) {
+        for(auto& thr : as_thread_range())
             if(thr.thread.joinable())
                 thr.thread.join();
-        }
     }
 
     ATOMIC_QUEUE_NOINLINE cycles_t max_duration() const noexcept {
@@ -335,6 +334,15 @@ struct SharedState {
 
         return t1 - t0;
     }
+};
+
+struct SharedState2 : SharedState {
+    ThreadState threads2[2];
+
+    template<class... Args>
+    ATOMIC_QUEUE_INLINE SharedState2(Args... args)
+        : SharedState(args..., threads2)
+    {}
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -552,45 +560,16 @@ ATOMIC_QUEUE_NOINLINE void run_throughput_benchmarks(HugePages& hp, std::vector<
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct LatencyContext {
-    // These remain constant.
-    alignas(CACHE_LINE_SIZE)
-    unsigned const N;
-
-    // These are modified at the start.
-    alignas(CACHE_LINE_SIZE)
-    Barrier2 barrier;
-
-    alignas(CACHE_LINE_SIZE)
-    Times sender;
-
-    alignas(CACHE_LINE_SIZE)
-    Times receiver;
-
-    ATOMIC_QUEUE_INLINE cycles_t duration() const noexcept {
-        auto st0 = sender.get(0);
-        auto rt0 = sender.get(0);
-        auto st1 = sender.get(1);
-        auto rt1 = sender.get(1);
-        return std::max(st1, rt1) - std::min(st0, rt0);
-    }
-
-    ATOMIC_QUEUE_INLINE LatencyContext(unsigned n, unsigned thread_count) noexcept
-        : N(n)
-        , barrier{thread_count * 2}
-    {
-        assert(is_suitably_aligned(this));
-    }
-};
-
 template<class Queue>
-ATOMIC_QUEUE_NOINLINE void ping_pong_receiver(Queue* q1, Queue* q2, LatencyContext* ctx) {
+ATOMIC_QUEUE_NOINLINE void ping_pong_receiver(SharedState* ctx, ThreadState* thread) {
     region_guard_t<Queue> guard;
+    Queue* const q1 = static_cast<Queue*>(ctx->queue0);
+    Queue* const q2 = static_cast<Queue*>(ctx->queue1);
     ConsumerOf<Queue> consumer_q1{*q1};
     ProducerOf<Queue> producer_q2{*q2};
 
     ctx->barrier.countdown();
-    ctx->receiver.set(0);
+    thread->times.set(0);
 
     unsigned n;
     do {
@@ -598,43 +577,50 @@ ATOMIC_QUEUE_NOINLINE void ping_pong_receiver(Queue* q1, Queue* q2, LatencyConte
         producer_q2.push(*q2, n);
     } while(ATOMIC_QUEUE_LIKELY(n > 1));
 
-    ctx->receiver.set(1);
+    thread->sum.store(-1, std::memory_order_seq_cst);
+    thread->times.set(1);
 }
 
 template<class Queue>
-ATOMIC_QUEUE_NOINLINE void ping_pong_sender(Queue* q1, Queue* q2, LatencyContext* ctx) {
+ATOMIC_QUEUE_NOINLINE void ping_pong_sender(SharedState* ctx, ThreadState* thread) {
     region_guard_t<Queue> guard;
+    Queue* const q1 = static_cast<Queue*>(ctx->queue0);
+    Queue* const q2 = static_cast<Queue*>(ctx->queue1);
     ProducerOf<Queue> producer_q1{*q1};
     ConsumerOf<Queue> consumer_q2{*q2};
-    unsigned n = ctx->N;
+    unsigned n = ctx->n_msg;
 
     ctx->barrier.countdown();
-    ctx->sender.set(0);
+    thread->times.set(0);
 
     do {
         producer_q1.push(*q1, n);
         n = consumer_q2.pop(*q2);
     } while(as_signed(--n) > 0);
 
-    ctx->sender.set(1);
+    thread->sum.store(-1, std::memory_order_seq_cst);
+    thread->times.set(1);
 }
 
 template<class Queue>
 ATOMIC_QUEUE_INLINE cycles_t time_ping_pong_once(unsigned N, HugePages& hp, unsigned const (&cpus)[2]) {
-    set_thread_affinity(cpus[0]); // This thread#0 is the sender.
-    set_default_thread_affinity(cpus[1]);
+    auto ctx = hp.create_unique_ptr<SharedState2>(N, 1u, cpus);
+    auto sender0 = ctx->reuse_this_thread(); // This thread#0 is the sender.
 
-    auto ctx = hp.create_unique_ptr<LatencyContext>(N, 1u);
+    // set_thread_affinity(cpus[0]); // This thread#0 is the sender.
+    // set_default_thread_affinity(cpus[1]);
 
     ContextOf<Queue> const queue_ctx{1, 1};
     auto q1 = hp.create_unique_ptr<Queue>(queue_ctx);
     auto q2 = hp.create_unique_ptr<Queue>(queue_ctx);
+    ctx->queue0 = q1.get();
+    ctx->queue1 = q2.get();
 
-    std::thread receiver(ping_pong_receiver<Queue>, q1.get(), q2.get(), ctx.get());
-    ping_pong_sender<Queue>(q1.get(), q2.get(), ctx.get());
-    receiver.join();
+    ctx->create_thread(ping_pong_receiver<Queue>);
+    ping_pong_sender<Queue>(ctx.get(), sender0);
+    ctx->join();
 
-    return ctx->duration();
+    return ctx->max_duration();
 }
 
 template<class Queue>
