@@ -738,7 +738,7 @@ int main() {
 
     size_t constexpr MB = 1024 * 1024;
     HugePages hp(HugePages::PAGE_1GB, 32 * MB); // Try allocating a 1GB huge page to minimize TLB misses.
-    HugePageAllocatorBase::hp = &hp;
+    HugePages::instance = &hp;
 
     if(!options.no_throughput())
         run_throughput_benchmarks(hp, cpu_topology, options);

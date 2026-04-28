@@ -25,12 +25,12 @@ public:
     static WarnFn* warn_no_1GB_pages;
     static WarnFn* warn_no_2MB_pages;
 
-    struct Deleter {
-        HugePages* hp_;
+    static HugePages* instance;
 
+    struct Deleter {
         template<class T>
         void operator()(T* p) const {
-            hp_->destroy(p);
+            instance->destroy(p);
         }
     };
 
@@ -103,12 +103,12 @@ public:
 
     template<class T, class... Args>
     std::unique_ptr<T, Deleter> create_unique_ptr(Args&&... args) {
-        return std::unique_ptr<T, Deleter>{new(this->allocate(sizeof(T))) T{std::forward<Args>(args)...}, Deleter{this}};
+        return std::unique_ptr<T, Deleter>{new(this->allocate(sizeof(T))) T{std::forward<Args>(args)...}};
     }
 
     template<class T, class... Args>
     std::unique_ptr<T, Deleter> create_unique_ptr(NoContext, Args&&... args) {
-        return std::unique_ptr<T, Deleter>{new(this->allocate(sizeof(T))) T{std::forward<Args>(args)...}, Deleter{this}};
+        return std::unique_ptr<T, Deleter>{new(this->allocate(sizeof(T))) T{std::forward<Args>(args)...}};
     }
 
     template<class T>
@@ -128,12 +128,8 @@ public:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct HugePageAllocatorBase {
-    static HugePages* hp;
-};
-
 template<class T>
-struct HugePageAllocator : HugePageAllocatorBase
+struct HugePageAllocator
 {
     // static bool constexpr is_always_equal = false;
     // static bool constexpr propagate_on_container_copy_assignment = true;
@@ -151,24 +147,24 @@ struct HugePageAllocator : HugePageAllocatorBase
     {}
 
     T* allocate(size_t n) const {
-        T* p = static_cast<T*>(hp->allocate(n * sizeof(T)));
+        T* p = static_cast<T*>(HugePages::instance->allocate(n * sizeof(T)));
         assert(is_suitably_aligned(p));
         return p;
     }
 
     void deallocate(T* p, size_t n) const {
-        hp->deallocate(p, n * sizeof(T));
+        HugePages::instance->deallocate(p, n * sizeof(T));
     }
 
-    template<class U>
-    bool operator==(HugePageAllocator<U> b) const {
-        return hp == b.hp;
-    }
+    // template<class U>
+    // bool operator==(HugePageAllocator<U> b) const {
+    //     return true;
+    // }
 
-    template<class U>
-    bool operator!=(HugePageAllocator<U> b) const {
-        return hp != b.hp;
-    }
+    // template<class U>
+    // bool operator!=(HugePageAllocator<U> b) const {
+    //     return false;
+    // }
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
