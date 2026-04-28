@@ -208,13 +208,12 @@ struct QueueTypes {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct Times {
-    enum { N_TIMES = 2 };
-    std::atomic<cycles_t> t[N_TIMES] = {};
+    std::atomic<cycles_t> t[2] = {};
 
     ATOMIC_QUEUE_INLINE void set(unsigned i) noexcept {
         auto* p = t + i; // Resolve the address into a register before cycles.
         auto now = cycles();
-        p->store(now, std::memory_order_seq_cst);
+        *p = now; // std::memory_order_seq_cst
     }
 
     ATOMIC_QUEUE_INLINE cycles_t get(unsigned i) const noexcept {
@@ -228,6 +227,7 @@ struct ThreadState {
     alignas(CACHE_LINE_SIZE)
     Times times;
     std::atomic<sum_t> sum = {};
+
     std::thread thread;
 };
 
@@ -284,7 +284,7 @@ struct SharedState {
                 thr.thread.join();
     }
 
-    ATOMIC_QUEUE_NOINLINE cycles_t max_duration() const noexcept {
+    ATOMIC_QUEUE_NOINLINE cycles_t total_time() const noexcept {
         cycles_t t0 = CYCLES_MAX, t1 = 0;
         for(auto& thr : as_range(threads, n_threads * 2)) {
             t0 = min_value(t0, thr.times.get(0));
@@ -323,7 +323,6 @@ ATOMIC_QUEUE_NOINLINE void throughput_producer(SharedState* ctx, ThreadState* th
         producer.push(*queue, n);
     while(--n);
 
-    thread->sum.store(-1, std::memory_order_seq_cst);
     thread->times.set(1);
 }
 
@@ -341,9 +340,10 @@ ATOMIC_QUEUE_NOINLINE void throughput_consumer(SharedState* ctx, ThreadState* th
     do {
         n = consumer.pop(*queue);
         sum += n; // Includes stop value.
-    } while(n > 1);
+    } while(n >= 2);
 
-    thread->sum.store(sum, std::memory_order_seq_cst);
+    sum += n < 2;
+    thread->sum = sum; // memory_order_seq_cst
     thread->times.set(1);
 }
 
@@ -371,7 +371,7 @@ ATOMIC_QUEUE_INLINE cycles_t time_throughput_once(HugePages& hp, std::vector<uns
     throughput_producer<Queue>(ctx.get(), producer0); // Use this thread#0 for the first producer.
     ctx->join();
 
-    return ctx->max_duration();
+    return ctx->total_time();
 }
 
 template<class Queue>
@@ -396,7 +396,8 @@ ATOMIC_QUEUE_NOINLINE void time_throughput(char const* name, HugePages& hp, std:
                 sum_t total_sum = 0;
                 for(unsigned i = 0, j = 0; j < threads * 2; ++j) {
                     auto consumer_sum = consumer_sums[j].sum.load(X);
-                    if(consumer_sum != -1) {
+                    // Set sums are +1 biased.
+                    if(consumer_sum--) {
                         total_sum += consumer_sum;
                         // Verify that no consumer was starved.
                         auto consumer_sum_frac = consumer_sum * expected_sum_inv;
@@ -538,8 +539,7 @@ ATOMIC_QUEUE_NOINLINE void ping_pong_receiver(SharedState* ctx, ThreadState* thr
         producer_q2.push(*q2, n);
     } while(ATOMIC_QUEUE_LIKELY(n > 1));
 
-    thread->sum.store(-1, std::memory_order_seq_cst);
-    thread->times.set(1);
+    thread->times.set(1); // std::memory_order_seq_cst;
 }
 
 template<class Queue>
@@ -559,8 +559,7 @@ ATOMIC_QUEUE_NOINLINE void ping_pong_sender(SharedState* ctx, ThreadState* threa
         n = consumer_q2.pop(*q2);
     } while(as_signed(--n) > 0);
 
-    thread->sum.store(-1, std::memory_order_seq_cst);
-    thread->times.set(1);
+    thread->times.set(1); // std::memory_order_seq_cst;
 }
 
 template<class Queue>
@@ -578,7 +577,7 @@ ATOMIC_QUEUE_INLINE cycles_t time_ping_pong_once(unsigned N, HugePages& hp, unsi
     ping_pong_sender<Queue>(ctx.get(), sender0);
     ctx->join();
 
-    return ctx->max_duration();
+    return ctx->total_time();
 }
 
 template<class Queue>
@@ -602,7 +601,7 @@ ATOMIC_QUEUE_NOINLINE void time_ping_pong(char const* name, HugePages& hp, std::
         }
     }
 
-    auto round_trip_time = to_seconds(best_duration) / N_PING_PONG_MESSAGES;
+    auto round_trip_time = to_seconds(best_duration) / (N_PING_PONG_MESSAGES / 2);
     printf("%32s: %.9f sec/round-trip\n", name, round_trip_time);
 }
 

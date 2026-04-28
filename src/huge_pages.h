@@ -137,6 +137,16 @@ struct HugePageAllocator { // A stateless allocator.
     ATOMIC_QUEUE_INLINE void deallocate(T* p, size_t n) const {
         HugePages::instance->deallocate(p, n * sizeof(T));
     }
+
+    template<class U>
+    bool operator==(HugePageAllocator<U>) const {
+        return true;
+    }
+
+    template<class U>
+    bool operator!=(HugePageAllocator<U>) const {
+        return false;
+    }
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

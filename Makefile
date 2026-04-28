@@ -2,7 +2,6 @@
 
 # Usage examples (assuming this directory is ~/src/atomic_queue):
 #
-#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2))
 #   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) all run_tests
 #   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 BUILD=debug run_tests
 #   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 BUILD=debug run_tests run_benchmarks_quick
@@ -393,5 +392,5 @@ endif # has_system_config
 ################################################################################################################################
 
 # Local Variables:
-# compile-command: "/bin/time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) BUILD=debug run_tests"
+# compile-command: "/bin/time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=gcc-14 BUILD=debug run_tests"
 # End:
