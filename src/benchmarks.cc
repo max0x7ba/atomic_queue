@@ -182,13 +182,6 @@ struct TbbAdapter : RetryDecorator<Queue> {
 using Allocator = HugePageAllocator<unsigned>;
 using BoostAllocator = boost::lockfree::allocator<Allocator>;
 
-void check_huge_pages_leaks(char const* name, HugePages& hp) {
-    if(!hp.empty()) {
-        fprintf(stderr, "%s: %zu bytes of HugePages memory leaked.\n", name, hp.used());
-        hp.reset();
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // According to my benchmarking, it looks like the best performance is achieved with the following parameters:
@@ -449,7 +442,7 @@ ATOMIC_QUEUE_NOINLINE void time_throughput(char const* name, HugePages& hp, std:
                 }
 
                 consumer_sums = ThreadStates(); // Deallocate memory.
-                check_huge_pages_leaks(name, hp);
+                hp.check_huge_pages_leaks(name);
 
                 // Verify that all messages were received exactly once: no duplicates, no omissions.
                 if(auto diff = total_sum - expected_sum * threads)
@@ -636,10 +629,10 @@ ATOMIC_QUEUE_NOINLINE void time_ping_pong(char const* name, HugePages& hp, std::
         unsigned const cpus[2] = {hw_thread_ids[0], hw_thread_ids[cpu2]};
         for(unsigned run = RUNS; run--;) {
             auto duration = time_ping_pong_once<Queue>(N_PING_PONG_MESSAGES, hp, cpus);
-            if(duration < best_duration)
+            if(best_duration > duration)
                 best_duration = duration;
 
-            check_huge_pages_leaks(name, hp);
+            hp.check_huge_pages_leaks(name);
         }
     }
 
