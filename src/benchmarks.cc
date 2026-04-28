@@ -207,43 +207,9 @@ struct QueueTypes {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<class T>
-struct copyable_atomic : std::atomic<T> {
-    using B = std::atomic<T>;
-    using B::B;
-
-    copyable_atomic(copyable_atomic const& b) noexcept {
-        details::copy_relaxed(*this,b);
-    }
-
-    copyable_atomic(copyable_atomic&& b) noexcept {
-        details::copy_relaxed(*this,b);
-    }
-
-    copyable_atomic& operator=(copyable_atomic const& b) noexcept {
-        details::copy_relaxed(*this, b);
-        return *this;
-    }
-
-    copyable_atomic& operator=(copyable_atomic&& b) noexcept {
-        details::copy_relaxed(*this, b);
-        return *this;
-    }
-
-    void swap(copyable_atomic& b) noexcept {
-        details::swap_relaxed(*this,b);
-    }
-
-    friend void swap(copyable_atomic& a, copyable_atomic& b) noexcept {
-        a.swap(b);
-    }
-};
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 struct Times {
     enum { N_TIMES = 2 };
-    copyable_atomic<cycles_t> t[N_TIMES];
+    std::atomic<cycles_t> t[N_TIMES] = {};
 
     ATOMIC_QUEUE_INLINE void set(unsigned i) noexcept {
         auto* p = t + i; // Resolve the address into a register before cycles.
@@ -261,7 +227,7 @@ struct Times {
 struct ThreadState {
     alignas(CACHE_LINE_SIZE)
     Times times;
-    copyable_atomic<sum_t> sum;
+    std::atomic<sum_t> sum = {};
     std::thread thread;
 };
 
@@ -336,8 +302,8 @@ struct SharedState2 : SharedState {
     ThreadState threads2[2];
 
     template<class... Args>
-    ATOMIC_QUEUE_INLINE SharedState2(Args... args)
-        : SharedState(args..., threads2)
+    constexpr ATOMIC_QUEUE_INLINE SharedState2(Args... args)
+        : SharedState(args..., threads2 + 0) // threads2 haven't been initialized here yet.
     {}
 };
 
