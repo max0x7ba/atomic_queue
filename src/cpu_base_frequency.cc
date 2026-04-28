@@ -168,13 +168,13 @@ void atomic_queue::set_thread_affinity(unsigned hw_thread_id) {
     set_thread_affinity_(cpuset);
 }
 
-void atomic_queue::reset_thread_affinity() {
-    cpu_set_t cpuset;
-    CPU_ZERO(&cpuset);
-    for(unsigned i = 0, j = std::thread::hardware_concurrency(); i < j; ++i)
-        CPU_SET(i, &cpuset);
-    set_thread_affinity_(cpuset);
-}
+// void atomic_queue::reset_thread_affinity() {
+//     cpu_set_t cpuset;
+//     CPU_ZERO(&cpuset);
+//     for(unsigned i = 0, j = std::thread::hardware_concurrency(); i < j; ++i)
+//         CPU_SET(i, &cpuset);
+//     set_thread_affinity_(cpuset);
+// }
 
 void atomic_queue::set_default_thread_affinity(unsigned hw_thread_id) {
     default_thread_affinity = hw_thread_id;
@@ -190,10 +190,11 @@ int pthread_create(pthread_t* newthread,
     if(!real_pthread_create)
         std::abort();
 
+    cpu_set_t cpuset;
     pthread_attr_t attr2;
     pthread_attr_t *pattr = const_cast<pthread_attr_t*>(attr);
+
     if(default_thread_affinity >= 0) {
-        cpu_set_t cpuset;
         CPU_ZERO(&cpuset);
         CPU_SET(default_thread_affinity, &cpuset);
         if(!pattr) {

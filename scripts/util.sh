@@ -1,18 +1,32 @@
+#!/bin/bash
+
+function strip-cxx-symbol {
+    local -n s2="$2"
+    local s="$(echo "$1" | tr -c -s '[:alnum:]' '_')"
+    s=${s//anonymous_namespace_}
+    s=${s//atomic_queue_}
+    s=${s//false/F}
+    s=${s//true/T}
+    s=${s//void_}
+    s2=${s//unsigned_int/unsigned}
+}
+
 function disassemble-symbol {(
     set -eu
     local re_symbol="$1" obj="$2"
 
-    local out="$(/bin/realpath -s "$2")" c_symbol cxx_symbol
-    local out_prefix="${out%o}"
+    local out="$(/bin/realpath -s "$2")" c_symbol cxx_symbol cxx_symbol2
+    local out_prefix="$(dirname "$out")"
     local re_filter_out='^[[:space:]]*$|^Disassembly of section |^/[^:]+:[[:space:]]+file format'
 
     local objdump=(objdump --{disassembler-color,visualize-jumps}=color -Mintel -C)
     (( ${S:-0} < 1 )) || objdump+=(-lS) # S=1 includes source code.
 
     paste <(nm -jU "$obj") <(nm -jUC "$obj") | egrep -e "$re_symbol" | while IFS=$'\t' read c_symbol cxx_symbol; do
-        out="${out_prefix}${c_symbol}.S"
+        strip-cxx-symbol "$cxx_symbol" cxx_symbol2
+        out="${out_prefix}/${cxx_symbol2}.S"
         ( (( ${V:-0} < 1 )) || set -x; ${objdump[@]} --disassemble="$cxx_symbol" "$obj" ) | egrep -ve "$re_filter_out" > "$out"
-        echo "$out: $cxx_symbol"
+        echo "$out: ${cxx_symbol}"
     done
 )}
 
@@ -26,4 +40,37 @@ chrt_fifo := $(chrt -f 50 echo -n 'chrt' || echo -n 'sudo chrt') -f 50
 uname_m := $(uname -m)
 use_ld := -fuse-ld=$(type -p lld &> /dev/null && echo -n lld || echo -n bfd)
 EOF
+)}
+
+# cd ~/src/atomic_queue; source ./scripts/util.sh; benchmark ryzen_5825u
+# cd ~/src/atomic_queue; source ./scripts/util.sh; N=2 benchmark ryzen_5825u_4
+function benchmark {(
+    set -eu
+
+    local commit="$(git rev-parse --short HEAD)"
+    local N=${N:-1}
+    local benchmark_cmd=(make -R -j8 T=2 TOOLSET=gcc-14)
+
+    local -A ryzen_5825u=(
+        [smt1]=0-15
+        [smt0]=0-15:2
+    )
+    local -A ryzen_5825u_4=(
+        [smt1]=0-3
+        [smt0]=0-7:2
+    )
+    local -A ryzen_5950x=(
+        [smt1]=0-31
+        [smt0]=0-15
+    )
+
+    for target in clean "run_tests all"; do
+        ${benchmark_cmd[@]} $target
+    done
+
+    local cpu_name="$1" name cpu_list target
+    local -n cpu_lists=$1
+    for name in "${!cpu_lists[@]}"; do
+        taskset -c "${cpu_lists[$name]}" time ${benchmark_cmd[@]} run_benchmarks_n N=$N TAG=${commit}.${cpu_name}.${name}
+    done
 )}

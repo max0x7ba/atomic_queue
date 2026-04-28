@@ -5,6 +5,7 @@
 // Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file LICENSE.
 
 #include <atomic>
+#include <cstdint>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -118,6 +119,49 @@ auto constexpr R = std::memory_order_release;
 auto constexpr X = std::memory_order_relaxed;
 auto constexpr C = std::memory_order_seq_cst;
 auto constexpr AR = std::memory_order_acq_rel;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+ATOMIC_QUEUE_INLINE static constexpr int as_signed(unsigned c) noexcept { return c; }
+ATOMIC_QUEUE_INLINE static constexpr int as_signed(int c) noexcept { return c; }
+ATOMIC_QUEUE_INLINE static constexpr unsigned as_unsigned(unsigned c) noexcept { return c; }
+ATOMIC_QUEUE_INLINE static constexpr unsigned as_unsigned(int c) noexcept { return c; }
+
+// Do not allow integral promotion, numeric conversions or any other conversions for arguments of as_signed and as_unsigned.
+template<class T> T as_signed(T) noexcept = delete;
+template<class T> T as_unsigned(T) noexcept = delete;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// std::min/max reference parameters may require spilling registers to stack in order to make a value addressable/referencable.
+// These take by value only, no conversions.
+
+template<class T>
+ATOMIC_QUEUE_INLINE static T min_value(T a, T b) noexcept {
+    return b < a ? b : a;
+}
+
+template<class T>
+ATOMIC_QUEUE_INLINE static T max_value(T a, T b) noexcept {
+    return a < b ? b : a;
+}
+
+// Let the caller resolve any ambiguity.
+template<class T, class U> T min_value(T a, T b) noexcept = delete;
+template<class T, class U> T max_value(T a, T b) noexcept = delete;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+template<class T>
+ATOMIC_QUEUE_INLINE static constexpr bool is_suitably_aligned(T* p) noexcept {
+    return !(reinterpret_cast<std::uintptr_t>(p) % alignof(T));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct NoContext {
+    template<class... Args>
+    ATOMIC_QUEUE_INLINE constexpr NoContext(Args&&...) noexcept {}
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

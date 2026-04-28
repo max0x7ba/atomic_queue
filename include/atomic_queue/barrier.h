@@ -13,19 +13,35 @@ namespace atomic_queue {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 class Barrier {
-    std::atomic<unsigned> counter_ = {};
+    std::atomic<int> counter_ = {};
 
 public:
-    void wait() noexcept {
-        counter_.fetch_add(1, std::memory_order_acquire);
-        while(counter_.load(std::memory_order_relaxed))
+    ATOMIC_QUEUE_INLINE void wait() noexcept {
+        counter_.fetch_add(1, X);
+        while(counter_.load(A))
             spin_loop_pause();
     }
 
-    void release(unsigned expected_counter) noexcept {
-        while(expected_counter != counter_.load(std::memory_order_relaxed))
+    ATOMIC_QUEUE_INLINE void release(int expected_counter) noexcept {
+        while(expected_counter != counter_.load(X))
             spin_loop_pause();
-        counter_.store(0, std::memory_order_release);
+        counter_.store(0, R);
+    }
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct Barrier2 {
+    std::atomic<unsigned> counter = {};
+
+    ATOMIC_QUEUE_INLINE unsigned countdown() noexcept {
+        unsigned caller_idx = --counter; // std::memory_order_seq_cst
+
+        // All callers execute the same code path.
+        do spin_loop_pause();
+        while(counter.load()); // std::memory_order_seq_cst
+
+        return caller_idx;
     }
 };
 

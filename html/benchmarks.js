@@ -228,16 +228,24 @@ $(function() {
         createChart("bar");
     };
 
-    plot_scalability('scalability-9900KS-5GHz', scalability_9900KS, 60e6, 1000e6);
-    plot_scalability('scalability-ryzen-5825u', scalability_ryzen_5825u, 40e6, 1000e6);
-    plot_scalability('cc-scalability-ryzen-5825u', cc_scalability_ryzen_5825u, 40e6, 1000e6);
-    plot_scalability('scalability-xeon-gold-6132', scalability_xeon_gold_6132, 15e6, 300e6);
-    plot_scalability('scalability-ryzen-5950x', scalability_ryzen_5950x, 20e6, 500e6);
-    plot_latency('latency-9900KS-5GHz', latency_9900KS);
-    plot_latency('latency-ryzen-5825u', latency_ryzen_5825u);
+    plot_scalability('smt-scalability-ryzen-5825u', smt_scalability_ryzen_5825u, 60e6, 1000e6);
+    plot_scalability('cc-scalability-ryzen-5825u', cc_scalability_ryzen_5825u, 60e6, 1000e6);
+
+    plot_scalability('smt-scalability-ryzen-5950x', smt_scalability_ryzen_5950x, 20e6, 500e6);
+    plot_scalability('cc-scalability-ryzen-5950x', cc_scalability_ryzen_5950x, 20e6, 500e6);
+
+    plot_latency('smt-latency-ryzen-5825u', smt_latency_ryzen_5825u);
     plot_latency('cc-latency-ryzen-5825u', cc_latency_ryzen_5825u);
-    plot_latency('latency-xeon-gold-6132', latency_xeon_gold_6132);
+
+    plot_latency('smt-latency-ryzen-5950x', smt_latency_ryzen_5950x);
     plot_latency('cc-latency-ryzen-5950x', cc_latency_ryzen_5950x);
+
+    plot_scalability('scalability-9900KS-5GHz', scalability_9900KS, 60e6, 1000e6);
+    plot_latency('latency-9900KS-5GHz', latency_9900KS);
+
+    plot_scalability('scalability-xeon-gold-6132', scalability_xeon_gold_6132, 15e6, 300e6);
+    plot_latency('latency-xeon-gold-6132', latency_xeon_gold_6132);
+
 
     $(".view-toggle")
         .html((index, html) => `<svg class="arrow-down-circle" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M1 8a7 7 0 1 0 14 0A7 7 0 0 0 1 8zm15 0A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM8.5 4.5a.5.5 0 0 0-1 0v5.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V4.5z"/></svg> ${html}`)

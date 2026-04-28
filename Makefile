@@ -2,14 +2,15 @@
 
 # Usage examples (assuming this directory is ~/src/atomic_queue):
 #
-#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2))
 #   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) all run_tests
 #   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 BUILD=debug run_tests
+#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 BUILD=debug run_tests run_benchmarks_quick
 #   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=clang-20 BUILD=debug run_tests
-#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 run_benchmarks_n
+#   AQB=1 time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 run_benchmarks_n
+#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 asm_throughput asm_latency
 #   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=clang-20 run_benchmarks_n
-#   taskset -c 0,1,2,3 time make -C ~/src/atomic_queue -Rj4 T=1 TOOLSET=gcc-14 run_benchmarks_n N=2
-#   taskset -c 0,2,4,6 time make -C ~/src/atomic_queue -Rj4 T=1 TOOLSET=gcc-14 run_benchmarks_n N=2
+#   AQB=1 taskset -c 0,1,2,3 time make -C ~/src/atomic_queue -Rj4 T=1 TOOLSET=gcc-14 run_benchmarks_n N=2 TAG=5825u-smt1
+#   AQB=1 taskset -c 0,2,4,6 time make -C ~/src/atomic_queue -Rj4 T=1 TOOLSET=gcc-14 run_benchmarks_n N=2 TAG=5825u-smt0
 #   taskset -c $(seq -s, 0 2 15) time make -C ~/src/atomic_queue -Rj8 T=1 TOOLSET=gcc-14 run_benchmarks_n N=33 TAG=cross-core
 #   taskset -c 4-7 time make -C ~/src/atomic_queue -Rj4 TOOLSET=gcc-14 run_benchmarks_n N=2 TAG=statev1
 #   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=gcc-14 ASM=1
@@ -135,9 +136,9 @@ AR := $(call toolset_exe,ar,ar)
 
 cxxflags.x86_64 := -fcf-protection=none -masm=intel
 
-cxxflags.gcc.asm.1 := -save-temps=obj -fverbose-asm -fno-{stack-protector,stack-clash-protection}
+cxxflags.gcc.asm.1 := -save-temps=obj -fverbose-asm
 cxxflags.gcc.debug := -Og -f{stack-protector-all,no-omit-frame-pointer} # -D_GLIBCXX_DEBUG
-cxxflags.gcc.release := -O3 -mtune=native -f{no-stack-protector,align-{functions,loops}=64} -DNDEBUG ${cxxflags.gcc.asm.${ASM}}
+cxxflags.gcc.release := -O3 -mtune=native -fno-{stack-protector,stack-clash-protection} -falign-functions=64 -DNDEBUG ${cxxflags.gcc.asm.${ASM}}
 cxxflags.gcc.sanitize := ${cxxflags.gcc.debug} -fsanitize=thread
 cxxflags.gcc.sanitize2 := ${cxxflags.gcc.debug} -fsanitize=undefined,address
 cxxflags.gcc := -march=native -f{no-plt,no-math-errno,finite-math-only,message-length=0} -W{all,extra,error,no-{array-bounds,maybe-uninitialized,unused-variable,unused-function,unused-local-typedefs}} ${cxxflags.gcc.${BUILD}}
@@ -147,7 +148,7 @@ ldflags.gcc.sanitize2 := ${ldflags.gcc.debug} -fsanitize=undefined,address
 ldflags.gcc := -g ${use_ld} ${ldflags.gcc.${BUILD}}
 
 # clang-14 for arm doesn't support -march=native.
-has_native := $(if $(and $(findstring clang,${CXX}), $(findstring aarch64,$(shell uname -m)), $(shell ${CXX} -march=native -c -xc++ -o/dev/null /dev/null 2>&1)),,1)
+has_native := $(if $(and $(findstring clang,${CXX}), $(findstring aarch64,${uname_m}), $(shell ${CXX} -march=native -c -xc++ -o/dev/null /dev/null 2>&1)),,1)
 cxxflags.clang.debug := -O0 -fstack-protector-all $(and ${has_native},-march=native)
 cxxflags.clang.release := -O3 -f{no-stack-protector,align-functions=64} -DNDEBUG $(and ${has_native},-march=native -mtune=native)
 cxxflags.clang.sanitize := ${cxxflags.clang.debug} -fsanitize=thread
@@ -199,13 +200,13 @@ exes := example tests benchmarks
 example_src := example.cc
 
 tests_src := tests.cc
-${build_dir}/tests : cppflags += -DBOOST_TEST_DYN_LINK=1
-${build_dir}/tests : ldlibs += -lboost_unit_test_framework
+${build_dir}/tests.o : cppflags += -DBOOST_TEST_DYN_LINK=1
+${build_dir}/tests :   ldlibs += -lboost_unit_test_framework
 
 benchmarks_src := benchmarks.cc cpu_base_frequency.cc huge_pages.cc
-${build_dir}/benchmarks : cppflags += ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium}
-${build_dir}/benchmarks : cxxflags += ${cxxflags.tbb} ${cxxflags.moodycamel} ${cxxflags.xenium}
-${build_dir}/benchmarks : ldlibs += ${ldlibs.tbb} ${ldlibs.moodycamel} ${ldlibs.xenium} -ldl
+${build_dir}/benchmarks.o : cppflags += ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium}
+${build_dir}/benchmarks.o : cxxflags += ${cxxflags.tbb} ${cxxflags.moodycamel} ${cxxflags.xenium}
+${build_dir}/benchmarks   : ldlibs += ${ldlibs.tbb} ${ldlibs.moodycamel} ${ldlibs.xenium} -ldl
 
 # Build targets definitions end.
 ################################################################################################################################
@@ -237,6 +238,8 @@ ${build_dir}/%.a : ${relink} | $$(dir $$@)
 
 ${build_dir}/%.o : src/%.cc ${recompile} | $$(dir $$@)
 	${J}$(call strip2,${COMPILE.CXX})
+
+
 
 ################################################################################################################################
 # Compiler and linker options tracking.
@@ -272,8 +275,8 @@ run_benchmarks_n : results/$${new_filename}.${N}.txt
 run_benchmarks_perf : perf/$${new_filename}.txt
 	@printf "%(%F %T)T $@ saved \e[32m$(abspath $<)\e[0m\n\n"
 
-run_benchmarks : ${build_dir}/benchmarks
-	@echo -n "$@ "; set -x; scripts/benchmark.sh ${chrt_fifo} $<
+run_benchmarks_quick : ${build_dir}/benchmarks
+	@echo -n "$@ "; set -x; AQB=1 taskset -c 4-7 ${chrt_fifo} $<
 
 run_tests : ${build_dir}/tests
 	@echo -n "$@ "; set -x; $< --log_level=unit_scope --report_level=short
@@ -298,17 +301,24 @@ ${build_dir}/ : | ${build_dir}/.make/ ;
 
 env2 : env
 
-.PHONY : update_env_txt env versions run_benchmarks clean all compile_commands compile_commands.json TAGS run_tests run_benchmarks_n run_benchmarks_perf env2
+ifdef not_cleaning # Not cleanining.
 
-ifeq (,$(findstring clean,${MAKECMDGOALS})) # Not cleanining.
+asm_throughput : private symbol_regex = "throughput_(consumer|producer)<atomic_queue::AtomicQueue2"
+asm_latency : private symbol_regex = "ping_pong_(receiver|sender)<atomic_queue::AtomicQueue2"
+
+asm_% : scripts/util.sh ${build_dir}/benchmarks $$(if $${symbol_regex},force,$$(error $$@ is not defined))
+	source $< && disassemble-symbol ${symbol_regex} ${build_dir}/benchmarks.o
+
 -include $(sort ${auto_generated_header_d}) # Remove duplicates and include.
 endif # Not cleanining.
+
+.PHONY : update_env_txt env versions run_benchmarks_quick clean all compile_commands compile_commands.json TAGS run_tests run_benchmarks_n run_benchmarks_perf env2
 
 endif # Build with a single toolset.
 
 ################################################################################################################################
 
-ifeq (,$(findstring clean,${MAKECMDGOALS})) # Not cleanining.
+ifdef not_cleaning # Not cleanining.
 
 ${BUILD_ROOT}/system_config.mk : scripts/util.sh | $$(dir $$@)
 	source $< && create_system_config_mk > $@
@@ -361,7 +371,7 @@ $(call log,Build targets "${targets}" with toolsets "${toolsets}" in parallel us
 $(intcmp ${MAKELEVEL},1,$(call log_kv,BUILD_ROOT))
 
 with-toolset-% :
-	${MAKE} -R --no-print-directory --output-sync TOOLSET=$* with_toolset_sub_make=1 ${MAKECMDGOALS}
+	${MAKE} -R --no-print-directory --output-sync TOOLSET=$* with-toolset-submake=1 ${MAKECMDGOALS}
 
 # The last-resort rule. Must be the last in the Makefile.
 % : ${toolsets:%=with-toolset-%}
@@ -370,9 +380,9 @@ with-toolset-% :
 ################################################################################################################################
 else # Parallelize building with multiple toolsets.
 
-ifndef with_toolset_sub_make
+ifndef with-toolset-submake
 $(call log,Build targets "${targets}" with ${TOOLSET} using up to ${n_cpus} CPUs.)
-$(intcmp ${MAKELEVEL},1,$(call log_kv,BUILD_ROOT))
+# $(intcmp ${MAKELEVEL},1,$(call log_kv,BUILD_ROOT))
 endif
 
 endif # Parallelize building with multiple toolsets.
@@ -382,5 +392,5 @@ endif # has_system_config
 ################################################################################################################################
 
 # Local Variables:
-# compile-command: "/bin/time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) BUILD=debug run_tests"
+# compile-command: "/bin/time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=gcc-14 BUILD=debug run_tests"
 # End:

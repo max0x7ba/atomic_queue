@@ -34,7 +34,7 @@ void log_cpus(std::vector<CpuTopologyInfo> const&) noexcept;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void set_thread_affinity(unsigned hw_thread_id);
-void reset_thread_affinity();
+// void reset_thread_affinity();
 
 void set_default_thread_affinity(unsigned hw_thread_id);
 

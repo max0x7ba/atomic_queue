@@ -1,3 +1,7 @@
 *~
 build/
+results/
+perf/
 __pycache__/
+.cache/
+compile_commands.json

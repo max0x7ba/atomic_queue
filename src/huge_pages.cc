@@ -2,6 +2,7 @@
 #include "huge_pages.h"
 
 #include <system_error>
+#include <cstdio>
 
 #include <unistd.h>
 #include <sys/mman.h>
@@ -12,10 +13,23 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-size_t const default_page_size = ::sysconf(_SC_PAGESIZE);
+using std::fprintf;
+using std::fputs;
 
-atomic_queue::HugePages::WarnFn* atomic_queue::HugePages::warn_no_1GB_pages = 0;
-atomic_queue::HugePages::WarnFn* atomic_queue::HugePages::warn_no_2MB_pages = 0;
+static void default_advise_hugeadm_1GB() noexcept {
+    fputs("Warning: Failed to allocate 1GB huge pages. Run \"sudo hugeadm --pool-pages-min 1GB:1 --pool-pages-max 1GB:1\".\n", stderr);
+}
+
+static void default_advise_hugeadm_2MB() noexcept {
+    fputs("Warning: Failed to allocate 2MB huge pages. Run \"sudo hugeadm --pool-pages-min 2MB:16 --pool-pages-max 2MB:16\".\n", stderr);
+}
+
+atomic_queue::HugePages::WarnFn* atomic_queue::HugePages::warn_no_1GB_pages = default_advise_hugeadm_1GB;
+atomic_queue::HugePages::WarnFn* atomic_queue::HugePages::warn_no_2MB_pages = default_advise_hugeadm_2MB;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+size_t const default_page_size = ::sysconf(_SC_PAGESIZE);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -67,6 +81,40 @@ atomic_queue::HugePages::~HugePages() noexcept {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-atomic_queue::HugePages* atomic_queue::HugePageAllocatorBase::hp = 0;
+void* atomic_queue::HugePages::allocate(size_t size, std::nothrow_t) noexcept {
+    if(static_cast<size_t>(end_ - cur_) < size)
+        return 0;
+    void* p = cur_;
+    cur_ += size;
+    return p;
+}
+
+void* atomic_queue::HugePages::allocate(size_t size) {
+    void* p = this->allocate(size, std::nothrow_t{});
+    if(!p)
+        throw std::bad_alloc();
+    return p;
+}
+
+void atomic_queue::HugePages::deallocate(void* p, size_t size) noexcept {
+    auto q = cur_ - size;
+    if(q == p) // Can only deallocate the last allocation at the end.
+        cur_ = q;
+    else
+        std::abort();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void atomic_queue::HugePages::check_huge_pages_leaks(char const* name) noexcept {
+    if(!empty()) {
+        fprintf(stderr, "%s: %zu bytes of HugePages memory leaked.\n", name, used());
+        reset();
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+atomic_queue::HugePages* atomic_queue::HugePages::instance = 0;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
