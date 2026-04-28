@@ -2,7 +2,7 @@
 #ifndef HUGE_PAGES_H_INCLUDED
 #define HUGE_PAGES_H_INCLUDED
 
-#include "benchmarks.h"
+#include "atomic_queue/defs.h"
 
 #include <new>
 #include <memory>

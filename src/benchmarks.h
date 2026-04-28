@@ -17,11 +17,6 @@ struct Context {
     unsigned consumers;
 };
 
-struct NoContext {
-    template<class... Args>
-    ATOMIC_QUEUE_INLINE constexpr NoContext(Args&&...) noexcept {}
-};
-
 template<class T> typename T::ContextType context_of_(int);
 template<class T> NoContext context_of_(long);
 template<class T> using ContextOf = decltype(context_of_<T>(0));
