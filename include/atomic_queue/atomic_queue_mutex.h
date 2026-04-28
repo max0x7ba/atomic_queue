@@ -45,7 +45,7 @@ public:
     using value_type = T;
 
     template<class U>
-    bool try_push(U&& element) noexcept {
+    ATOMIC_QUEUE_INLINE bool try_push(U&& element) noexcept {
         ScopedLock lock(mutex_);
         if(ATOMIC_QUEUE_LIKELY(head_ - tail_ < size_)) {
             details::remap<SHUFFLE_BITS>(q_, head_, size_) = std::forward<U>(element);
@@ -55,7 +55,7 @@ public:
         return false;
     }
 
-    bool try_pop(T& element) noexcept {
+    ATOMIC_QUEUE_INLINE bool try_pop(T& element) noexcept {
         ScopedLock lock(mutex_);
         if(ATOMIC_QUEUE_LIKELY(head_ != tail_)) {
             element = std::move(details::remap<SHUFFLE_BITS>(q_, tail_, size_));
@@ -65,11 +65,11 @@ public:
         return false;
     }
 
-    bool was_empty() const noexcept {
+    ATOMIC_QUEUE_INLINE bool was_empty() const noexcept {
         return static_cast<int>(head_ - tail_) <= 0;
     }
 
-    bool was_full() const noexcept {
+    ATOMIC_QUEUE_INLINE bool was_full() const noexcept {
         return static_cast<int>(head_ - tail_) >= static_cast<int>(size_);
     }
 };

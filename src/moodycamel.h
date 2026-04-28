@@ -26,26 +26,26 @@ struct MoodyCamelQueue : moodycamel::ConcurrentQueue<T> {
 
     struct Producer {
         producer_token_t t_;
-        Producer(MoodyCamelQueue& q) noexcept : t_(q) {}
-        void push(MoodyCamelQueue& q, T element) { q.push(t_, element); }
+        ATOMIC_QUEUE_INLINE Producer(MoodyCamelQueue& q) noexcept : t_(q) {}
+        ATOMIC_QUEUE_INLINE void push(MoodyCamelQueue& q, T element) { q.push(t_, element); }
     };
 
     struct Consumer {
         consumer_token_t t_;
-        Consumer(MoodyCamelQueue& q) noexcept : t_(q) {}
-        T pop(MoodyCamelQueue& q) { return q.pop(t_); }
+        ATOMIC_QUEUE_INLINE Consumer(MoodyCamelQueue& q) noexcept : t_(q) {}
+        ATOMIC_QUEUE_INLINE T pop(MoodyCamelQueue& q) { return q.pop(t_); }
     };
 
-    MoodyCamelQueue(Context context)
+    ATOMIC_QUEUE_INLINE MoodyCamelQueue(Context context)
         : moodycamel::ConcurrentQueue<T>(Capacity, context.producers, 0)
     {}
 
-    void push(producer_token_t& tok, T element) noexcept {
+    ATOMIC_QUEUE_INLINE void push(producer_token_t& tok, T element) noexcept {
         while(!this->try_enqueue(tok, element))
             spin_loop_pause();
     }
 
-    T pop(consumer_token_t& tok) noexcept {
+    ATOMIC_QUEUE_INLINE T pop(consumer_token_t& tok) noexcept {
         T element;
         while(!this->try_dequeue(tok, element))
             spin_loop_pause();
@@ -57,16 +57,16 @@ struct MoodyCamelQueue : moodycamel::ConcurrentQueue<T> {
 
 template<class T, unsigned Capacity>
 struct MoodyCamelReaderWriterQueue : moodycamel::ReaderWriterQueue<T> {
-    MoodyCamelReaderWriterQueue()
+    ATOMIC_QUEUE_INLINE MoodyCamelReaderWriterQueue()
         : moodycamel::ReaderWriterQueue<T>(Capacity)
     {}
 
-    void push(T element) noexcept {
+    ATOMIC_QUEUE_INLINE void push(T element) noexcept {
         while(!this->try_enqueue(element))
             spin_loop_pause();
     }
 
-    T pop() noexcept {
+    ATOMIC_QUEUE_INLINE T pop() noexcept {
         T element;
         while(!this->try_dequeue(element))
             spin_loop_pause();

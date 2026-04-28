@@ -24,7 +24,7 @@ class Spinlock {
 public:
     using scoped_lock = std::lock_guard<Spinlock>;
 
-    Spinlock() noexcept {
+    ATOMIC_QUEUE_INLINE Spinlock() noexcept {
         if(ATOMIC_QUEUE_UNLIKELY(::pthread_spin_init(&s_, 0)))
             std::abort();
     }
@@ -32,16 +32,16 @@ public:
     Spinlock(Spinlock const&) = delete;
     Spinlock& operator=(Spinlock const&) = delete;
 
-    ~Spinlock() noexcept {
+    ATOMIC_QUEUE_INLINE ~Spinlock() noexcept {
         ::pthread_spin_destroy(&s_);
     }
 
-    void lock() noexcept {
+    ATOMIC_QUEUE_INLINE void lock() noexcept {
         if(ATOMIC_QUEUE_UNLIKELY(::pthread_spin_lock(&s_)))
             std::abort();
     }
 
-    void unlock() noexcept {
+    ATOMIC_QUEUE_INLINE void unlock() noexcept {
         if(ATOMIC_QUEUE_UNLIKELY(::pthread_spin_unlock(&s_)))
             std::abort();
     }
@@ -58,7 +58,7 @@ public:
         TicketSpinlock* const m_;
         unsigned const ticket_;
     public:
-        LockGuard(TicketSpinlock& m) noexcept
+        ATOMIC_QUEUE_INLINE LockGuard(TicketSpinlock& m) noexcept
             : m_(&m)
             , ticket_(m.lock())
         {}
@@ -66,14 +66,14 @@ public:
         LockGuard(LockGuard const&) = delete;
         LockGuard& operator=(LockGuard const&) = delete;
 
-        ~LockGuard() noexcept {
+        ATOMIC_QUEUE_INLINE ~LockGuard() noexcept {
             m_->unlock(ticket_);
         }
     };
 
     using scoped_lock = LockGuard;
 
-    TicketSpinlock() noexcept = default;
+    ATOMIC_QUEUE_INLINE TicketSpinlock() noexcept = default;
     TicketSpinlock(TicketSpinlock const&) = delete;
     TicketSpinlock& operator=(TicketSpinlock const&) = delete;
 
@@ -90,11 +90,11 @@ public:
         return ticket;
     }
 
-    void unlock() noexcept {
+    ATOMIC_QUEUE_INLINE void unlock() noexcept {
         unlock(next_.load(std::memory_order_relaxed) + 1);
     }
 
-    void unlock(unsigned ticket) noexcept {
+    ATOMIC_QUEUE_INLINE void unlock(unsigned ticket) noexcept {
         next_.store(ticket + 1, std::memory_order_release);
     }
 };
@@ -110,7 +110,7 @@ public:
     UnfairSpinlock(UnfairSpinlock const&) = delete;
     UnfairSpinlock& operator=(UnfairSpinlock const&) = delete;
 
-    void lock() noexcept {
+    ATOMIC_QUEUE_INLINE void lock() noexcept {
         for(;;) {
             if(!lock_.load(std::memory_order_relaxed) && !lock_.exchange(1, std::memory_order_acquire))
                 return;
@@ -118,7 +118,7 @@ public:
         }
     }
 
-    void unlock() noexcept {
+    ATOMIC_QUEUE_INLINE void unlock() noexcept {
         lock_.store(0, std::memory_order_release);
     }
 };
