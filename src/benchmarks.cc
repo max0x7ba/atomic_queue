@@ -484,8 +484,7 @@ ATOMIC_QUEUE_INLINE void time_throughput_spsc(char const* name, HugePages& hp, s
     time_throughput<Queue>(name, hp, hw_thread_ids, N_TROUGHPUT_MESSAGES, 1, 1); // Special case for 1 producer and 1 consumer.
 }
 
-ATOMIC_QUEUE_NOINLINE void run_throughput_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const& cpu_topology, BenchmarkOptions options) {
-    auto hw_thread_ids = hw_thread_id(cpu_topology); // Sorted by hw_thread_id: avoid HT, same socket.
+ATOMIC_QUEUE_NOINLINE void run_throughput_benchmarks(HugePages& hp, std::vector<unsigned> const& hw_thread_ids, BenchmarkOptions options) {
     printf("---- Running throughput benchmarks with up to %zu CPUs (higher is better) ----\n", hw_thread_ids.size() & -2);
 
     int constexpr SIZE = 65536;
@@ -610,9 +609,6 @@ ATOMIC_QUEUE_INLINE cycles_t time_ping_pong_once(unsigned N, HugePages& hp, unsi
     auto ctx = hp.create_unique_ptr<SharedState2>(N, 1u, cpus);
     auto sender0 = ctx->reuse_this_thread(); // This thread#0 is the sender.
 
-    // set_thread_affinity(cpus[0]); // This thread#0 is the sender.
-    // set_default_thread_affinity(cpus[1]);
-
     ContextOf<Queue> const queue_ctx{1, 1};
     auto q1 = hp.create_unique_ptr<Queue>(queue_ctx);
     auto q2 = hp.create_unique_ptr<Queue>(queue_ctx);
@@ -651,8 +647,7 @@ ATOMIC_QUEUE_NOINLINE void time_ping_pong(char const* name, HugePages& hp, std::
     printf("%32s: %.9f sec/round-trip\n", name, round_trip_time);
 }
 
-void run_ping_pong_benchmarks(HugePages& hp, std::vector<CpuTopologyInfo> const& cpu_topology, BenchmarkOptions options) {
-    auto hw_thread_ids = hw_thread_id(cpu_topology); // Sorted by hw_thread_id: avoid HT, same socket.
+void run_ping_pong_benchmarks(HugePages& hp, std::vector<unsigned> const& hw_thread_ids, BenchmarkOptions options) {
     printf("---- Running ping-pong benchmarks with 2 CPUs (lower is better) ----\n");
 
     // This benchmark doesn't require queue capacity greater than 1, however, capacity of 1 elides
@@ -734,16 +729,17 @@ int main() {
     if(cpu_topology.size() < 2)
         throw std::runtime_error("A CPU with at least 2 hardware threads is required.");
 
-    set_thread_affinity(cpu_topology[0].hw_thread_id); // Pin the main thread#0 to CPU#0 prior to allocating memory.
+    auto hw_thread_ids = hw_thread_id(cpu_topology); // Sorted by hw_thread_id.
+    set_thread_affinity(hw_thread_ids[0]); // Pin the main thread#0 to CPU#0 prior to allocating memory.
 
     size_t constexpr MB = 1024 * 1024;
     HugePages hp(HugePages::PAGE_1GB, 32 * MB); // Try allocating a 1GB huge page to minimize TLB misses.
     HugePages::instance = &hp;
 
     if(!options.no_throughput())
-        run_throughput_benchmarks(hp, cpu_topology, options);
+        run_throughput_benchmarks(hp, hw_thread_ids, options);
     if(!options.no_ping_pong())
-        run_ping_pong_benchmarks(hp, cpu_topology, options);
+        run_ping_pong_benchmarks(hp, hw_thread_ids, options);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
