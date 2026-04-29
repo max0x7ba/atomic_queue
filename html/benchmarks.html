@@ -53,7 +53,7 @@
 
     <h1 class="view-toggle">Latency Benchmark</h1>
     <div>
-      <p>One thread posts an integer to another thread through one queue and waits for a reply from another queue, 2 queues and 2 threads, in total. Each thread pings or pongs 500,000 messages into its egress queue. Contention is minimal here (1-producer-1-consumer, 1 element in the queue) in order to be able to achieve the lowest possible latency a queue can provide. This benchmark measures the total time taken to post 500,000 messages and receive 500,000 replies. A benchmark run reports the best sec/round-trip latency (time taken to push a message and pop its reply) out of 10 tries for each queue. The charts report mean, stdev, min and max of sec/round-trip latency across 33 benchmark runs.</p>
+      <p>One thread posts an integer to another thread through one queue and waits for a reply from another queue, 2 queues and 2 threads, in total. A _ping_ is an incoming message, a _pong_ is a reply to that. Only one ping or pong message exists or is being in-flight, at all times. In total, each thread pushes 500,000 _pings_ into its ingress queue, and pops 500,000 pongs from its ingress queue. Contention is minimal here (1-producer-1-consumer, 1 element in the queue) in order to be able to achieve the lowest possible latency a queue can provide. This benchmark measures the total time taken to post 500,000 messages and receive 500,000 replies. A benchmark run reports the best sec/round-trip latency (time taken to push a message and pop its reply) out of 10 tries for each queue. The charts report mean, stdev, min and max of sec/round-trip latency across 33 benchmark runs.</p>
 
       <h3 class="view-toggle">Latency (with SMT) on AMD Ryzen 7 5825U</h3>
       <div>
