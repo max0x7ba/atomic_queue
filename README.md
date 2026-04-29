@@ -344,10 +344,22 @@ The charts report mean, stdev, min and max of sec/round-trip latency across 33 b
 - In the round-trip latency benchmark, **every tested queue** achieves its best latency only when the producer and consumer threads share the same CPU core.
 When the threads run on **different cores**, latency increases by **3× or more**.
 - When producer and consumer threads run on different cores, **all queues** show **at least 1.5× lower** throughput.
-- `moodycamel::ConcurrentQueue` is the notable exception here, with its 1-producer-1-consumer throughput being the worst, yet scaling up linearly when adding another pair of producer-consumer threads. And that reveals its architecture at a glance, without having to examine its source code -- it is a bunch of single-producer-single-consumer queues trying to emulate a multiple-producer-multiple-consumer queue, where different threads `push` into different internal SPSC queues, different threads `pop` from different internal SPSC queues. It is unable to `pop` elements in the same _global time order_ matching that of _global time order_ of `push` calls, unlike true MPMC queues. Neither it is able to match the lowest latencies of true SPSC queues. `moodycamel::ConcurrentQueue` probably aspired to deliver the _global time order_ of MPMC queues for the price of the lowest latency of SPSC queues. But ended up delivering a high-latency queue that could still be, technically, called an MPMC queue, while not being a feasible/fungible/compatible drop-in replacement for all other (true) MPMC queue benchmarked here. Whereas all the other MPMC queues are perfectly fungible compatible drop-in replacements for any other MPMC queue, including the pseudo-MPMC `moodycamel::ConcurrentQueue` too. `moodycamel::ConcurrentQueue` is optimized for throughput at the expense of anything else, thusly epitomizing ["_When a measure becomes a target, it ceases to be a good measure_"][20] better than anything else.
 - The numbers shown for each queue reflect the **best-case** result across within-core, cross-core, and cross-CCX/socket scenarios.
 - **Important**: These scenarios behave very differently in practice. Excellent performance with two SMT threads on a single core is often irrelevant for real-world use cases where threads must run on different cores.
 - **Recommendation**: Always benchmark your specific thread placement (same core vs. different cores vs. different CCX) for latency-critical or throughput-critical applications.
+
+### Notable exceptions
+`moodycamel::ConcurrentQueue` is the notable exception here, with its 1-producer-1-consumer throughput being the worst, yet scaling up in almost perfect linear fashion when the benchmark adds another pair of producer-consumer threads.
+
+That is quite unlike anything and makes one think of possible root causes for its extreme top throughput performance diverging from anything else.
+
+Thinking more about it, reveals `moodycamel::ConcurrentQueue` architecture at a glance, without having to examine its source code -- it is a bunch of single-producer-single-consumer queues trying to emulate a multiple-producer-multiple-consumer queue, where different threads `push` into different internal SPSC queues, different threads `pop` from different internal SPSC queues. It is unable to `pop` elements in the same _global time order_ matching that of _global time order_ of `push` calls, unlike true MPMC queues. Neither it is able to match the _low latencies_ of true SPSC queues.
+
+`moodycamel::ConcurrentQueue` probably aspired to combine the _global time order_ feature of MPMC queues with the _low-latency_ feature of SPSC queues. But ended up delivering neither the _global time order_ nor the _low-latency_.
+
+`moodycamel::ConcurrentQueue` could still be, technically, called an MPMC queue. While, in practice, not being a feasible/fungible/compatible drop-in replacement for all other (true) MPMC queue benchmarked here. Whereas all the other MPMC queues are perfectly fungible compatible drop-in replacements for any other MPMC queue, including pseudo-MPMC `moodycamel::ConcurrentQueue` too.
+
+`moodycamel::ConcurrentQueue` is optimized for throughput at the expense of anything else, it appears, thusly epitomizing ["_When a measure becomes a target, it ceases to be a good measure_"][20] better than anything else.
 
 ## Reading material
 Some books on the subject of multi-threaded programming I found quite instructive:
