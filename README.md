@@ -289,15 +289,21 @@ Using smaller pages cripple CPU performance with TLB cache misses.
 [View throughput and latency benchmarks charts][1].
 
 ### Methodology
-There are a few OS behaviours that complicate benchmarking:
-* CPU scheduler can place threads on different CPU cores each run. To avoid that the threads are pinned to specific CPU cores.
-* CPU scheduler can preempt threads. To avoid that real-time `SCHED_FIFO` priority 50 is used to disable scheduler time quantum expiry and make the threads non-preemptable by lower priority processes/threads.
-* Real-time thread throttling disabled.
-* Adverse address space randomisation may cause extra CPU cache conflicts, as well as other processes running on the system. To minimise effects of that `benchmarks` executable is run at least 33 times. The benchmark charts display average values. The chart tooltip also displays the standard deviation, minimum and maximum values.
+There are a few OS behaviours that complicate benchmarking, make benchmark runs irreproducible, and introduce otherwise unnecessary timing noise into benchmark timings:
 
-Benchmark performance of single-producer-single-consumer queues `boost::lockfree::spsc_queue`, `moodycamel::ReaderWriterQueue` and these queues in single-producer-single-consumer mode should be identical because they implement exactly the same algorithm using exactly the same atomic load and store instructions. `boost::lockfree::spsc_queue` implementation benchmarked at that time had no optimizations for minimizing L1d cache contention, cold branch misprediction or pipeline stalls from subtler issues noticeable only in the generated assembly code.
+* CPU scheduler can place threads on different CPU cores each run, often poorly. The benchmark pins threads to specific CPU cores to test throughput/latency of communication between in particular scenarios, such as SMT, cross-core with no SMT, cross-CCX/socket. That obviates the CPU scheduler from having to decide which CPU to run a thread on completely, along with any of its mis-sheduling risks[^3].
+* CPU scheduler preempts threads. Real-time `SCHED_FIFO` priority 50 is used to make benchmark threads non-preemptable by lower priority processes/threads.
+* Real-time thread throttling, enabled by default, makes the kernel preempt real-time `SCHED_FIFO` threads every second to protect against real-time threads hogging CPUs and making the system unavailable for anything else. Disabled during benchmarks runs[^1].
+* Address space randomisation makes CPU branch prediction the least efficient. In addition to making all CPU caches only "somewhat" but not the least efficient. Disabled during benchmarks runs[^1].
+* CPU vulnerability mitigations make system calls dramatically more expensive. Disabled during benchmarks runs[^1].
+* Transparent huge pages are "always" enabled during benchmarks runs[^2]. That enables only much less than 50% of transparent huge page functionality and its benefits, with (indefinitely) delayed effect.
+* Synchronous compaction is "always" enabled during benchmarks runs[^2]. Enables the rest of transparent huge page functionality and its benefits, with immediate positive effect on memory allocations in every process. [thp-usage][14] provides more information.
 
-I only have access to a few x86-64 machines. If you have access to different hardware feel free to submit the output file of `scripts/run-benchmarks.sh` and I will include your results into the benchmarks page.
+To further minimise the noise in timings:
+* `benchmarks` executable runs the same workload 10 times with each queue and reports the shortest (best) time measured. Everyone needs a break every little while and `benchmarks` executable gives each queue 10 breaks every few fractions of a second.
+* The benchmark charts report `{mean, stdev, min, max}` descriptive statistics of the best throughput `msg/sec` and latency `sec/round-trip` measurements obtained from at least 33 runs of `benchmarks` executable. (33 runs of `benchmarks` take ~1h30s on Ryzen 5950X).
+
+The goal of the benchmarks is to time things as accurately as possible. For the purpose of viewing the reality clearly without any distortions of perception, prejudice or judgement.
 
 #### Huge pages
 When huge pages are available the benchmarks use 1x1GB or 16x2MB huge pages for the queues to minimise TLB misses. To enable huge pages do one of:
@@ -370,3 +376,7 @@ Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file L
 [17]: https://en.cppreference.com/w/cpp/atomic/memory_order
 [18]: https://github.com/max0x7ba/atomic_queue/blob/master/.github/workflows
 [19]: https://man7.org/linux/man-pages/man2/sched_yield.2.html
+
+[^1]: A security feature that cripples CPU performance to protect against someone else's threats. Always disabled in my workstations.
+[^2]: Always enabled in my workstations for best performance in memory/compute-intensive workloads, such as linear algebra computations with `numpy` and `Pandas`, training ANNs on GPUs with `PyTorch`.
+[^3]: "Completely Fair Scheduler" was never a good idea nor a right solution for anything: `make -j` freezed a Linux system because the process scheduler strived to allocate the CPU/memory resources to all processes equally fairly. The _scheduler automatic task group creation_ Linux feature, now enabled by default, breaks `nice` and creates more problem trying to put a band-aid on the ill-conceived "Completely Fair Scheduler" idea. Desirable robust process scheduling is the opposite of fair. Solaris implemented the desirable robust process scheduling in 2000s, `make -j` never destablized Solaris. `make -j` was the right way to build fast on any Unix. Switching to Linux, people got most surprised with `make -j` completely freezing the highest-end Linux systems in 2009, and had to learn that `-j` option takes an integer argument (my experience). GNU Make implemented `-l` band-aid option to work-around this Linux-only CPU scheduler problem, and `-l` is worthless for 99% of use-cases (people still hope it solves 1% of use-cases, which have been elusive, so far). And here we are now, with fundamentally completely broken "Completely Fair Scheduler", with its _scheduler automatic task group creation_ band-aid solution now completely breaking `nice`. And worthless `make -l` workaround for `make -j` completely destablizing Linux with its "Completely Fair Scheduler". Despite the deluge of Linux security mitigations severly crippling CPU performance for protection against threats, non-existing for 99% of Linux users.
