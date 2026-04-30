@@ -311,8 +311,9 @@ struct SharedState2 : SharedState {
 
 template<class Queue>
 ATOMIC_QUEUE_NOINLINE void throughput_producer(SharedState* ctx, ThreadState* thread) {
-    region_guard_t<Queue> guard;
     Queue* const queue = static_cast<Queue*>(ctx->queue0);
+
+    [[maybe_unused]] region_guard_t<Queue> guard;
     ProducerOf<Queue> producer{*queue};
     unsigned n = ctx->n_msg;
 
@@ -328,8 +329,9 @@ ATOMIC_QUEUE_NOINLINE void throughput_producer(SharedState* ctx, ThreadState* th
 
 template<class Queue>
 ATOMIC_QUEUE_NOINLINE void throughput_consumer(SharedState* ctx, ThreadState* thread) {
-    region_guard_t<Queue> guard;
     Queue* const queue = static_cast<Queue*>(ctx->queue0);
+
+    [[maybe_unused]] region_guard_t<Queue> guard;
     ConsumerOf<Queue> consumer{*queue};
     sum_t sum = 1; // Set sums are +1 biased.
     unsigned n;
@@ -519,9 +521,10 @@ ATOMIC_QUEUE_NOINLINE void run_throughput_benchmarks(HugePages& hp, std::vector<
 
 template<class Queue>
 ATOMIC_QUEUE_NOINLINE void ping_pong_receiver(SharedState* ctx, ThreadState* thread) {
-    region_guard_t<Queue> guard;
     Queue* const q1 = static_cast<Queue*>(ctx->queue0);
     Queue* const q2 = static_cast<Queue*>(ctx->queue1);
+
+    [[maybe_unused]] region_guard_t<Queue> guard;
     ConsumerOf<Queue> consumer_q1{*q1};
     ProducerOf<Queue> producer_q2{*q2};
 
@@ -539,9 +542,10 @@ ATOMIC_QUEUE_NOINLINE void ping_pong_receiver(SharedState* ctx, ThreadState* thr
 
 template<class Queue>
 ATOMIC_QUEUE_NOINLINE void ping_pong_sender(SharedState* ctx, ThreadState* thread) {
-    region_guard_t<Queue> guard;
     Queue* const q1 = static_cast<Queue*>(ctx->queue0);
     Queue* const q2 = static_cast<Queue*>(ctx->queue1);
+
+    [[maybe_unused]] region_guard_t<Queue> guard;
     ProducerOf<Queue> producer_q1{*q1};
     ConsumerOf<Queue> consumer_q2{*q2};
     unsigned n = ctx->n_msg;

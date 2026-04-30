@@ -141,7 +141,7 @@ cxxflags.gcc.debug := -Og -f{stack-protector-all,no-omit-frame-pointer} # -D_GLI
 cxxflags.gcc.release := -O3 -mtune=native -fno-{stack-protector,stack-clash-protection} -falign-functions=64 -DNDEBUG ${cxxflags.gcc.asm.${ASM}}
 cxxflags.gcc.sanitize := ${cxxflags.gcc.debug} -fsanitize=thread
 cxxflags.gcc.sanitize2 := ${cxxflags.gcc.debug} -fsanitize=undefined,address
-cxxflags.gcc := -march=native -f{no-plt,no-math-errno,finite-math-only,message-length=0} -W{all,extra,error,no-{array-bounds,maybe-uninitialized,unused-variable,unused-function,unused-local-typedefs}} ${cxxflags.gcc.${BUILD}}
+cxxflags.gcc := -march=native -f{no-plt,no-math-errno,finite-math-only,message-length=0} -W{all,extra,error} ${cxxflags.gcc.${BUILD}}
 ldflags.gcc.sanitize := ${ldflags.gcc.debug} -fsanitize=thread
 ldflags.gcc.sanitize2 := ${ldflags.gcc.debug} -fsanitize=undefined,address
 # ldflags.gcc := -fuse-ld=${use-ld.gcc} -Wl,--compress-debug-sections=zstd,-O2,--gc-sections ${ldflags.gcc.${BUILD}}
@@ -153,7 +153,7 @@ cxxflags.clang.debug := -O0 -fstack-protector-all $(and ${has_native},-march=nat
 cxxflags.clang.release := -O3 -fno-stack-protector -DNDEBUG $(and ${has_native},-march=native -mtune=native)
 cxxflags.clang.sanitize := ${cxxflags.clang.debug} -fsanitize=thread
 cxxflags.clang.sanitize2 := ${cxxflags.clang.debug} -fsanitize=undefined,address
-cxxflags.clang := -stdlib=libstdc++ -f{no-plt,no-math-errno,finite-math-only,message-length=0} -W{all,extra,error,no-{unused-variable,unused-function,unused-local-typedefs}} ${cxxflags.clang.${BUILD}}
+cxxflags.clang := -stdlib=libstdc++ -f{no-plt,no-math-errno,finite-math-only,message-length=0} -W{all,extra,error} ${cxxflags.clang.${BUILD}}
 ldflags.clang.debug := -latomic # A work-around for clang bug.
 ldflags.clang.sanitize := ${ldflags.clang.debug} -fsanitize=thread
 ldflags.clang.sanitize2 := ${ldflags.clang.debug} -fsanitize=undefined,address
@@ -172,7 +172,7 @@ cppflags.moodycamel := -I..
 ldlibs.moodycamel :=
 
 cppflags.xenium := -I../xenium
-cxxflags.xenium := -std=c++17
+cxxflags.xenium :=
 ldlibs.xenium :=
 
 recompile := ${build_dir}/.make/recompile
@@ -205,7 +205,7 @@ ${build_dir}/tests :   ldlibs += -lboost_unit_test_framework
 
 benchmarks_src := benchmarks.cc cpu_base_frequency.cc huge_pages.cc
 ${build_dir}/benchmarks.o : cppflags += ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium}
-${build_dir}/benchmarks.o : cxxflags += ${cxxflags.tbb} ${cxxflags.moodycamel} ${cxxflags.xenium}
+${build_dir}/benchmarks.o : cxxflags += -std=c++17 ${cxxflags.tbb} ${cxxflags.moodycamel} ${cxxflags.xenium} # benchmarks.cc uses c++17 features.
 ${build_dir}/benchmarks   : ldlibs += ${ldlibs.tbb} ${ldlibs.moodycamel} ${ldlibs.xenium} -ldl
 
 # Build targets definitions end.
