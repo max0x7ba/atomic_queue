@@ -349,15 +349,13 @@ When the threads run on **different cores**, latency increases by **3× or more*
 - **Recommendation**: Always benchmark your specific thread placement (same core vs. different cores vs. different CCX) for latency-critical or throughput-critical applications.
 
 ### Notable exceptions
-`moodycamel::ConcurrentQueue` is the notable exception here, with its 1-producer-1-consumer throughput being the worst, yet scaling up in almost perfect linear fashion when the benchmark adds another pair of producer-consumer threads.
+`moodycamel::ConcurrentQueue` is the notable exception here, with its 1-producer-1-consumer throughput being the worst, yet scaling up in almost perfect linear fashion when the benchmark adds another pair of producer-consumer threads. Such impressive scaling, unmatched by anything else, feels too good to be true.
 
-That is quite unlike anything and makes one think of possible root causes for its extreme top throughput performance diverging from anything else.
-
-Thinking more about it, reveals `moodycamel::ConcurrentQueue` architecture at a glance, without having to examine its source code -- it is a bunch of single-producer-single-consumer queues trying to emulate a multiple-producer-multiple-consumer queue, where different threads `push` into different internal SPSC queues, different threads `pop` from different internal SPSC queues. It is unable to `pop` elements in the same _global time order_ matching that of _global time order_ of `push` calls, unlike true MPMC queues. Neither it is able to match the _low latencies_ of true SPSC queues.
+Thinking more reminds of [Amdahl's law][21]: perfectly linear scaling is possible only when adding another producer-consumer-thread-pair does not increase contention on the queue object. This realization makes `moodycamel::ConcurrentQueue` architecture immediately obvious, without having to examine its source code -- `moodycamel::ConcurrentQueue` tries to emulate a multiple-producer-multiple-consumer queue with a bunch of single-producer-single-consumer queues, where different threads `push` into different internal SPSC queues, different threads `pop` from different internal SPSC queues. That makes it unable to `pop` elements in the same _global time order_ matching that of _global time order_ of `push` calls, unlike true MPMC queues.
 
 `moodycamel::ConcurrentQueue` probably aspired to combine the _global time order_ feature of MPMC queues with the _low-latency_ feature of SPSC queues. But ended up delivering neither the _global time order_ nor the _low-latency_.
 
-`moodycamel::ConcurrentQueue` could still be, technically, called an MPMC queue. While, in practice, not being a feasible/fungible/compatible drop-in replacement for all other (true) MPMC queue benchmarked here. Whereas all the other MPMC queues are perfectly fungible compatible drop-in replacements for any other MPMC queue, including pseudo-MPMC `moodycamel::ConcurrentQueue` too.
+While `moodycamel::ConcurrentQueue` could still, technically, be called an MPMC queue, in practice, `moodycamel::ConcurrentQueue` is not a feasible/fungible/compatible drop-in replacement for all other (true) MPMC queue benchmarked here. Whereas all the other MPMC queues are perfectly fungible compatible drop-in replacements for any other MPMC queue, including pseudo-MPMC `moodycamel::ConcurrentQueue` too.
 
 `moodycamel::ConcurrentQueue` is optimized for throughput at the expense of anything else, it appears, thusly epitomizing ["_When a measure becomes a target, it ceases to be a good measure_"][20] better than anything else.
 
@@ -390,6 +388,7 @@ Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file L
 [18]: https://github.com/max0x7ba/atomic_queue/blob/master/.github/workflows
 [19]: https://man7.org/linux/man-pages/man2/sched_yield.2.html
 [20]: https://en.wikipedia.org/wiki/Goodhart%27s_law
+[21]: https://en.wikipedia.org/wiki/Amdahl%27s_law
 
 [^1]: A security feature that cripples CPU performance to protect against someone else's threat vectors. Always disabled in my workstations.
 [^2]: Always enabled in my workstations for best performance in memory/compute-intensive workloads, such as linear algebra computations with `numpy` and `Pandas`, training ANNs on GPUs with `PyTorch`.
