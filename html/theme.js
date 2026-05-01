@@ -2,13 +2,13 @@
 
 // Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file LICENSE.
 
-const theme_axis = {
+const atomic_queue_theme_axis = {
     gridLineColor: '#444',
     labels: { style: { color: '#eee' } },
     title: { style: { color: '#eee' } }
 };
 
-Highcharts.theme = {
+const atomic_queue_theme = {
     chart: {
         backgroundColor: 'black',
         spacingBottom: 40,
@@ -22,8 +22,8 @@ Highcharts.theme = {
         }
     },
     subtitle: { style: { color: '#aaa' } },
-    xAxis: theme_axis,
-    yAxis: theme_axis,
+    xAxis: atomic_queue_theme_axis,
+    yAxis: atomic_queue_theme_axis,
     tooltip: {
         followPointer: true,
         useHTML: true,
@@ -97,6 +97,3 @@ Highcharts.theme = {
     credits: { enabled: false },
     accessibility: { enabled: false }
 };
-
-// Apply the theme
-Highcharts.setOptions(Highcharts.theme);

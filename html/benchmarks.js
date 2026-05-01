@@ -3,6 +3,8 @@
 // Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file LICENSE.
 
 $(function() {
+    Highcharts.setOptions(atomic_queue_theme);
+
     const spsc_pattern = { pattern: {
         path: {
             d: 'M 0 0 L 10 10 M 9 -1 L 11 1 M -1 9 L 1 11',
@@ -41,13 +43,13 @@ $(function() {
         return Highcharts.numberFormat(v, 0);
     }
 
-    function get_caption(div) {
-        const caption = $(div).data("caption");
-        return {
-            text: caption,
-            useHTML: true,
-        };
-    }
+    // function get_caption(div) {
+    //     const caption = $(div).data("caption");
+    //     return {
+    //         text: caption,
+    //         useHTML: true,
+    //     };
+    // }
 
     function plot_scalability(div, results, max_lin, max_log) {
         const modes = [
