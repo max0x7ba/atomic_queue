@@ -2,30 +2,24 @@
 
 # Usage examples (assuming this directory is ~/src/atomic_queue):
 #
-#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) all run_tests
-#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 BUILD=debug run_tests
-#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 BUILD=debug run_tests run_benchmarks_quick
-#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=clang-20 BUILD=debug run_tests
+#   /bin/time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) run_tests
+#   /bin/time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 BUILD=sanitize run_tests
+#   /bin/time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 BUILD=debug run_tests run_benchmarks_quick
+#   /bin/time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=clang-20 BUILD=debug run_tests run_benchmarks_quick
+#   /bin/time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=clang-20 BUILD=debug TAGS run_tests
+#   /bin/time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 asm_throughput asm_latency
 #   AQB=1 time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 run_benchmarks_n
-#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 asm_throughput asm_latency
-#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=clang-20 run_benchmarks_n
-#   AQB=1 taskset -c 0,1,2,3 time make -C ~/src/atomic_queue -Rj4 T=1 TOOLSET=gcc-14 run_benchmarks_n N=2 TAG=5825u-smt1
-#   AQB=1 taskset -c 0,2,4,6 time make -C ~/src/atomic_queue -Rj4 T=1 TOOLSET=gcc-14 run_benchmarks_n N=2 TAG=5825u-smt0
-#   taskset -c $(seq -s, 0 2 15) time make -C ~/src/atomic_queue -Rj8 T=1 TOOLSET=gcc-14 run_benchmarks_n N=33 TAG=cross-core
-#   taskset -c 4-7 time make -C ~/src/atomic_queue -Rj4 TOOLSET=gcc-14 run_benchmarks_n N=2 TAG=statev1
-#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=gcc-14 ASM=1
-#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=clang-20 BUILD=debug TAGS
-#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=clang BUILD=sanitize run_tests
+#   AQB=1 taskset -c 0-7    /bin/time make -C ~/src/atomic_queue -Rj8 T=1 TOOLSET=gcc-14 run_benchmarks_n N=2 TAG=5825u-smt1
+#   AQB=1 taskset -c 0-15:2 /bin/time make -C ~/src/atomic_queue -Rj8 T=1 TOOLSET=gcc-14 run_benchmarks_n N=2 TAG=5825u-smt0
 #
 # Build and run with multiple toolsets in parallel:
 #
-#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc,gcc-14,clang,clang-20 BUILD=debug all run_tests
-#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc,gcc-14,clang,clang-20 CPPFLAGS="-DATOMIC_QUEUE_REMAP=RemapAnd" all run_tests
-#   printf "%s\n" distclean "all run_tests" | xargs -Iargs time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc,gcc-14,clang,clang-20 BUILD=debug args
+#   /bin/time make -C ~/src/atomic_queue -Rj$(nproc) T=1 TOOLSET=gcc-11,gcc-12,gcc-13,gcc-14,clang-18,clang-19,clang-20 BUILD=debug all run_tests
+#   cd ~/src/atomic_queue && make T=1 distclean && /bin/time make -k -Rj$(nproc) T=1 TOOLSET=gcc-11,gcc-12,gcc-13,gcc-14,clang-18,clang-19,clang-20
 #
 # Additional CPPFLAGS, CXXFLAGS, LDLIBS, LDFLAGS can come from the command line, e.g. make CPPFLAGS='-I<my-include-dir>', or from environment variables.  For example, also produce assembly outputs:
 #
-#   time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) CPPFLAGS="-DATOMIC_QUEUE_REMAP=RemapAnd"
+#   /bin/time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) CPPFLAGS="-DATOMIC_QUEUE_REMAP=RemapAnd"
 #
 
 ################################################################################################################################
@@ -58,8 +52,6 @@ J := ${J.${JOBSERVER}}
 
 ################################################################################################################################
 
-override undefine has_system_config
-
 ifneq (,$(findstring clean,${MAKECMDGOALS}))
 override cleaning := 1
 override undefine not_cleaning
@@ -86,6 +78,8 @@ n_cpus := $(or $(subst -j,,$(filter -j%,${MAKEFLAGS})),1)
 
 SHELL := /bin/bash
 .SHELLFLAGS := --norc -o pipefail -e -c
+
+export TIME='Elapsed time %E, user %Us, system %Ss, CPU %P, RSS %MkB, exit-status %x.\n'
 
 # Don't try loading localized messages for anything.
 undefine LANG
@@ -141,7 +135,7 @@ cxxflags.gcc.debug := -Og -f{stack-protector-all,no-omit-frame-pointer} # -D_GLI
 cxxflags.gcc.release := -O3 -mtune=native -fno-{stack-protector,stack-clash-protection} -falign-functions=64 -DNDEBUG ${cxxflags.gcc.asm.${ASM}}
 cxxflags.gcc.sanitize := ${cxxflags.gcc.debug} -fsanitize=thread
 cxxflags.gcc.sanitize2 := ${cxxflags.gcc.debug} -fsanitize=undefined,address
-cxxflags.gcc := -march=native -f{no-plt,no-math-errno,finite-math-only,message-length=0} -W{all,extra,error} ${cxxflags.gcc.${BUILD}}
+cxxflags.gcc := -march=native -f{no-plt,no-math-errno,finite-math-only,message-length=0} -W{all,extra,error,no-maybe-uninitialized} ${cxxflags.gcc.${BUILD}}
 ldflags.gcc.sanitize := ${ldflags.gcc.debug} -fsanitize=thread
 ldflags.gcc.sanitize2 := ${ldflags.gcc.debug} -fsanitize=undefined,address
 # ldflags.gcc := -fuse-ld=${use-ld.gcc} -Wl,--compress-debug-sections=zstd,-O2,--gc-sections ${ldflags.gcc.${BUILD}}
@@ -225,7 +219,6 @@ ${exes} : % : ${build_dir}/%
 .PHONY : ${exes}
 # for t in gcc gcc clang clang; do make -C ~/src/atomic_queue -rj$(($(nproc)/2)) BUILD=debug TOOLSET=$t; done
 
-
 ${exes:%=${build_dir}/%} : ${build_dir}/% : ${relink} | $$(dir $$@)
 	${J}$(call strip2,${LINK.EXE})
 
@@ -238,8 +231,6 @@ ${build_dir}/%.a : ${relink} | $$(dir $$@)
 
 ${build_dir}/%.o : src/%.cc ${recompile} | $$(dir $$@)
 	${J}$(call strip2,${COMPILE.CXX})
-
-
 
 ################################################################################################################################
 # Compiler and linker options tracking.
@@ -361,24 +352,27 @@ targets := $(or ${MAKECMDGOALS},${.DEFAULT_GOAL})
 timestamp_usec = $(shell printf "%.0f" $${EPOCHREALTIME}e+6)
 t0 := ${timestamp_usec}
 
-all :
-	@printf "${log_src}: ${c7}%s made targets '%s' in %'.3f seconds.${c0}\n" "${TOOLSET}" "${targets}" "$$((${timestamp_usec} - ${t0}))"e-6
-
 ################################################################################################################################
 ifneq (,${mutli_toolset}) # Parallelize building with multiple toolsets.
 
-$(call log,Build targets "${targets}" with toolsets "${toolsets}" in parallel using up to ${n_cpus} CPUs.)
+$(call log,Make targets "${targets}" with toolsets "${toolsets}" in parallel using up to ${n_cpus} CPUs.)
 $(intcmp ${MAKELEVEL},1,$(call log_kv,BUILD_ROOT))
 
+# These apply to sub-makes only.
+export with-toolset-submake=1
+GNUMAKEFLAGS += --no-print-directory --output-sync=target
+
 with-toolset-% :
-	${MAKE} -R --no-print-directory --output-sync TOOLSET=$* with-toolset-submake=1 ${MAKECMDGOALS}
+	${MAKE} TOOLSET=$* ${MAKECMDGOALS}
 
 # The last-resort rule. Must be the last in the Makefile.
 % : ${toolsets:%=with-toolset-%}
-	@printf "${log_src}: ${c7}%s made targets '%s' in %'.3f seconds.${c0}\n" "${TOOLSET}" "${targets}" "$$((${timestamp_usec} - ${t0}))"e-6
+	@printf "${log_src}: ${c7}Made targets \"%s\" with toolsets "%s" in %'.6f seconds.${c0}\n" "${targets}" "${toolsets}" "$$((${timestamp_usec} - ${t0}))"e-6
 
 ################################################################################################################################
 else # Parallelize building with multiple toolsets.
+
+all :; @:
 
 ifndef with-toolset-submake
 $(call log,Build targets "${targets}" with ${TOOLSET} using up to ${n_cpus} CPUs.)
