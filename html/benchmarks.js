@@ -102,12 +102,12 @@ $(function() {
                     stdev: stdev,
                 };
             }
-            const tbody = data.map((d) => `<tr><td style="color: ${d.color}">${d.name}: </td><td><strong>${d.mean}</strong></td><td><strong>${d.stdev}</strong></td><td>${d.min}</td><td>${d.max}</td></tr>`).join('\n')
+            const tbody = data.map((d) => `<tr><td style="color: ${d.color}">${d.name}: </td><td><strong>${d.mean}</strong></td><td>${d.stdev}</td><td>${d.min}</td><td>${d.max}</td></tr>`).join('\n')
             return tooltips[n_threads] = `
                 <span class="tooltip_scalability_title">${n_threads} producers, ${n_threads} consumers</span>
                 <table class="tooltip_scalability">
-                <tr><th></th><th>mean</th><th>stdev</th><th>min</th><th>max</th></tr>
-                ${tbody}
+                <thead><tr><th></th><th>mean</th><th>stdev</th><th>min</th><th>max</th></tr></thead>
+                <tbody>${tbody}</tbody>
                 </table>
                 `;
         };

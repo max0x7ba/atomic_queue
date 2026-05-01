@@ -30,7 +30,10 @@ Highcharts.theme = {
         backgroundColor: 'rgba(0, 0, 0, 0.8)',
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.5)',
-        style: { color: 'white' }
+        style: {
+            fontFamily: "'Roboto Mono', monospace",
+            color: 'white'
+        }
     },
     plotOptions: {
         series: {
@@ -79,17 +82,17 @@ Highcharts.theme = {
         itemHoverStyle: { color: 'white' },
         itemHiddenStyle: { color: '#888' }
     },
-    caption: {
-        align: "center",
-        text: undefined,
-        style: {
-            color: 'white',
-            fontSize: '1em',
-            fontFamily: "PT Serif",
-            fontWeight: 400,
-            fontStyle: 'italic',
-        }
-    },
+    // caption: {
+    //     align: "center",
+    //     text: undefined,
+    //     style: {
+    //         color: 'white',
+    //         fontSize: '1em',
+    //         fontFamily: "PT Serif",
+    //         fontWeight: 400,
+    //         fontStyle: 'italic',
+    //     }
+    // },
     lang: { thousandsSep: ',' },
     credits: { enabled: false },
     accessibility: { enabled: false }
