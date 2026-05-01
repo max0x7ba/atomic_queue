@@ -353,11 +353,9 @@ When the threads run on **different cores**, latency increases by **3× or more*
 
 Thinking more reminds of [Amdahl's law][21]: perfectly linear scaling is possible only when adding another producer-consumer-thread-pair does not increase contention on the queue object. This realization makes `moodycamel::ConcurrentQueue` architecture immediately obvious, without having to examine its source code -- `moodycamel::ConcurrentQueue` tries to emulate a multiple-producer-multiple-consumer queue with a bunch of single-producer-single-consumer queues, where different threads `push` into different internal SPSC queues, different threads `pop` from different internal SPSC queues. That makes it unable to `pop` elements in the same _global time order_ matching that of _global time order_ of `push` calls, unlike true MPMC queues.
 
-`moodycamel::ConcurrentQueue` probably aspired to combine the _global time order_ feature of MPMC queues with the _low-latency_ feature of SPSC queues. But ended up delivering neither the _global time order_ nor the _low-latency_.
+While `moodycamel::ConcurrentQueue` could still, technically, be called an MPMC queue, in practice, it is not a feasible/fungible/compatible drop-in replacement for any other (true) MPMC queue benchmarked here. Whereas all the other MPMC queues are perfectly fungible compatible drop-in replacements for another, including pseudo-MPMC `moodycamel::ConcurrentQueue` too.
 
-While `moodycamel::ConcurrentQueue` could still, technically, be called an MPMC queue, in practice, `moodycamel::ConcurrentQueue` is not a feasible/fungible/compatible drop-in replacement for all other (true) MPMC queue benchmarked here. Whereas all the other MPMC queues are perfectly fungible compatible drop-in replacements for any other MPMC queue, including pseudo-MPMC `moodycamel::ConcurrentQueue` too.
-
-`moodycamel::ConcurrentQueue` is optimized for throughput at the expense of anything else, it appears, thusly epitomizing ["_When a measure becomes a target, it ceases to be a good measure_"][20] better than anything else.
+`moodycamel::ConcurrentQueue` probably aspired to combine the _global time order_ feature of MPMC queues with the _low-latency_ feature of SPSC queues. But ended up gaming MPMC throughput benchmarks while delivering neither the _global time order_ nor the _low-latency_. Thusly epitomizing ["_When a measure becomes a target, it ceases to be a good measure_"][20] better than anything else.
 
 ## Reading material
 Some books on the subject of multi-threaded programming I found quite instructive:
