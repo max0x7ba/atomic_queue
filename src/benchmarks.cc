@@ -87,7 +87,7 @@ template<class P> Range<P> as_range(P p, size_t n) noexcept { return {p, p + n};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-using cycles_t = decltype(__builtin_ia32_rdtsc());
+using cycles_t = decltype(__rdtsc());
 static_assert(std::is_unsigned<cycles_t>::value);
 
 using icycles_t = std::make_signed<cycles_t>::type; // Signed integers convert into double with one AVX instruction, unlike unsigned.
@@ -97,7 +97,7 @@ ATOMIC_QUEUE_INLINE static cycles_t cycles() noexcept {
     // If software requires RDTSC to be executed only after all previous instructions have executed and all previous loads are
     // globally visible, it can execute LFENCE immediately before RDTSC.
     _mm_lfence();
-    return __builtin_ia32_rdtsc();
+    return __rdtsc();
 }
 
 double TSC_TO_SECONDS = 0; // Set in main.

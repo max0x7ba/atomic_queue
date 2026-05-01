@@ -117,7 +117,7 @@ struct RemapBmi {
 #endif
 
         // These 2 statements generate 2 instructions which require nn in the register.
-        unsigned new_elem_idx = __builtin_ia32_bextr_u32(index, nn); // BMI1 instruction.
+        unsigned new_elem_idx = __bextr_u32(index, nn); // BMI1 instruction.
         // C++ standard does not define behaviour of shifts not less than the number of bits.
         // Address sanitizer reports "shift exponent X is too large for 32-bit type 'unsigned int'".
         // On x86, all dynamic shift instructions (count in a register) mask the count to 5/6 bits (32/64-bit registers).
