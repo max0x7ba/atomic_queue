@@ -1,12 +1,14 @@
 #!/bin/bash
 
-function strip-cxx-symbol {
+function cxx-symbol-to-filename {
     local -n s="$2"
     s=${1//[![:alnum:]_]/-}
     s=${s//@(anonymous-namespace-|atomic_queue-|void-)}
     s=${s//false/F}
     s=${s//true/T}
+    s=${s//short_int/short}
     s=${s//unsigned_int/unsigned}
+    s=${s//long_int/long}
     s=${s//+(-)/-}
     s=${s/#-}
     s=${s/%-}
@@ -26,7 +28,7 @@ function disassemble-symbol {(
     (( ${S:-0} < 1 )) || objdump+=(-lS) # S=1 includes source code.
 
     nm -jUC "$obj" | egrep -e "$re_symbol" | while read cxx_symbol; do
-        strip-cxx-symbol "$cxx_symbol" cxx_symbol2
+        cxx-symbol-to-filename "$cxx_symbol" cxx_symbol2
         out="${out_prefix}/${cxx_symbol2}.S"
         ( (( ${V:-0} < 1 )) || set -x; ${objdump[@]} --disassemble="$cxx_symbol" "$obj" ) | egrep -ve "$re_filter_out" > "$out"
         echo "$out: ${cxx_symbol}"
