@@ -62,7 +62,8 @@ struct IndexBits {
     enum : unsigned {
         mask_elem_idx = ~(~0u << N_BITS),
         mask_hi = ~0u << (2 * N_BITS),
-        count = N_BITS
+        count = N_BITS,
+        count2 = count << 8 | count,
     };
 };
 
@@ -101,32 +102,29 @@ struct RemapAnd {
 #ifdef __BMI__
 struct RemapBmi {
     // Shorter and faster machine code for swapping bits with BMI instructions, if available.
-    // bextr, shlx, and dispatch in parallel, ~7 instructions, ~3 cycles.
+    // BMI1 (and, bextr, mov + and) dispatch in parallel, 7 instructions, ~3 cycles.
+    // BMI2 (and, bextr, bzhi) dispatch in parallel, 6 instructions, ~3 cycles.
     // At least +1.5% faster throughput benchmark relative to RemapXor.
     template<class Bits>
     ATOMIC_QUEUE_INLINE static unsigned remap(unsigned index, unsigned size, Bits) noexcept {
-        unsigned nn{Bits::count << 8 | Bits::count};
-        // Disable constant propagation for nn to prevent the compiler from transforming the following code into more expensive instructions.
-        // This one register is used by both bextr and shlx/shl instructions (otherwise transformed into different code).
-        // Disable constant propagation for index too to always generate the same machine code.
         static_assert(ATOMIC_QUEUE_FULL_THROTTLE == 1, "Unexpected ATOMIC_QUEUE_FULL_THROTTLE value.");
+
+        unsigned nn  = Bits::count2;
+        asm("":"+r"(nn)); // Disable constant propagation for nn to prevent the compiler from transforming the following code.
+        // asm("":"+R"(index)); // Disable constant propagation for index too to always generate the same shortest machine code.
+
+        unsigned new_elem_idx = __bextr_u32(index, nn); // BMI1 bextr supersedes mov + shr + and.
 #ifdef __BMI2__
-        asm("":"+r"(nn): "r"(index)); // Any register for BMI2 shlx shift count.
+        unsigned new_line_idx = _bzhi_u32(index, nn); // BMI2 bzhi supersedes mov + and.
 #else
-        asm("":"+c"(nn): "r"(index)); // Without BMI2, shl shift count must be in ecx register.
+        unsigned new_line_idx = index & Bits::mask_elem_idx; // mov + and.
 #endif
-
-        // These 2 statements generate 2 instructions which require nn in the register.
-        unsigned new_elem_idx = __bextr_u32(index, nn); // BMI1 instruction.
-        // C++ standard does not define behaviour of shifts not less than the number of bits.
-        // Address sanitizer reports "shift exponent X is too large for 32-bit type 'unsigned int'".
-        // On x86, all dynamic shift instructions (count in a register) mask the count to 5/6 bits (32/64-bit registers).
-        // (index << (nn & 31)) should compile into the same code as (index << nn), because (nn & 31) is done by dynamic shift instructions.
-        // But compilers emit unnecessary (nn & 31) instructions for (index << (nn & 31)) and that's a recurring code-generation bug.
-        // (index << (nn & 31)) would make Address sanitizer happy.
-        unsigned new_line_idx = index << nn; // This statement generates shlx r32,r32,r32 with BMI2, otherwise shl r32,cl.
-
-        return new_elem_idx | (new_line_idx & ~Bits::mask_hi) | (index & (Bits::mask_hi & (size - 1)));
+        index &= (Bits::mask_hi & (size - 1));
+        asm("": "+R"(new_line_idx): "r"(index)); // Do not reorder preceding computations with the following.
+        new_line_idx <<= Bits::count;
+        new_elem_idx |= index;
+        asm("":"+R"(new_elem_idx): "r"(new_line_idx)); // Do not commute the arguments of the adjacent two or instructions.
+        return new_elem_idx | new_line_idx; // Or with new_line_idx last.
     }
 
     template<class Bits>

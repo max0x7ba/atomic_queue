@@ -3,14 +3,22 @@
 # Usage examples (assuming this directory is ~/src/atomic_queue):
 #
 #   /bin/time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) run_tests
-#   /bin/time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 BUILD=sanitize run_tests
-#   /bin/time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 BUILD=debug run_tests run_benchmarks_quick
-#   /bin/time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=clang-20 BUILD=debug run_tests run_benchmarks_quick
 #   /bin/time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=clang-20 BUILD=debug TAGS run_tests
+#
+#   /bin/time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 BUILD=debug run_tests
+#   /bin/time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 BUILD=sanitize run_tests
+#   /bin/time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 BUILD=sanitize2 run_tests
+#
+#   /bin/time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 run_tests run_benchmarks_quick
+#   /bin/time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=clang-20 run_tests run_benchmarks_quick
+#
 #   /bin/time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 asm_throughput asm_latency
-#   AQB=1 time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 run_benchmarks_n
-#   AQB=1 taskset -c 0-7    /bin/time make -C ~/src/atomic_queue -Rj8 T=1 TOOLSET=gcc-14 run_benchmarks_n N=2 TAG=5825u-smt1
-#   AQB=1 taskset -c 0-15:2 /bin/time make -C ~/src/atomic_queue -Rj8 T=1 TOOLSET=gcc-14 run_benchmarks_n N=2 TAG=5825u-smt0
+#
+#   AQB=1 /bin/time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 run_benchmarks_n
+#   AQB=1 taskset -c 4-7    /bin/time make -C ~/src/atomic_queue -Rj4 T=1 TOOLSET=gcc-14 run_benchmarks_n N=2 TAG=5825u_4-smt1
+#   AQB=1 taskset -c 8-15:2 /bin/time make -C ~/src/atomic_queue -Rj4 T=1 TOOLSET=gcc-14 run_benchmarks_n N=2 TAG=5825u_4-smt0
+#
+#	cd ~/src/atomic_queue; make -Rj8 T=1 TOOLSET=gcc-14 run_tests asm_throughput asm_latency & make -Rj8 T=2 CXXFLAGS="-mno-bmi2" TOOLSET=gcc-14 run_tests asm_throughput asm_latency & wait
 #
 # Build and run with multiple toolsets in parallel:
 #
