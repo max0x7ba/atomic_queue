@@ -9,7 +9,7 @@
 #   /bin/time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) TOOLSET=clang-20 BUILD=debug TAGS run_tests
 #   /bin/time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 asm_throughput asm_latency
 #   AQB=1 time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 run_benchmarks_n
-#   AQB=1 taskset -c 4-7    /bin/time make -C ~/src/atomic_queue -Rj8 T=1 TOOLSET=gcc-14 run_benchmarks_n N=2 TAG=resolve
+#   AQB=1 taskset -c 0-7    /bin/time make -C ~/src/atomic_queue -Rj8 T=1 TOOLSET=gcc-14 run_benchmarks_n N=2 TAG=5825u-smt1
 #   AQB=1 taskset -c 0-15:2 /bin/time make -C ~/src/atomic_queue -Rj8 T=1 TOOLSET=gcc-14 run_benchmarks_n N=2 TAG=5825u-smt0
 #
 # Build and run with multiple toolsets in parallel:
@@ -198,7 +198,7 @@ ${build_dir}/tests.o : cppflags += -DBOOST_TEST_DYN_LINK=1
 ${build_dir}/tests :   ldlibs += -lboost_unit_test_framework
 
 benchmarks_src := benchmarks.cc cpu_base_frequency.cc huge_pages.cc
-${build_dir}/benchmarks.o : cppflags += ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium} -DATOMIC_QUEUE_WANT_RESOLVE_ADDR_EARLY=1
+${build_dir}/benchmarks.o : cppflags += ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium}
 ${build_dir}/benchmarks.o : cxxflags += -std=c++17 ${cxxflags.tbb} ${cxxflags.moodycamel} ${cxxflags.xenium} # benchmarks.cc uses c++17 features.
 ${build_dir}/benchmarks   : ldlibs += ${ldlibs.tbb} ${ldlibs.moodycamel} ${ldlibs.xenium} -ldl
 
