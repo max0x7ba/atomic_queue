@@ -240,6 +240,27 @@ ATOMIC_QUEUE_INLINE static void copy_relaxed(std::atomic<T>& a, std::atomic<T> c
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// The code for Queue variants with array data members use the most expensive x86 [base + index*scale + displacement] addressing
+// modes to refer the arrays relative to this pointer. This minimizes register utilization, but instructions with such
+// addressing cost extra [+3,+5] bytes to encode and +1 CPU cycle to execute.
+//
+// resolve_addr_early resolves [base + displacement] early, but requires an extra register to hold the resolved data member address.
+//
+// This feature is disabled by default. The benchmarks enable it because they can afford allocating extra registers.
+
+#if ATOMIC_QUEUE_WANT_RESOLVE_ADDR_EARLY
+#	define ATOMIC_QUEUE_RESOLVE_ADDR_EARLY(a) details::resolve_addr_early(a)
+#else
+#	define ATOMIC_QUEUE_RESOLVE_ADDR_EARLY(a) (a)
+#endif
+
+template<class T>
+ATOMIC_QUEUE_INLINE static T* resolve_addr_early(T* ATOMIC_QUEUE_RESTRICT p) noexcept {
+    return p;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 } // namespace details
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -491,12 +512,12 @@ class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL, MINIMIZE_
     alignas(CACHE_LINE_SIZE) std::atomic<T> elements_[size_];
 
     ATOMIC_QUEUE_INLINE T do_pop(unsigned tail) noexcept {
-        std::atomic<T>& q_element = details::remap<SHUFFLE_BITS>(elements_, tail, size_);
+        std::atomic<T>& q_element = details::remap<SHUFFLE_BITS>(ATOMIC_QUEUE_RESOLVE_ADDR_EARLY(elements_), tail, size_);
         return Base::template do_pop<T, NIL>(q_element);
     }
 
     ATOMIC_QUEUE_INLINE void do_push(T element, unsigned head) noexcept {
-        std::atomic<T>& q_element = details::remap<SHUFFLE_BITS>(elements_, head, size_);
+        std::atomic<T>& q_element = details::remap<SHUFFLE_BITS>(ATOMIC_QUEUE_RESOLVE_ADDR_EARLY(elements_), head, size_);
         Base::template do_push<T, NIL>(element, q_element);
     }
 
@@ -532,13 +553,13 @@ class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE, MINIMIZE_CON
 
     ATOMIC_QUEUE_INLINE T do_pop(unsigned tail) noexcept {
         unsigned index = details::Remap::remap(tail, size_, Bits{});
-        return Base::do_pop(states_[index], elements_[index]);
+        return Base::do_pop(ATOMIC_QUEUE_RESOLVE_ADDR_EARLY(states_)[index], ATOMIC_QUEUE_RESOLVE_ADDR_EARLY(elements_)[index]);
     }
 
     template<class U>
     ATOMIC_QUEUE_INLINE void do_push(U&& element, unsigned head) noexcept {
         unsigned index = details::Remap::remap(head, size_, Bits{});
-        Base::do_push(std::forward<U>(element), states_[index], elements_[index]);
+        Base::do_push(std::forward<U>(element), ATOMIC_QUEUE_RESOLVE_ADDR_EARLY(states_)[index], ATOMIC_QUEUE_RESOLVE_ADDR_EARLY(elements_)[index]);
     }
 
 public:
