@@ -536,6 +536,11 @@ class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE, MINIMIZE_CON
 
     template<class U>
     ATOMIC_QUEUE_INLINE void do_push(U&& element, unsigned head) noexcept {
+#if ATOMIC_QUEUE_FULL_THROTTLE
+        auto* ATOMIC_QUEUE_RESTRICT elements_ = this->elements_;
+        auto* ATOMIC_QUEUE_RESTRICT states_ = this->states_;
+        asm("":: "r"(elements_), "r"(states_));
+#endif
         unsigned index = details::Remap::remap(head, size_, Bits{});
         Base::do_push(std::forward<U>(element), states_[index], elements_[index]);
     }
