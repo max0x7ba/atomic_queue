@@ -61,6 +61,7 @@ template<int N_BITS>
 struct IndexBits {
     enum : unsigned {
         mask_elem_idx = ~(~0u << N_BITS),
+        mask_line_idx = mask_elem_idx << N_BITS,
         mask_hi = ~0u << (2 * N_BITS),
         count = N_BITS,
         count2 = count << 8 | count,

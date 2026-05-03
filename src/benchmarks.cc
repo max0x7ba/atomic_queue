@@ -43,6 +43,7 @@ using std::printf;
 using std::fprintf;
 
 using namespace ::atomic_queue;
+namespace A = ::atomic_queue;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -192,16 +193,16 @@ struct QueueTypes {
     using T = unsigned;
 
     // For atomic elements only.
-    using AtomicQueue =                                Type<RetryDecorator<atomic_queue::AtomicQueue<T, SIZE, T{}, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, false, SPSC>>>;
-    using OptimistAtomicQueue =                                       Type<atomic_queue::AtomicQueue<T, SIZE, T{}, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, false, SPSC>>;
-    using AtomicQueueB =        Type<RetryDecorator<CapacityArgAdaptor<atomic_queue::AtomicQueueB<T, Allocator, T{}, MAXIMIZE_THROUGHPUT, false, SPSC>, SIZE>>>;
-    using OptimistAtomicQueueB =               Type<CapacityArgAdaptor<atomic_queue::AtomicQueueB<T, Allocator, T{}, MAXIMIZE_THROUGHPUT, false, SPSC>, SIZE>>;
+    using AtomicQueue =                            RetryDecorator<A::AtomicQueue<T, SIZE, T{}, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, false, SPSC>>;
+    using OptimistAtomicQueue =                                   A::AtomicQueue<T, SIZE, T{}, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, false, SPSC>;
+    using AtomicQueueB =        RetryDecorator<CapacityArgAdaptor<A::AtomicQueueB<T, Allocator, T{}, MAXIMIZE_THROUGHPUT, false, SPSC>, SIZE>>;
+    using OptimistAtomicQueueB =               CapacityArgAdaptor<A::AtomicQueueB<T, Allocator, T{}, MAXIMIZE_THROUGHPUT, false, SPSC>, SIZE>;
 
     // For non-atomic elements.
-    using AtomicQueue2 =                         Type<RetryDecorator<atomic_queue::AtomicQueue2<T, SIZE, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, false, SPSC>>>;
-    using OptimistAtomicQueue2 =                                Type<atomic_queue::AtomicQueue2<T, SIZE, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, false, SPSC>>;
-    using AtomicQueueB2 = Type<RetryDecorator<CapacityArgAdaptor<atomic_queue::AtomicQueueB2<T, Allocator, MAXIMIZE_THROUGHPUT, false, SPSC>, SIZE>>>;
-    using OptimistAtomicQueueB2 =        Type<CapacityArgAdaptor<atomic_queue::AtomicQueueB2<T, Allocator, MAXIMIZE_THROUGHPUT, false, SPSC>, SIZE>>;
+    using AtomicQueue2 =                     RetryDecorator<A::AtomicQueue2<T, SIZE, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, false, SPSC>>;
+    using OptimistAtomicQueue2 =                            A::AtomicQueue2<T, SIZE, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, false, SPSC>;
+    using AtomicQueueB2 = RetryDecorator<CapacityArgAdaptor<A::AtomicQueueB2<T, Allocator, MAXIMIZE_THROUGHPUT, false, SPSC>, SIZE>>;
+    using OptimistAtomicQueueB2 =        CapacityArgAdaptor<A::AtomicQueueB2<T, Allocator, MAXIMIZE_THROUGHPUT, false, SPSC>, SIZE>;
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -482,35 +483,35 @@ ATOMIC_QUEUE_NOINLINE void run_throughput_benchmarks(HugePages& hp, std::vector<
 
     if(ATOMIC_QUEUE_LIKELY(!options.no_variant_1())) {
         if(ATOMIC_QUEUE_LIKELY(!options.no_variant_a())) {
-            time_throughput_spsc("AtomicQueue", hp, hw_thread_ids, SPSC::AtomicQueue{});
-            time_throughput_mpmc("AtomicQueue", hp, hw_thread_ids, MPMC::AtomicQueue{}, 2);
-            time_throughput_spsc("OptimistAtomicQueue", hp, hw_thread_ids, SPSC::OptimistAtomicQueue{});
-            time_throughput_mpmc("OptimistAtomicQueue", hp, hw_thread_ids, MPMC::OptimistAtomicQueue{}, 2);
+            time_throughput_spsc("AtomicQueue", hp, hw_thread_ids, Type<SPSC::AtomicQueue>{});
+            time_throughput_mpmc("AtomicQueue", hp, hw_thread_ids, Type<MPMC::AtomicQueue>{}, 2);
+            time_throughput_spsc("OptimistAtomicQueue", hp, hw_thread_ids, Type<SPSC::OptimistAtomicQueue>{});
+            time_throughput_mpmc("OptimistAtomicQueue", hp, hw_thread_ids, Type<MPMC::OptimistAtomicQueue>{}, 2);
         }
 
         if(ATOMIC_QUEUE_LIKELY(!options.no_variant_b())) {
-            time_throughput_spsc("AtomicQueueB", hp, hw_thread_ids, SPSC::AtomicQueueB{});
-            time_throughput_mpmc("AtomicQueueB", hp, hw_thread_ids, MPMC::AtomicQueueB{}, 2);
-            time_throughput_spsc("OptimistAtomicQueueB", hp, hw_thread_ids, SPSC::OptimistAtomicQueueB{});
-            time_throughput_mpmc("OptimistAtomicQueueB", hp, hw_thread_ids, MPMC::OptimistAtomicQueueB{}, 2);
+            time_throughput_spsc("AtomicQueueB", hp, hw_thread_ids, Type<SPSC::AtomicQueueB>{});
+            time_throughput_mpmc("AtomicQueueB", hp, hw_thread_ids, Type<MPMC::AtomicQueueB>{}, 2);
+            time_throughput_spsc("OptimistAtomicQueueB", hp, hw_thread_ids, Type<SPSC::OptimistAtomicQueueB>{});
+            time_throughput_mpmc("OptimistAtomicQueueB", hp, hw_thread_ids, Type<MPMC::OptimistAtomicQueueB>{}, 2);
         }
     }
 
     if(ATOMIC_QUEUE_LIKELY(!options.no_variant_2())) {
         if(ATOMIC_QUEUE_LIKELY(!options.no_variant_a())) {
-            time_throughput_spsc("AtomicQueue2", hp, hw_thread_ids, SPSC::AtomicQueue2{});
-            time_throughput_mpmc("AtomicQueue2", hp, hw_thread_ids, MPMC::AtomicQueue2{}, 2);
+            time_throughput_spsc("AtomicQueue2", hp, hw_thread_ids, Type<SPSC::AtomicQueue2>{});
+            time_throughput_mpmc("AtomicQueue2", hp, hw_thread_ids, Type<MPMC::AtomicQueue2>{}, 2);
 
-            time_throughput_spsc("OptimistAtomicQueue2", hp, hw_thread_ids, SPSC::OptimistAtomicQueue2{});
-            time_throughput_mpmc("OptimistAtomicQueue2", hp, hw_thread_ids, MPMC::OptimistAtomicQueue2{}, 2);
+            time_throughput_spsc("OptimistAtomicQueue2", hp, hw_thread_ids, Type<SPSC::OptimistAtomicQueue2>{});
+            time_throughput_mpmc("OptimistAtomicQueue2", hp, hw_thread_ids, Type<MPMC::OptimistAtomicQueue2>{}, 2);
         }
 
         if(ATOMIC_QUEUE_LIKELY(!options.no_variant_b())) {
-            time_throughput_spsc("AtomicQueueB2", hp, hw_thread_ids, SPSC::AtomicQueueB2{});
-            time_throughput_mpmc("AtomicQueueB2", hp, hw_thread_ids, MPMC::AtomicQueueB2{}, 2);
+            time_throughput_spsc("AtomicQueueB2", hp, hw_thread_ids, Type<SPSC::AtomicQueueB2>{});
+            time_throughput_mpmc("AtomicQueueB2", hp, hw_thread_ids, Type<MPMC::AtomicQueueB2>{}, 2);
 
-            time_throughput_spsc("OptimistAtomicQueueB2", hp, hw_thread_ids, SPSC::OptimistAtomicQueueB2{});
-            time_throughput_mpmc("OptimistAtomicQueueB2", hp, hw_thread_ids, MPMC::OptimistAtomicQueueB2{}, 2);
+            time_throughput_spsc("OptimistAtomicQueueB2", hp, hw_thread_ids, Type<SPSC::OptimistAtomicQueueB2>{});
+            time_throughput_mpmc("OptimistAtomicQueueB2", hp, hw_thread_ids, Type<MPMC::OptimistAtomicQueueB2>{}, 2);
         }
     }
 
@@ -640,25 +641,25 @@ void run_ping_pong_benchmarks(HugePages& hp, std::vector<unsigned> const& hw_thr
 
     if(ATOMIC_QUEUE_LIKELY(!options.no_variant_1())) {
         if(ATOMIC_QUEUE_LIKELY(!options.no_variant_a())) {
-            time_ping_pong<SPSC::AtomicQueue::type>("AtomicQueue", hp, hw_thread_ids);
-            time_ping_pong<SPSC::OptimistAtomicQueue::type>("OptimistAtomicQueue", hp, hw_thread_ids);
+            time_ping_pong<SPSC::AtomicQueue>("AtomicQueue", hp, hw_thread_ids);
+            time_ping_pong<SPSC::OptimistAtomicQueue>("OptimistAtomicQueue", hp, hw_thread_ids);
         }
 
         if(ATOMIC_QUEUE_LIKELY(!options.no_variant_b())) {
-            time_ping_pong<SPSC::AtomicQueueB::type>("AtomicQueueB", hp, hw_thread_ids);
-            time_ping_pong<SPSC::OptimistAtomicQueueB::type>("OptimistAtomicQueueB", hp, hw_thread_ids);
+            time_ping_pong<SPSC::AtomicQueueB>("AtomicQueueB", hp, hw_thread_ids);
+            time_ping_pong<SPSC::OptimistAtomicQueueB>("OptimistAtomicQueueB", hp, hw_thread_ids);
         }
     }
 
     if(ATOMIC_QUEUE_LIKELY(!options.no_variant_2())) {
         if(ATOMIC_QUEUE_LIKELY(!options.no_variant_a())) {
-            time_ping_pong<SPSC::AtomicQueue2::type>("AtomicQueue2", hp, hw_thread_ids);
-            time_ping_pong<SPSC::OptimistAtomicQueue2::type>("OptimistAtomicQueue2", hp, hw_thread_ids);
+            time_ping_pong<SPSC::AtomicQueue2>("AtomicQueue2", hp, hw_thread_ids);
+            time_ping_pong<SPSC::OptimistAtomicQueue2>("OptimistAtomicQueue2", hp, hw_thread_ids);
         }
 
         if(ATOMIC_QUEUE_LIKELY(!options.no_variant_b())) {
-            time_ping_pong<SPSC::AtomicQueueB2::type>("AtomicQueueB2", hp, hw_thread_ids);
-            time_ping_pong<SPSC::OptimistAtomicQueueB2::type>("OptimistAtomicQueueB2", hp, hw_thread_ids);
+            time_ping_pong<SPSC::AtomicQueueB2>("AtomicQueueB2", hp, hw_thread_ids);
+            time_ping_pong<SPSC::OptimistAtomicQueueB2>("OptimistAtomicQueueB2", hp, hw_thread_ids);
         }
     }
 
