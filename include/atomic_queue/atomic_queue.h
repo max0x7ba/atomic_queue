@@ -109,9 +109,8 @@ struct RemapBmi {
     ATOMIC_QUEUE_INLINE static unsigned remap(unsigned index, unsigned size, Bits) noexcept {
         static_assert(ATOMIC_QUEUE_FULL_THROTTLE == 1, "Unexpected ATOMIC_QUEUE_FULL_THROTTLE value.");
 
-        unsigned nn  = Bits::count2;
-        asm("":"+r"(nn)); // Disable constant propagation for nn to prevent the compiler from transforming the following code.
-        // asm("":"+R"(index)); // Disable constant propagation for index too to always generate the same shortest machine code.
+        register unsigned nn asm("eax")  = Bits::count2; // Load the immidiate into the accumulator on the spot.
+        asm("":"+a"(nn)); // Disable constant propagation for nn to prevent the compiler from transforming the following code.
 
         unsigned new_elem_idx = __bextr_u32(index, nn); // BMI1 bextr supersedes mov + shr + and.
 #ifdef __BMI2__
@@ -119,11 +118,9 @@ struct RemapBmi {
 #else
         unsigned new_line_idx = index & Bits::mask_elem_idx; // mov + and.
 #endif
-        index &= (Bits::mask_hi & (size - 1));
-        asm("": "+R"(new_line_idx): "r"(index)); // Do not reorder preceding computations with the following.
         new_line_idx <<= Bits::count;
-        new_elem_idx |= index;
-        asm("":"+R"(new_elem_idx): "r"(new_line_idx)); // Do not commute the arguments of the adjacent two or instructions.
+        new_elem_idx |= index & (Bits::mask_hi & (size - 1));;
+        asm("":"+r"(new_elem_idx): "a"(new_line_idx)); // Do not commute the arguments of the adjacent two or instructions.
         return new_elem_idx | new_line_idx; // Or with new_line_idx last.
     }
 
