@@ -101,6 +101,7 @@ struct RemapAnd {
 };
 
 #ifdef __BMI__
+
 struct RemapBmi {
     // Shorter and faster machine code for swapping bits with BMI instructions, if available.
     // BMI1 (and, bextr, mov + and) dispatch in parallel, 7 instructions, ~3 cycles.
@@ -110,16 +111,17 @@ struct RemapBmi {
     ATOMIC_QUEUE_INLINE static unsigned remap(unsigned index, unsigned size, Bits) noexcept {
         static_assert(ATOMIC_QUEUE_FULL_THROTTLE == 1, "Unexpected ATOMIC_QUEUE_FULL_THROTTLE value.");
 
-        register unsigned nn asm("eax")  = Bits::count2; // Load the immidiate into the accumulator on the spot.
-        asm("":"+a"(nn)); // Disable constant propagation for nn to prevent the compiler from transforming the following code.
+        // register unsigned nn asm("esi")  = Bits::count2; // Load the immidiate into the accumulator on the spot.
+        unsigned nn  = Bits::count2; // Load the immidiate into the accumulator on the spot.
+        asm("":"+S"(nn)); // Disable constant propagation for nn to prevent the compiler from transforming the following code.
 
         unsigned new_elem_idx = __bextr_u32(index, nn); // BMI1 bextr supersedes mov + shr + and.
 #ifdef __BMI2__
-        unsigned new_line_idx = _bzhi_u32(index, nn); // BMI2 bzhi supersedes mov + and.
+        unsigned new_line_idx = _bzhi_u32(index, nn) << Bits::count; // BMI2 bzhi supersedes mov + and.
+        // unsigned new_line_idx = (index << nn) & Bits::mask_line_idx; // BMI2 shlx supersedes mov + shl.
 #else
-        unsigned new_line_idx = index & Bits::mask_elem_idx; // mov + and.
+        unsigned new_line_idx = (index & Bits::mask_elem_idx) << Bits::count;
 #endif
-        new_line_idx <<= Bits::count;
         new_elem_idx |= index & (Bits::mask_hi & (size - 1));;
         asm("":"+r"(new_elem_idx): "a"(new_line_idx)); // Do not commute the arguments of the adjacent two or instructions.
         return new_elem_idx | new_line_idx; // Or with new_line_idx last.

@@ -12,10 +12,13 @@
 #   /bin/time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 run_tests run_benchmarks_quick
 #   /bin/time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=clang-20 run_tests run_benchmarks_quick
 #
-#   /bin/time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 asm_throughput asm_latency
+#   /bin/time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 run_tests asm_throughput asm_latency
 #
 #   AQB=1 /bin/time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 run_benchmarks_n
-#   AQB=1 taskset -c 4-7    /bin/time make -C ~/src/atomic_queue -Rj4 T=1 TOOLSET=gcc-14 run_benchmarks_n N=2 TAG=5825u_4-smt1
+#   AQB=131 taskset -c 8-15 /bin/time make -C ~/src/atomic_queue -Rj4 T=1 TOOLSET=gcc-14 run_benchmarks_n N=2 TAG=5825u_4-RemapBmi
+#   AQB=131 taskset -c 8-15 /bin/time make -C ~/src/atomic_queue -Rj4 T=2 TOOLSET=gcc-14 CPPFLAGS="-DATOMIC_QUEUE_REMAP=RemapAnd" run_benchmarks_n N=2 TAG=5825u_4-RemapAnd
+#   AQB=131 taskset -c 8-15 /bin/time make -C ~/src/atomic_queue -Rj4 T=3 TOOLSET=gcc-14 CPPFLAGS="-DATOMIC_QUEUE_REMAP=RemapXor" run_benchmarks_n N=2 TAG=5825u_4-RemapXor
+#
 #   AQB=1 taskset -c 8-15:2 /bin/time make -C ~/src/atomic_queue -Rj4 T=1 TOOLSET=gcc-14 run_benchmarks_n N=2 TAG=5825u_4-smt0
 #
 #	cd ~/src/atomic_queue; make -Rj8 T=1 TOOLSET=gcc-14 run_tests asm_throughput asm_latency & make -Rj8 T=2 CXXFLAGS="-mno-bmi2" TOOLSET=gcc-14 run_tests asm_throughput asm_latency & wait
@@ -38,6 +41,7 @@ T := 0
 build_root.0 := build   # T=0 builds into build sub-directory.
 build_root.1 := /tmp/b1 # T=1 builds into /tmp/b1.
 build_root.2 := /tmp/b2 # T=2 builds into /tmp/b2.
+build_root.3 := /tmp/b3 # T=3 builds into /tmp/b3.
 
 # Tedious BUILD_ROOT selection by setting BUILD_ROOT variable.
 BUILD_ROOT := $(strip $(or ${build_root.${T}},$(error build_root.${T} is undefined.)))

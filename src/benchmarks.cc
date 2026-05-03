@@ -65,6 +65,8 @@ struct BenchmarkOptions : EnvBits64 {
     ATOMIC_QUEUE_INLINE constexpr auto  no_variant_b() const noexcept { return bits & 16; };
     ATOMIC_QUEUE_INLINE constexpr auto  no_variant_1() const noexcept { return bits & 32; };
     ATOMIC_QUEUE_INLINE constexpr auto  no_variant_2() const noexcept { return bits & 64; };
+
+    ATOMIC_QUEUE_INLINE constexpr auto       no_spsc() const noexcept { return bits & 128; };
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -448,12 +450,13 @@ ATOMIC_QUEUE_NOINLINE void run_throughput_benchmarks(HugePages& hp, std::vector<
     int constexpr SIZE = 65536;
 
     // The reference.
-    time_throughput_spsc("boost::lockfree::spsc_queue", hp, hw_thread_ids,
-                                  Type<BoostSpScAdapter<boost::lockfree::spsc_queue<unsigned, boost::lockfree::capacity<SIZE>>>>{});
+    if(ATOMIC_QUEUE_LIKELY(!options.no_spsc()))
+        time_throughput_spsc("boost::lockfree::spsc_queue", hp, hw_thread_ids,
+                             Type<BoostSpScAdapter<boost::lockfree::spsc_queue<unsigned, boost::lockfree::capacity<SIZE>>>>{});
 
     if(ATOMIC_QUEUE_LIKELY(!options.minimal())) {
         time_throughput_mpmc("boost::lockfree::queue", hp, hw_thread_ids,
-                                      Type<BoostQueueAdapter<boost::lockfree::queue<unsigned, BoostAllocator, boost::lockfree::capacity<SIZE - 2>>>>{});
+                             Type<BoostQueueAdapter<boost::lockfree::queue<unsigned, BoostAllocator, boost::lockfree::capacity<SIZE - 2>>>>{});
 
         // time_throughput_mpmc("TicketSpinlock", hp, hw_thread_ids, Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, TicketSpinlock>>>{});
         // run_throughput_mpmc_benchmark("UnfairSpinlock", hp, hw_thread_ids, Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, UnfairSpinlock>>>{});
@@ -483,34 +486,44 @@ ATOMIC_QUEUE_NOINLINE void run_throughput_benchmarks(HugePages& hp, std::vector<
 
     if(ATOMIC_QUEUE_LIKELY(!options.no_variant_1())) {
         if(ATOMIC_QUEUE_LIKELY(!options.no_variant_a())) {
-            time_throughput_spsc("AtomicQueue", hp, hw_thread_ids, Type<SPSC::AtomicQueue>{});
+            if(ATOMIC_QUEUE_LIKELY(!options.no_spsc()))
+                time_throughput_spsc("AtomicQueue", hp, hw_thread_ids, Type<SPSC::AtomicQueue>{});
             time_throughput_mpmc("AtomicQueue", hp, hw_thread_ids, Type<MPMC::AtomicQueue>{}, 2);
-            time_throughput_spsc("OptimistAtomicQueue", hp, hw_thread_ids, Type<SPSC::OptimistAtomicQueue>{});
+
+            if(ATOMIC_QUEUE_LIKELY(!options.no_spsc()))
+                time_throughput_spsc("OptimistAtomicQueue", hp, hw_thread_ids, Type<SPSC::OptimistAtomicQueue>{});
             time_throughput_mpmc("OptimistAtomicQueue", hp, hw_thread_ids, Type<MPMC::OptimistAtomicQueue>{}, 2);
         }
 
         if(ATOMIC_QUEUE_LIKELY(!options.no_variant_b())) {
-            time_throughput_spsc("AtomicQueueB", hp, hw_thread_ids, Type<SPSC::AtomicQueueB>{});
+            if(ATOMIC_QUEUE_LIKELY(!options.no_spsc()))
+                time_throughput_spsc("AtomicQueueB", hp, hw_thread_ids, Type<SPSC::AtomicQueueB>{});
             time_throughput_mpmc("AtomicQueueB", hp, hw_thread_ids, Type<MPMC::AtomicQueueB>{}, 2);
-            time_throughput_spsc("OptimistAtomicQueueB", hp, hw_thread_ids, Type<SPSC::OptimistAtomicQueueB>{});
+
+            if(ATOMIC_QUEUE_LIKELY(!options.no_spsc()))
+                time_throughput_spsc("OptimistAtomicQueueB", hp, hw_thread_ids, Type<SPSC::OptimistAtomicQueueB>{});
             time_throughput_mpmc("OptimistAtomicQueueB", hp, hw_thread_ids, Type<MPMC::OptimistAtomicQueueB>{}, 2);
         }
     }
 
     if(ATOMIC_QUEUE_LIKELY(!options.no_variant_2())) {
         if(ATOMIC_QUEUE_LIKELY(!options.no_variant_a())) {
-            time_throughput_spsc("AtomicQueue2", hp, hw_thread_ids, Type<SPSC::AtomicQueue2>{});
+            if(ATOMIC_QUEUE_LIKELY(!options.no_spsc()))
+                time_throughput_spsc("AtomicQueue2", hp, hw_thread_ids, Type<SPSC::AtomicQueue2>{});
             time_throughput_mpmc("AtomicQueue2", hp, hw_thread_ids, Type<MPMC::AtomicQueue2>{}, 2);
 
-            time_throughput_spsc("OptimistAtomicQueue2", hp, hw_thread_ids, Type<SPSC::OptimistAtomicQueue2>{});
+            if(ATOMIC_QUEUE_LIKELY(!options.no_spsc()))
+                time_throughput_spsc("OptimistAtomicQueue2", hp, hw_thread_ids, Type<SPSC::OptimistAtomicQueue2>{});
             time_throughput_mpmc("OptimistAtomicQueue2", hp, hw_thread_ids, Type<MPMC::OptimistAtomicQueue2>{}, 2);
         }
 
         if(ATOMIC_QUEUE_LIKELY(!options.no_variant_b())) {
-            time_throughput_spsc("AtomicQueueB2", hp, hw_thread_ids, Type<SPSC::AtomicQueueB2>{});
+            if(ATOMIC_QUEUE_LIKELY(!options.no_spsc()))
+                time_throughput_spsc("AtomicQueueB2", hp, hw_thread_ids, Type<SPSC::AtomicQueueB2>{});
             time_throughput_mpmc("AtomicQueueB2", hp, hw_thread_ids, Type<MPMC::AtomicQueueB2>{}, 2);
 
-            time_throughput_spsc("OptimistAtomicQueueB2", hp, hw_thread_ids, Type<SPSC::OptimistAtomicQueueB2>{});
+            if(ATOMIC_QUEUE_LIKELY(!options.no_spsc()))
+                time_throughput_spsc("OptimistAtomicQueueB2", hp, hw_thread_ids, Type<SPSC::OptimistAtomicQueueB2>{});
             time_throughput_mpmc("OptimistAtomicQueueB2", hp, hw_thread_ids, Type<MPMC::OptimistAtomicQueueB2>{}, 2);
         }
     }
