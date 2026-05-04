@@ -345,9 +345,13 @@ protected:
             return element;
         }
         else {
+            State desired = LOADING;
             for(;;) {
+#if ATOMIC_QUEUE_FULL_THROTTLE
+                asm("":"+R"(desired)); // For shortest bytecode, don't place this object into any of r8-r15.
+#endif
                 State expected = STORED;
-                if(ATOMIC_QUEUE_LIKELY(state.compare_exchange_weak(expected, LOADING, A, X))) {
+                if(ATOMIC_QUEUE_LIKELY(state.compare_exchange_weak(expected, desired, A, X))) {
                     T element{std::move(q_element)};
                     state.store(EMPTY, R);
                     return element;
@@ -370,9 +374,13 @@ protected:
             state.store(STORED, R);
         }
         else {
+            State desired = STORING;
             for(;;) {
+#if ATOMIC_QUEUE_FULL_THROTTLE
+                asm("":"+R"(desired)); // For shortest bytecode, don't place this object into any of r8-r15.
+#endif
                 State expected = EMPTY;
-                if(ATOMIC_QUEUE_LIKELY(state.compare_exchange_weak(expected, STORING, A, X))) {
+                if(ATOMIC_QUEUE_LIKELY(state.compare_exchange_weak(expected, desired, A, X))) {
                     q_element = std::forward<U>(element);
                     state.store(STORED, R);
                     return;
