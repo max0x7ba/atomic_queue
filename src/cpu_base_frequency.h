@@ -41,10 +41,11 @@ void set_default_thread_affinity(unsigned hw_thread_id);
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct EnvBits64 {
-    unsigned long long bits = 0;
+    using U = unsigned long long;
+    U value;
 
-    constexpr EnvBits64() noexcept = default;
-    EnvBits64(char const* env_name);
+    EnvBits64(char const* env_name, U default_bits=0);
+    EnvBits64(char const* env_name, U default_bits, U min, U max);
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

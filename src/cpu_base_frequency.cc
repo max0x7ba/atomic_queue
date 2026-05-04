@@ -216,8 +216,8 @@ int pthread_create(pthread_t* newthread,
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-EnvBits64::EnvBits64(char const* env_name)
-    : bits{}
+EnvBits64::EnvBits64(char const* env_name, U default_bits)
+    : value{default_bits}
 {
     if(char const* value_beg = std::getenv(env_name)) {
         // strtoull auto-detects base-8, base-10, base-16 from the prefix. But not base-2.
@@ -226,10 +226,17 @@ EnvBits64::EnvBits64(char const* env_name)
         value_beg += base2;
 
         char* value_end = 0;
-        bits = std::strtoull(value_beg, &value_end, base2);
-        if(!value_end || *value_end || (ULLONG_MAX == bits && ERANGE == errno))
-            throw std::out_of_range(value_beg);
+        value = std::strtoull(value_beg, &value_end, base2);
+        if(!value_end || *value_end || (ULLONG_MAX == value && ERANGE == errno))
+            throw std::out_of_range(env_name);
     }
+}
+
+EnvBits64::EnvBits64(char const* env_name, U default_bits, U min, U max)
+    : EnvBits64(env_name, default_bits)
+{
+    if(value < min || value > max)
+        throw std::out_of_range(env_name);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
