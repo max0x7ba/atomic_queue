@@ -111,9 +111,8 @@ struct RemapBmi {
     ATOMIC_QUEUE_INLINE static unsigned remap(unsigned index, unsigned size, Bits) noexcept {
         static_assert(ATOMIC_QUEUE_FULL_THROTTLE == 1, "Unexpected ATOMIC_QUEUE_FULL_THROTTLE value.");
 
-        // register unsigned nn asm("esi") = Bits::count2; // Load the immidiate into the accumulator on the spot.
-        unsigned nn  = Bits::count2; // Load the immidiate into the accumulator on the spot.
-        asm("":"+S"(nn)); // Disable constant propagation for nn to prevent the compiler from transforming the following code.
+        unsigned nn  = Bits::count2;
+        asm("":"+U"(nn)); // Disable constant propagation for nn to prevent the compiler from transforming the following code.
 
 #ifdef __BMI2__
         unsigned new_line_idx = _bzhi_u32(index, nn) << Bits::count; // BMI2 bzhi supersedes mov + and.
@@ -124,7 +123,7 @@ struct RemapBmi {
         unsigned new_line_idx = (index & Bits::mask_elem_idx) << Bits::count;
 #endif
         new_elem_idx |= index & (Bits::mask_hi & (size - 1));
-        asm("":"+r"(new_elem_idx): "r"(new_line_idx)); // Do not commute the arguments of the adjacent two or instructions.
+        asm(""::"r"(new_elem_idx), "r"(new_line_idx)); // Do not commute the arguments of the adjacent two or instructions.
         return new_elem_idx | new_line_idx; // Or with new_line_idx last.
     }
 
@@ -343,13 +342,9 @@ protected:
                     spin_loop_pause();
         }
         else {
-            State desired = LOADING;
             for(;;) {
-#if ATOMIC_QUEUE_FULL_THROTTLE
-                asm("":"+R"(desired)); // For shortest bytecode, don't place this object into any of r8-r15.
-#endif
                 State expected = STORED;
-                if(ATOMIC_QUEUE_UNLIKELY(state.compare_exchange_weak(expected, desired, A, X)))
+                if(ATOMIC_QUEUE_UNLIKELY(state.compare_exchange_weak(expected, LOADING, A, X)))
                     break;
                 // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
                 do
@@ -371,13 +366,9 @@ protected:
                     spin_loop_pause();
         }
         else {
-            State desired = STORING;
             for(;;) {
-#if ATOMIC_QUEUE_FULL_THROTTLE
-                asm("":"+R"(desired)); // For shortest bytecode, don't place this object into any of r8-r15.
-#endif
                 State expected = EMPTY;
-                if(ATOMIC_QUEUE_UNLIKELY(state.compare_exchange_weak(expected, desired, A, X)))
+                if(ATOMIC_QUEUE_UNLIKELY(state.compare_exchange_weak(expected, STORING, A, X)))
                     break;
                 // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
                 do
