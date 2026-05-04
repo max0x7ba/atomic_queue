@@ -25,7 +25,7 @@
 #
 # Build and run with multiple toolsets in parallel:
 #
-#   /bin/time make -C ~/src/atomic_queue -Rj$(nproc) T=1 TOOLSET=gcc-11,gcc-12,gcc-13,gcc-14,clang-18,clang-19,clang-20 BUILD=debug all run_tests
+#   /bin/time make -C ~/src/atomic_queue -Rj$(nproc) T=3 TOOLSET=gcc-11,gcc-12,gcc-13,gcc-14,clang-18,clang-19,clang-20 BUILD=debug all run_tests
 #   cd ~/src/atomic_queue && make T=1 distclean && /bin/time make -k -Rj$(nproc) T=1 TOOLSET=gcc-11,gcc-12,gcc-13,gcc-14,clang-18,clang-19,clang-20
 #
 # Additional CPPFLAGS, CXXFLAGS, LDLIBS, LDFLAGS can come from the command line, e.g. make CPPFLAGS='-I<my-include-dir>', or from environment variables.  For example, also produce assembly outputs:
@@ -379,7 +379,7 @@ with-toolset-% :
 
 # The last-resort rule. Must be the last in the Makefile.
 % : ${toolsets:%=with-toolset-%}
-	@printf "${log_src}: ${c7}Made targets \"%s\" with toolsets "%s" in %'.6f seconds.${c0}\n" "${targets}" "${toolsets}" "$$((${timestamp_usec} - ${t0}))"e-6
+	@printf "${log_src}: ${c7}Made targets \"%s\" with $(words ${toolsets}) toolsets ${TOOLSET} in %'.6f seconds.${c0}\n" "${targets}" "$$((${timestamp_usec} - ${t0}))"e-6
 
 ################################################################################################################################
 else # Parallelize building with multiple toolsets.
