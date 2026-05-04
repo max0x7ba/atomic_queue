@@ -330,9 +330,15 @@ ATOMIC_QUEUE_NOINLINE void throughput_producer(SharedState* ctx, ThreadState* th
     ctx->barrier.countdown();
     thread->times.set(0); // std::memory_order_seq_cst
 
-    do
+    do {
         producer.push(*queue, n);
-    while(--n);
+#if ATOMIC_QUEUE_FULL_THROTTLE
+        // memory_order_release doesn't prevent reordering of _subsequent_ loads and stores prior to the memory_order_release store.
+        // gcc-14 reorders decrementing n earlier. This unnecessary eager reordering butchers branch fusion for dec + jne.
+        // Hint the compiler to delay decrementing n prior to this point.
+        asm(""::"r"(n));
+#endif
+    } while(--n);
 
     thread->times.set(1); // std::memory_order_seq_cst
 }
@@ -343,7 +349,11 @@ ATOMIC_QUEUE_NOINLINE void throughput_consumer(SharedState* ctx, ThreadState* th
 
     [[maybe_unused]] region_guard_t<Queue> guard;
     ConsumerOf<Queue> consumer{*queue};
+#if ATOMIC_QUEUE_FULL_THROTTLE
+    register sum_t sum asm("r11") = 1; // Allocate undesirable r11 for the sum. To avoid allocating r11 for more frequently accessed values.
+#else
     sum_t sum = 1; // Set sums are +1 biased.
+#endif
     unsigned n;
 
     ctx->barrier.countdown();
@@ -351,8 +361,11 @@ ATOMIC_QUEUE_NOINLINE void throughput_consumer(SharedState* ctx, ThreadState* th
 
     do {
         n = consumer.pop(*queue);
+#if ATOMIC_QUEUE_FULL_THROTTLE
+        asm("":"+r"(sum));
+#endif
         sum += n; // Includes stop value.
-    } while(n > 1);
+    } while(n != 1);
 
     thread->sum = sum;
     thread->times.set(1); // std::memory_order_seq_cst

@@ -488,7 +488,7 @@ class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL, MINIMIZE_
     ATOMIC_QUEUE_INLINE T do_pop(unsigned tail) noexcept {
 #if ATOMIC_QUEUE_FULL_THROTTLE
         // Hint the compiler to resolve the pointer to the array member from this pointer early with 2-arg lea instruction.
-        // To avoid resolving a pointer to the array element from this pointer with most expensive 3-arg lea instruction in the hot path.
+        // To avoid resolving a pointer to the array element from this pointer with the most expensive 3-arg lea instruction in the hot path.
         auto* ATOMIC_QUEUE_RESTRICT elements_ = this->elements_;
         asm(""::"r"(elements_));
 #endif
@@ -499,7 +499,7 @@ class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL, MINIMIZE_
     ATOMIC_QUEUE_INLINE void do_push(T element, unsigned head) noexcept {
 #if ATOMIC_QUEUE_FULL_THROTTLE
         // Hint the compiler to resolve the pointer to the array member from this pointer early with 2-arg lea instruction.
-        // To avoid resolving a pointer to the array element from this pointer with most expensive 3-arg lea instruction in the hot path.
+        // To avoid resolving a pointer to the array element from this pointer with the most expensive 3-arg lea instruction in the hot path.
         auto* ATOMIC_QUEUE_RESTRICT elements_ = this->elements_;
         asm(""::"r"(elements_));
 #endif
@@ -540,7 +540,7 @@ class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE, MINIMIZE_CON
     ATOMIC_QUEUE_INLINE T do_pop(unsigned tail) noexcept {
 #if ATOMIC_QUEUE_FULL_THROTTLE
         // Hint the compiler to resolve pointers to the array members from this pointer early with 2-arg lea instructions.
-        // To avoid resolving pointers to array elements from this pointer with most expensive 3-arg lea instructions in the hot path.
+        // To avoid resolving pointers to array elements from this pointer with the most expensive 3-arg lea instructions in the hot path.
         auto* ATOMIC_QUEUE_RESTRICT elements_ = this->elements_;
         auto* ATOMIC_QUEUE_RESTRICT states_ = this->states_;
         asm(""::"r"(elements_), "r"(states_));
@@ -553,7 +553,7 @@ class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE, MINIMIZE_CON
     ATOMIC_QUEUE_INLINE void do_push(U&& element, unsigned head) noexcept {
 #if ATOMIC_QUEUE_FULL_THROTTLE
         // Hint the compiler to resolve pointers to the array members from this pointer early with 2-arg lea instructions.
-        // To avoid resolving pointers to array elements from this pointer with most expensive 3-arg lea instructions in the hot path.
+        // To avoid resolving pointers to array elements from this pointer with the most expensive 3-arg lea instructions in the hot path.
         auto* ATOMIC_QUEUE_RESTRICT elements_ = this->elements_;
         auto* ATOMIC_QUEUE_RESTRICT states_ = this->states_;
         asm(""::"r"(elements_), "r"(states_));
