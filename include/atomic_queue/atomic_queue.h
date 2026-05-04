@@ -490,11 +490,23 @@ class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL, MINIMIZE_
     alignas(CACHE_LINE_SIZE) std::atomic<T> elements_[size_];
 
     ATOMIC_QUEUE_INLINE T do_pop(unsigned tail) noexcept {
+#if ATOMIC_QUEUE_FULL_THROTTLE
+        // Hint the compiler to resolve the pointer to the array member from this pointer early with 2-arg lea instruction.
+        // To avoid resolving a pointer to the array element from this pointer with most expensive 3-arg lea instruction in the hot path.
+        auto* ATOMIC_QUEUE_RESTRICT elements_ = this->elements_;
+        asm(""::"r"(elements_));
+#endif
         std::atomic<T>& q_element = details::remap<SHUFFLE_BITS>(elements_, tail, size_);
         return Base::template do_pop<T, NIL>(q_element);
     }
 
     ATOMIC_QUEUE_INLINE void do_push(T element, unsigned head) noexcept {
+#if ATOMIC_QUEUE_FULL_THROTTLE
+        // Hint the compiler to resolve the pointer to the array member from this pointer early with 2-arg lea instruction.
+        // To avoid resolving a pointer to the array element from this pointer with most expensive 3-arg lea instruction in the hot path.
+        auto* ATOMIC_QUEUE_RESTRICT elements_ = this->elements_;
+        asm(""::"r"(elements_));
+#endif
         std::atomic<T>& q_element = details::remap<SHUFFLE_BITS>(elements_, head, size_);
         Base::template do_push<T, NIL>(element, q_element);
     }
@@ -530,6 +542,13 @@ class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE, MINIMIZE_CON
     alignas(CACHE_LINE_SIZE) T elements_[size_] = {};
 
     ATOMIC_QUEUE_INLINE T do_pop(unsigned tail) noexcept {
+#if ATOMIC_QUEUE_FULL_THROTTLE
+        // Hint the compiler to resolve pointers to the array members from this pointer early with 2-arg lea instructions.
+        // To avoid resolving pointers to array elements from this pointer with most expensive 3-arg lea instructions in the hot path.
+        auto* ATOMIC_QUEUE_RESTRICT elements_ = this->elements_;
+        auto* ATOMIC_QUEUE_RESTRICT states_ = this->states_;
+        asm(""::"r"(elements_), "r"(states_));
+#endif
         unsigned index = details::Remap::remap(tail, size_, Bits{});
         return Base::do_pop(states_[index], elements_[index]);
     }
@@ -537,9 +556,11 @@ class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE, MINIMIZE_CON
     template<class U>
     ATOMIC_QUEUE_INLINE void do_push(U&& element, unsigned head) noexcept {
 #if ATOMIC_QUEUE_FULL_THROTTLE
+        // Hint the compiler to resolve pointers to the array members from this pointer early with 2-arg lea instructions.
+        // To avoid resolving pointers to array elements from this pointer with most expensive 3-arg lea instructions in the hot path.
         auto* ATOMIC_QUEUE_RESTRICT elements_ = this->elements_;
         auto* ATOMIC_QUEUE_RESTRICT states_ = this->states_;
-        asm("":: "r"(elements_), "r"(states_));
+        asm(""::"r"(elements_), "r"(states_));
 #endif
         unsigned index = details::Remap::remap(head, size_, Bits{});
         Base::do_push(std::forward<U>(element), states_[index], elements_[index]);
