@@ -269,11 +269,11 @@ struct SharedState {
         assert(is_suitably_aligned(this));
     }
 
-    ATOMIC_QUEUE_INLINE auto as_thread_range() noexcept {
+    ATOMIC_QUEUE_INLINE auto as_thread_range() const noexcept {
         return as_range(threads, n_threads * 2);
     }
 
-    ATOMIC_QUEUE_INLINE auto* reuse_this_thread() noexcept {
+    ATOMIC_QUEUE_NOINLINE auto* use_this_thread() noexcept {
         set_thread_affinity(hw_thread_ids[thread_idx]); // Use this thread#0 for the first producer. Pin to the same CPU.
         return threads + thread_idx++;
     }
@@ -293,16 +293,17 @@ struct SharedState {
     }
 
     ATOMIC_QUEUE_NOINLINE cycles_t total_time() const noexcept {
-        cycles_t t0 = CYCLES_MAX, t1 = 0;
-        for(auto& thr : as_range(threads, n_threads * 2)) {
-            t0 = min_value(t0, thr.times.get(0));
-            t1 = max_value(t1, thr.times.get(1));
+        cycles_t first_start_time = CYCLES_MAX;
+        cycles_t last_end_time = 0;
+
+        for(auto& thr : as_thread_range()) {
+            first_start_time = min_value(first_start_time, thr.times.get(0));
+            last_end_time = max_value(last_end_time, thr.times.get(1));
         }
 
-        if(ATOMIC_QUEUE_UNLIKELY(t0 == CYCLES_MAX || !t1)) // Must never happen.
+        if(ATOMIC_QUEUE_UNLIKELY(first_start_time >= last_end_time)) // Not expected to happen.
             std::abort();
-
-        return t1 - t0;
+        return last_end_time - first_start_time;
     }
 };
 
@@ -377,7 +378,7 @@ ATOMIC_QUEUE_INLINE cycles_t time_throughput_once(Params const* params, unsigned
     auto queue = HugePages::instance->create_unique_ptr<Queue>(ContextOf<Queue>{thread_count, thread_count});
     ctx->queue0 = queue.get();
 
-    auto* producer0 = ctx->reuse_this_thread(); // Use this thread#0 for the first producer.
+    auto* producer0 = ctx->use_this_thread(); // Use this thread#0 for the first producer.
 
     if(alternative_placement) {
         for(unsigned i = 0; i < thread_count; ++i) {
@@ -596,7 +597,7 @@ ATOMIC_QUEUE_NOINLINE void ping_pong_sender(SharedState* ctx, ThreadState* threa
 template<class Queue>
 ATOMIC_QUEUE_INLINE cycles_t time_ping_pong_once(Params const* params, unsigned const (&cpus)[2]) {
     auto ctx = HugePages::instance->create_unique_ptr<SharedState2>(params, cpus);
-    auto sender0 = ctx->reuse_this_thread(); // This thread#0 is the sender.
+    auto sender0 = ctx->use_this_thread(); // This thread#0 is the sender.
 
     ContextOf<Queue> const queue_ctx{1, 1};
     auto q1 = HugePages::instance->create_unique_ptr<Queue>(queue_ctx);
