@@ -111,7 +111,7 @@ struct RemapBmi {
     ATOMIC_QUEUE_INLINE static unsigned remap(unsigned index, unsigned size, Bits) noexcept {
         static_assert(ATOMIC_QUEUE_FULL_THROTTLE == 1, "Unexpected ATOMIC_QUEUE_FULL_THROTTLE value.");
 
-        // register unsigned nn asm("esi")  = Bits::count2; // Load the immidiate into the accumulator on the spot.
+        // register unsigned nn asm("esi") = Bits::count2; // Load the immidiate into the accumulator on the spot.
         unsigned nn  = Bits::count2; // Load the immidiate into the accumulator on the spot.
         asm("":"+S"(nn)); // Disable constant propagation for nn to prevent the compiler from transforming the following code.
 
@@ -123,7 +123,7 @@ struct RemapBmi {
         unsigned new_elem_idx = __bextr_u32(index, nn); // BMI1 bextr supersedes mov + shr + and.
         unsigned new_line_idx = (index & Bits::mask_elem_idx) << Bits::count;
 #endif
-        new_elem_idx |= index & (Bits::mask_hi & (size - 1));;
+        new_elem_idx |= index & (Bits::mask_hi & (size - 1));
         asm("":"+r"(new_elem_idx): "r"(new_line_idx)); // Do not commute the arguments of the adjacent two or instructions.
         return new_elem_idx | new_line_idx; // Or with new_line_idx last.
     }
@@ -292,41 +292,42 @@ protected:
 
     template<class T, T NIL>
     ATOMIC_QUEUE_INLINE static T do_pop(std::atomic<T>& q_element) noexcept {
+        T element;
         if(Derived::spsc_) {
             for(;;) {
-                T element = q_element.load(A);
-                if(ATOMIC_QUEUE_LIKELY(element != NIL)) {
-                    q_element.store(NIL, X);
-                    return element;
-                }
+                element = q_element.load(A);
+                if(ATOMIC_QUEUE_UNLIKELY(element != NIL))
+                    break;
                 if(Derived::maximize_throughput_)
                     spin_loop_pause();
             }
+            q_element.store(NIL, X);
         }
         else {
             for(;;) {
-                T element = q_element.exchange(NIL, A); // (2) The store to wait for.
-                if(ATOMIC_QUEUE_LIKELY(element != NIL))
-                    return element;
+                element = q_element.exchange(NIL, A); // (2) The store to wait for.
+                if(ATOMIC_QUEUE_UNLIKELY(element != NIL))
+                    break;
                 // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
                 do
                     spin_loop_pause();
                 while(Derived::maximize_throughput_ && q_element.load(X) == NIL);
             }
         }
+        return element;
     }
 
     template<class T, T NIL>
     ATOMIC_QUEUE_INLINE static void do_push(T element, std::atomic<T>& q_element) noexcept {
         assert(element != NIL);
         if(Derived::spsc_) {
-            while(ATOMIC_QUEUE_UNLIKELY(q_element.load(X) != NIL))
+            while(ATOMIC_QUEUE_LIKELY(q_element.load(X) != NIL))
                 if(Derived::maximize_throughput_)
                     spin_loop_pause();
             q_element.store(element, R);
         }
         else {
-            for(T expected = NIL; ATOMIC_QUEUE_UNLIKELY(!q_element.compare_exchange_weak(expected, element, R, X)); expected = NIL) {
+            for(T expected = NIL; ATOMIC_QUEUE_LIKELY(!q_element.compare_exchange_weak(expected, element, R, X)); expected = NIL) {
                 do
                     spin_loop_pause(); // (1) Wait for store (2) to complete.
                 while(Derived::maximize_throughput_ && q_element.load(X) != NIL);
@@ -340,9 +341,6 @@ protected:
             while(ATOMIC_QUEUE_UNLIKELY(state.load(A) != STORED))
                 if(Derived::maximize_throughput_)
                     spin_loop_pause();
-            T element{std::move(q_element)};
-            state.store(EMPTY, R);
-            return element;
         }
         else {
             State desired = LOADING;
@@ -351,17 +349,18 @@ protected:
                 asm("":"+R"(desired)); // For shortest bytecode, don't place this object into any of r8-r15.
 #endif
                 State expected = STORED;
-                if(ATOMIC_QUEUE_LIKELY(state.compare_exchange_weak(expected, desired, A, X))) {
-                    T element{std::move(q_element)};
-                    state.store(EMPTY, R);
-                    return element;
-                }
+                if(ATOMIC_QUEUE_UNLIKELY(state.compare_exchange_weak(expected, desired, A, X)))
+                    break;
                 // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
                 do
                     spin_loop_pause();
                 while(Derived::maximize_throughput_ && state.load(X) != STORED);
             }
         }
+
+        T element{std::move(q_element)};
+        state.store(EMPTY, R);
+        return element;
     }
 
     template<class U, class T>
@@ -370,8 +369,6 @@ protected:
             while(ATOMIC_QUEUE_UNLIKELY(state.load(A) != EMPTY))
                 if(Derived::maximize_throughput_)
                     spin_loop_pause();
-            q_element = std::forward<U>(element);
-            state.store(STORED, R);
         }
         else {
             State desired = STORING;
@@ -380,17 +377,17 @@ protected:
                 asm("":"+R"(desired)); // For shortest bytecode, don't place this object into any of r8-r15.
 #endif
                 State expected = EMPTY;
-                if(ATOMIC_QUEUE_LIKELY(state.compare_exchange_weak(expected, desired, A, X))) {
-                    q_element = std::forward<U>(element);
-                    state.store(STORED, R);
-                    return;
-                }
+                if(ATOMIC_QUEUE_UNLIKELY(state.compare_exchange_weak(expected, desired, A, X)))
+                    break;
                 // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
                 do
                     spin_loop_pause();
                 while(Derived::maximize_throughput_ && state.load(X) != EMPTY);
             }
         }
+
+        q_element = std::forward<U>(element);
+        state.store(STORED, R);
     }
 
 public:

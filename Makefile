@@ -41,7 +41,7 @@ T := 0
 build_root.0 := build   # T=0 builds into build sub-directory.
 
 # Other values for T build into /tmp, which normally mounts a tmpfs. (GCP instances don't).
-# Waste no CPU cycles for file-system encription and/or RAID mirroring. No wearing-out of HDD/SSD/NVMe disks with writes.
+# Waste no CPU cycles for file-system encryption and/or RAID mirroring. No wearing-out of HDD/SSD/NVMe disks with writes.
 build_root.1 := /tmp/b1 # T=1 builds into /tmp/b1.
 build_root.2 := /tmp/b2 # T=2 builds into /tmp/b2.
 build_root.3 := /tmp/b3 # T=3 builds into /tmp/b3.
@@ -309,8 +309,8 @@ env2 : env
 
 ifdef not_cleaning # Not cleanining.
 
-asm_throughput : private symbol_regex = "throughput_(consumer|producer)<atomic_queue::AtomicQueue2"
-asm_latency : private symbol_regex = "ping_pong_(receiver|sender)<atomic_queue::AtomicQueue2"
+asm_throughput : private symbol_regex = "throughput_(consumer|producer)<atomic_queue::AtomicQueue"
+asm_latency : private symbol_regex = "ping_pong_(receiver|sender)<atomic_queue::AtomicQueue"
 
 asm_% : scripts/util.sh ${build_dir}/benchmarks $$(if $${symbol_regex},force,$$(error $$@ is not defined))
 	source $< && disassemble-symbol ${symbol_regex} ${build_dir}/benchmarks.o
