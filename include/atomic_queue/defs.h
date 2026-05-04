@@ -12,7 +12,13 @@
 #if defined(__GNUC__) || defined(__clang__)
 #define ATOMIC_QUEUE_LIKELY(expr) __builtin_expect(static_cast<bool>(expr), 1)
 #define ATOMIC_QUEUE_UNLIKELY(expr) __builtin_expect(static_cast<bool>(expr), 0)
+
+#ifndef __clang__
+#define ATOMIC_QUEUE_NOINLINE __attribute__((noinline,noclone))
+#else
 #define ATOMIC_QUEUE_NOINLINE __attribute__((noinline))
+#endif
+
 #define ATOMIC_QUEUE_INLINE inline __attribute__((always_inline))
 #define ATOMIC_QUEUE_RESTRICT __restrict__
 
