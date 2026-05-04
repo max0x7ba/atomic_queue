@@ -387,15 +387,15 @@ ATOMIC_QUEUE_INLINE cycles_t time_throughput_once(Params const* params, unsigned
 
 template<class Queue>
 ATOMIC_QUEUE_NOINLINE void time_throughput(char const* name, Params const* params, unsigned n_thread_min, unsigned n_thread_max) {
-    int const N = params->n_msg;
-    sum_t const expected_sum = ((N + 1) * .5) * N;
+    int const n_msg = params->n_msg;
+    sum_t const expected_sum = (n_msg + 1) * .5 * n_msg;
     double const expected_sum_inv = 1. / expected_sum;
 
     for(unsigned n_threads = n_thread_min; n_threads <= n_thread_max; ++n_threads) {
         for(bool alternative_placement : {false, true}) {
             cycles_t min_time = CYCLES_MAX;
 
-            for(unsigned run = RUNS; run--;) {
+            for(unsigned run = RUNS; run--; HugePages::instance->check_huge_pages_leaks(name)) {
                 ThreadStates threads(n_threads * 2);
                 cycles_t time = time_throughput_once<Queue>(params, n_threads, alternative_placement, threads.data());
                 min_time = min_value(min_time, time);
@@ -416,10 +416,6 @@ ATOMIC_QUEUE_NOINLINE void time_throughput(char const* name, Params const* param
                         ++i;
                     }
                 }
-
-                threads = ThreadStates(); // Deallocate memory.
-                HugePages::instance->check_huge_pages_leaks(name);
-
                 // Verify that all messages were received exactly once: no duplicates, no omissions.
                 if(auto diff = total_sum - expected_sum * n_threads)
                     fprintf(stderr, "%s: wrong checksum error: producers: %u, expected_sum: %'lld, diff: %'lld.\n",
@@ -427,8 +423,8 @@ ATOMIC_QUEUE_NOINLINE void time_throughput(char const* name, Params const* param
             }
 
             double min_seconds = to_seconds(min_time);
-            unsigned msg_per_sec = N * n_threads / min_seconds;
-            printf("%32s,%2u,%c: %'11u msg/sec\n", name, n_threads, alternative_placement ? 'i' : 's', msg_per_sec);
+            double msg_per_sec = n_msg * static_cast<int64_t>(n_threads) / min_seconds;
+            printf("%32s,%2u,%c: %'11.0f msg/sec\n", name, n_threads, alternative_placement ? 'i' : 's', msg_per_sec);
         }
     }
 }
@@ -610,12 +606,9 @@ ATOMIC_QUEUE_NOINLINE void time_ping_pong(char const* name, Params const* params
     unsigned const n_cpus = hw_thread_ids.size();
     for(unsigned cpu2 = 1; cpu2 < n_cpus; cpu2 *= 2) {
         unsigned const cpus[2] = {hw_thread_ids[0], hw_thread_ids[cpu2]};
-        for(unsigned run = RUNS; run--;) {
+        for(unsigned run = RUNS; run--; HugePages::instance->check_huge_pages_leaks(name)) {
             auto total_time = time_ping_pong_once<Queue>(params, cpus);
-            if(shortest_total_time > total_time)
-                shortest_total_time = total_time;
-
-            HugePages::instance->check_huge_pages_leaks(name);
+            shortest_total_time = min_value(shortest_total_time, total_time);
         }
     }
 
