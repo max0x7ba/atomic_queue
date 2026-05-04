@@ -15,18 +15,27 @@
 #define ATOMIC_QUEUE_NOINLINE __attribute__((noinline))
 #define ATOMIC_QUEUE_INLINE inline __attribute__((always_inline))
 #define ATOMIC_QUEUE_RESTRICT __restrict__
+
+#if !defined(ATOMIC_QUEUE_FULL_THROTTLE) && defined(__x86_64__)
 #define ATOMIC_QUEUE_FULL_THROTTLE 1
+#endif
+
 #else
-#define ATOMIC_QUEUE_FULL_THROTTLE 0
 #define ATOMIC_QUEUE_LIKELY(expr) (expr)
 #define ATOMIC_QUEUE_UNLIKELY(expr) (expr)
 #define ATOMIC_QUEUE_NOINLINE
 #define ATOMIC_QUEUE_INLINE inline
+
 #ifdef _MSC_VER
 #define ATOMIC_QUEUE_RESTRICT __restrict
 #else
 #define ATOMIC_QUEUE_RESTRICT
 #endif
+
+#endif
+
+#if !defined(ATOMIC_QUEUE_FULL_THROTTLE)
+#define ATOMIC_QUEUE_FULL_THROTTLE 1
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
