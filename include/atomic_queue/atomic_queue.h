@@ -112,7 +112,7 @@ struct RemapBmi {
         static_assert(ATOMIC_QUEUE_FULL_THROTTLE == 1, "Unexpected ATOMIC_QUEUE_FULL_THROTTLE value.");
 
         unsigned nn  = Bits::count2;
-        asm("":"+U"(nn)); // Disable constant propagation for nn to prevent the compiler from transforming the following code.
+        asm("":"+r"(nn)); // Disable constant propagation for nn to prevent the compiler from transforming the following code.
 
 #ifdef __BMI2__
         unsigned new_line_idx = _bzhi_u32(index, nn) << Bits::count; // BMI2 bzhi supersedes mov + and.
