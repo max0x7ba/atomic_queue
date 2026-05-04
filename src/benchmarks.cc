@@ -328,13 +328,13 @@ ATOMIC_QUEUE_NOINLINE void throughput_producer(SharedState* ctx, ThreadState* th
     unsigned n = ctx->n_msg;
 
     ctx->barrier.countdown();
-    thread->times.set(0);
+    thread->times.set(0); // std::memory_order_seq_cst
 
     do
         producer.push(*queue, n);
     while(--n);
 
-    thread->times.set(1);
+    thread->times.set(1); // std::memory_order_seq_cst
 }
 
 template<class Queue>
@@ -347,15 +347,15 @@ ATOMIC_QUEUE_NOINLINE void throughput_consumer(SharedState* ctx, ThreadState* th
     unsigned n;
 
     ctx->barrier.countdown();
-    thread->times.set(0);
+    thread->times.set(0); // std::memory_order_seq_cst
 
     do {
         n = consumer.pop(*queue);
         sum += n; // Includes stop value.
     } while(n > 1);
 
-    thread->sum = sum; // memory_order_seq_cst
-    thread->times.set(1);
+    thread->sum = sum;
+    thread->times.set(1); // std::memory_order_seq_cst
 }
 
 template<class Queue>
@@ -538,15 +538,16 @@ ATOMIC_QUEUE_NOINLINE void run_throughput_benchmarks(Params const* params) {
 
 template<class Queue>
 ATOMIC_QUEUE_NOINLINE void ping_pong_receiver(SharedState* ctx, ThreadState* thread) {
-    Queue* const q1 = static_cast<Queue*>(ctx->queue0);
-    Queue* const q2 = static_cast<Queue*>(ctx->queue1);
+    // C++ strict-aliasing rules assume that q1 and q2 may alias. Specify explicitly these pointers never alias.
+    Queue* ATOMIC_QUEUE_RESTRICT q1 = static_cast<Queue*>(ctx->queue0);
+    Queue* ATOMIC_QUEUE_RESTRICT q2 = static_cast<Queue*>(ctx->queue1);
 
     [[maybe_unused]] region_guard_t<Queue> guard;
     ConsumerOf<Queue> consumer_q1{*q1};
     ProducerOf<Queue> producer_q2{*q2};
 
     ctx->barrier.countdown();
-    thread->times.set(0);
+    thread->times.set(0); // std::memory_order_seq_cst
 
     unsigned n;
     do {
@@ -554,13 +555,14 @@ ATOMIC_QUEUE_NOINLINE void ping_pong_receiver(SharedState* ctx, ThreadState* thr
         producer_q2.push(*q2, n);
     } while(ATOMIC_QUEUE_LIKELY(n > 1));
 
-    thread->times.set(1); // std::memory_order_seq_cst;
+    thread->times.set(1); // std::memory_order_seq_cst
 }
 
 template<class Queue>
 ATOMIC_QUEUE_NOINLINE void ping_pong_sender(SharedState* ctx, ThreadState* thread) {
-    Queue* const q1 = static_cast<Queue*>(ctx->queue0);
-    Queue* const q2 = static_cast<Queue*>(ctx->queue1);
+    // C++ strict-aliasing rules assume that q1 and q2 may alias. Specify explicitly these pointers never alias.
+    Queue* ATOMIC_QUEUE_RESTRICT q1 = static_cast<Queue*>(ctx->queue0);
+    Queue* ATOMIC_QUEUE_RESTRICT q2 = static_cast<Queue*>(ctx->queue1);
 
     [[maybe_unused]] region_guard_t<Queue> guard;
     ProducerOf<Queue> producer_q1{*q1};
@@ -568,14 +570,14 @@ ATOMIC_QUEUE_NOINLINE void ping_pong_sender(SharedState* ctx, ThreadState* threa
     unsigned n = ctx->n_msg;
 
     ctx->barrier.countdown();
-    thread->times.set(0);
+    thread->times.set(0); // std::memory_order_seq_cst
 
     do {
         producer_q1.push(*q1, n);
         n = consumer_q2.pop(*q2);
     } while(as_signed(--n) > 0);
 
-    thread->times.set(1); // std::memory_order_seq_cst;
+    thread->times.set(1); // std::memory_order_seq_cst
 }
 
 template<class Queue>
