@@ -35,9 +35,10 @@ class AtomicQueueMutexT {
     Mutex mutex_;
     alignas(CACHE_LINE_SIZE) unsigned head_ = 0;
     alignas(CACHE_LINE_SIZE) unsigned tail_ = 0;
-    alignas(CACHE_LINE_SIZE) T q_[size_] = {};
+    alignas(CACHE_LINE_SIZE) T elements_[size_] = {};
 
     static constexpr int SHUFFLE_BITS = details::GetIndexShuffleBits<MINIMIZE_CONTENTION, size_, CACHE_LINE_SIZE / sizeof(T)>::value;
+    using Bits = details::IndexBits<SHUFFLE_BITS>;
 
     using ScopedLock = typename ScopedLockType<Mutex>::type;
 
@@ -48,7 +49,8 @@ public:
     ATOMIC_QUEUE_INLINE bool try_push(U&& element) noexcept {
         ScopedLock lock(mutex_);
         if(ATOMIC_QUEUE_LIKELY(head_ - tail_ < size_)) {
-            details::remap<SHUFFLE_BITS>(q_, head_, size_) = std::forward<U>(element);
+            unsigned index = remap(head_, size_, Bits{});
+            elements_[index] = std::forward<U>(element);
             ++head_;
             return true;
         }
@@ -58,7 +60,8 @@ public:
     ATOMIC_QUEUE_INLINE bool try_pop(T& element) noexcept {
         ScopedLock lock(mutex_);
         if(ATOMIC_QUEUE_LIKELY(head_ != tail_)) {
-            element = std::move(details::remap<SHUFFLE_BITS>(q_, tail_, size_));
+            unsigned index = remap(tail_, size_, Bits{});
+            element = std::move(elements_[index]);
             ++tail_;
             return true;
         }
