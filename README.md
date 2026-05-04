@@ -88,7 +88,7 @@ include(FetchContent)
 FetchContent_Declare(
         atomic_queue
         GIT_REPOSITORY https://github.com/max0x7ba/atomic_queue.git
-        GIT_TAG master
+        GIT_TAG v1.9.0
 )
 FetchContent_MakeAvailable(atomic_queue)
 target_link_libraries(main PRIVATE atomic_queue::atomic_queue)

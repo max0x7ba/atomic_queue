@@ -1,6 +1,6 @@
 CMAKE_MINIMUM_REQUIRED( VERSION 3.25 )
 
-PROJECT(atomic_queue VERSION 1.5.0)
+PROJECT(atomic_queue VERSION 1.9.0)
 
 OPTION( ATOMIC_QUEUE_BUILD_TESTS
     "If the tests should be built."
