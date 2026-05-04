@@ -15,6 +15,7 @@
 #   /bin/time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 run_tests asm_throughput asm_latency
 #
 #   AQB=1 /bin/time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 run_benchmarks_n
+#
 #   AQN=100000 AQB=131 taskset -c 8-15 /bin/time make -C ~/src/atomic_queue -Rj8 T=1 TOOLSET=gcc-14 CPPFLAGS="-DATOMIC_QUEUE_REMAP=RemapBmi" run_benchmarks_n TAG=5825u-RemapBmi
 #   AQN=100000 AQB=131 taskset -c 8-15 /bin/time make -C ~/src/atomic_queue -Rj8 T=2 TOOLSET=gcc-14 CPPFLAGS="-DATOMIC_QUEUE_REMAP=RemapAnd" run_benchmarks_n TAG=5825u-RemapAnd
 #   AQN=100000 AQB=131 taskset -c 8-15 /bin/time make -C ~/src/atomic_queue -Rj8 T=3 TOOLSET=gcc-14 CPPFLAGS="-DATOMIC_QUEUE_REMAP=RemapXor" run_benchmarks_n TAG=5825u-RemapXor
@@ -147,7 +148,7 @@ cxxflags.x86_64 := -fcf-protection=none -masm=intel
 
 cxxflags.gcc.asm.1 := -save-temps=obj -fverbose-asm
 cxxflags.gcc.debug := -Og -f{stack-protector-all,no-omit-frame-pointer} # -D_GLIBCXX_DEBUG
-cxxflags.gcc.release := -O3 -mtune=native -fno-{stack-protector,stack-clash-protection,move-loop-invariants} -falign-functions=64 -DNDEBUG ${cxxflags.gcc.asm.${ASM}}
+cxxflags.gcc.release := -O3 -mtune=native -fno-{stack-protector,stack-clash-protection,move-loop-invariants} -falign-{functions,loops}=64 -DNDEBUG ${cxxflags.gcc.asm.${ASM}}
 cxxflags.gcc.sanitize := ${cxxflags.gcc.debug} -fsanitize=thread
 cxxflags.gcc.sanitize2 := ${cxxflags.gcc.debug} -fsanitize=undefined,address
 cxxflags.gcc := -march=native -f{no-plt,no-math-errno,finite-math-only,message-length=0} -W{all,extra,error,no-maybe-uninitialized} ${cxxflags.gcc.${BUILD}}
@@ -159,7 +160,7 @@ ldflags.gcc := -g ${use_ld} ${ldflags.gcc.${BUILD}}
 # clang-14 for arm doesn't support -march=native.
 has_native := $(if $(and $(findstring clang,${CXX}), $(findstring aarch64,${uname_m}), $(shell ${CXX} -march=native -c -xc++ -o/dev/null /dev/null 2>&1)),,1)
 cxxflags.clang.debug := -O0 -fstack-protector-all $(and ${has_native},-march=native)
-cxxflags.clang.release := -O3 -fno-stack-protector -DNDEBUG $(and ${has_native},-march=native -mtune=native)
+cxxflags.clang.release := -O3 -fno-stack-protector -falign-functions=64 -DNDEBUG $(and ${has_native},-march=native -mtune=native)
 cxxflags.clang.sanitize := ${cxxflags.clang.debug} -fsanitize=thread
 cxxflags.clang.sanitize2 := ${cxxflags.clang.debug} -fsanitize=undefined,address
 cxxflags.clang := -stdlib=libstdc++ -f{no-plt,no-math-errno,finite-math-only,message-length=0} -W{all,extra,error} ${cxxflags.clang.${BUILD}}
