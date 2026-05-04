@@ -289,8 +289,9 @@ protected:
         details::swap_relaxed(tail_, b.tail_);
     }
 
-    template<class T, T NIL>
+    template<class T>
     ATOMIC_QUEUE_INLINE static T do_pop(std::atomic<T>& q_element) noexcept {
+        constexpr T NIL = Derived::nil_;
         T element;
         if(Derived::spsc_) {
             for(;;) {
@@ -316,8 +317,9 @@ protected:
         return element;
     }
 
-    template<class T, T NIL>
+    template<class T>
     ATOMIC_QUEUE_INLINE static void do_push(T element, std::atomic<T>& q_element) noexcept {
+        constexpr T NIL = Derived::nil_;
         assert(element != NIL);
         if(Derived::spsc_) {
             while(ATOMIC_QUEUE_LIKELY(q_element.load(X) != NIL))
@@ -337,6 +339,7 @@ protected:
     template<class T>
     ATOMIC_QUEUE_INLINE static T do_pop(std::atomic<State>* ATOMIC_QUEUE_RESTRICT states, T* ATOMIC_QUEUE_RESTRICT elements, unsigned index) noexcept {
         auto& state = states[index];
+
         if(Derived::spsc_) {
             while(ATOMIC_QUEUE_UNLIKELY(state.load(A) != STORED))
                 if(Derived::maximize_throughput_)
@@ -362,6 +365,7 @@ protected:
     template<class U, class T>
     ATOMIC_QUEUE_INLINE static void do_push(U&& element, std::atomic<State>* ATOMIC_QUEUE_RESTRICT states, T* ATOMIC_QUEUE_RESTRICT elements, unsigned index) noexcept {
         auto& state = states[index];
+
         if(Derived::spsc_) {
             while(ATOMIC_QUEUE_UNLIKELY(state.load(A) != EMPTY))
                 if(Derived::maximize_throughput_)
@@ -484,17 +488,18 @@ class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL, MINIMIZE_
     static constexpr bool total_order_ = TOTAL_ORDER;
     static constexpr bool spsc_ = SPSC;
     static constexpr bool maximize_throughput_ = MAXIMIZE_THROUGHPUT;
+    static constexpr T nil_ = NIL;
 
     alignas(CACHE_LINE_SIZE) std::atomic<T> elements_[size_];
 
     ATOMIC_QUEUE_INLINE T do_pop(unsigned tail) noexcept {
         std::atomic<T>& q_element = details::remap<SHUFFLE_BITS>(elements_, tail, size_);
-        return Base::template do_pop<T, NIL>(q_element);
+        return Base::do_pop(q_element);
     }
 
     ATOMIC_QUEUE_INLINE void do_push(T element, unsigned head) noexcept {
         std::atomic<T>& q_element = details::remap<SHUFFLE_BITS>(elements_, head, size_);
-        Base::template do_push<T, NIL>(element, q_element);
+        Base::do_push(element, q_element);
     }
 
 public:
@@ -558,6 +563,7 @@ class AtomicQueueB : private std::allocator_traits<A>::template rebind_alloc<std
     static constexpr bool total_order_ = TOTAL_ORDER;
     static constexpr bool spsc_ = SPSC;
     static constexpr bool maximize_throughput_ = MAXIMIZE_THROUGHPUT;
+    static constexpr T nil_ = NIL;
 
     static constexpr auto ELEMENTS_PER_CACHE_LINE = CACHE_LINE_SIZE / sizeof(std::atomic<T>);
     static_assert(ELEMENTS_PER_CACHE_LINE, "Unexpected ELEMENTS_PER_CACHE_LINE.");
@@ -579,12 +585,12 @@ class AtomicQueueB : private std::allocator_traits<A>::template rebind_alloc<std
 
     ATOMIC_QUEUE_INLINE T do_pop(unsigned tail) noexcept {
         std::atomic<T>& q_element = details::remap<SHUFFLE_BITS>(elements_, tail, size_);
-        return Base::template do_pop<T, NIL>(q_element);
+        return Base::do_pop(q_element);
     }
 
     ATOMIC_QUEUE_INLINE void do_push(T element, unsigned head) noexcept {
         std::atomic<T>& q_element = details::remap<SHUFFLE_BITS>(elements_, head, size_);
-        Base::template do_push<T, NIL>(element, q_element);
+        Base::do_push(element, q_element);
     }
 
 public:
