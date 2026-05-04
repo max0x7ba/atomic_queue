@@ -15,9 +15,9 @@
 #   /bin/time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 run_tests asm_throughput asm_latency
 #
 #   AQB=1 /bin/time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 TOOLSET=gcc-14 run_benchmarks_n
-#   AQB=131 taskset -c 8-15 /bin/time make -C ~/src/atomic_queue -Rj4 T=1 TOOLSET=gcc-14 run_benchmarks_n N=2 TAG=5825u_4-RemapBmi
-#   AQB=131 taskset -c 8-15 /bin/time make -C ~/src/atomic_queue -Rj4 T=2 TOOLSET=gcc-14 CPPFLAGS="-DATOMIC_QUEUE_REMAP=RemapAnd" run_benchmarks_n N=2 TAG=5825u_4-RemapAnd
-#   AQB=131 taskset -c 8-15 /bin/time make -C ~/src/atomic_queue -Rj4 T=3 TOOLSET=gcc-14 CPPFLAGS="-DATOMIC_QUEUE_REMAP=RemapXor" run_benchmarks_n N=2 TAG=5825u_4-RemapXor
+#   AQN=100000 AQB=131 taskset -c 8-15 /bin/time make -C ~/src/atomic_queue -Rj8 T=1 TOOLSET=gcc-14 CPPFLAGS="-DATOMIC_QUEUE_REMAP=RemapBmi" run_benchmarks_n TAG=5825u-RemapBmi
+#   AQN=100000 AQB=131 taskset -c 8-15 /bin/time make -C ~/src/atomic_queue -Rj8 T=2 TOOLSET=gcc-14 CPPFLAGS="-DATOMIC_QUEUE_REMAP=RemapAnd" run_benchmarks_n TAG=5825u-RemapAnd
+#   AQN=100000 AQB=131 taskset -c 8-15 /bin/time make -C ~/src/atomic_queue -Rj8 T=3 TOOLSET=gcc-14 CPPFLAGS="-DATOMIC_QUEUE_REMAP=RemapXor" run_benchmarks_n TAG=5825u-RemapXor
 #
 #   AQB=1 taskset -c 8-15:2 /bin/time make -C ~/src/atomic_queue -Rj4 T=1 TOOLSET=gcc-14 run_benchmarks_n N=2 TAG=5825u_4-smt0
 #
@@ -39,6 +39,9 @@
 # Easy BUILD_ROOT selection by setting T variable.
 T := 0
 build_root.0 := build   # T=0 builds into build sub-directory.
+
+# Other values for T build into /tmp, which normally mounts a tmpfs. (GCP instances don't).
+# Waste no CPU cycles for file-system encription and/or RAID mirroring. No wearing-out of HDD/SSD/NVMe disks with writes.
 build_root.1 := /tmp/b1 # T=1 builds into /tmp/b1.
 build_root.2 := /tmp/b2 # T=2 builds into /tmp/b2.
 build_root.3 := /tmp/b3 # T=3 builds into /tmp/b3.
