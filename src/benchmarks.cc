@@ -51,7 +51,7 @@ namespace {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-int constexpr N_MSG = 100'000;
+int constexpr N_MSG = 1'000'000;
 int constexpr RUNS = 3;
 
 struct Options : EnvBits64 {
@@ -76,8 +76,11 @@ struct Params {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Similar to boost::type<>.
 template<class T>
-using Type = std::common_type<T>; // Similar to boost::type<>.
+struct Type {
+    using type = T;
+};
 
 using sum_t = long long;
 
@@ -479,7 +482,8 @@ ATOMIC_QUEUE_INLINE void time_throughput_spsc(char const* name, Params const* pa
 }
 
 ATOMIC_QUEUE_NOINLINE void run_throughput_benchmarks(Params const* params) {
-    printf("---- Running throughput benchmarks with up to %zu CPUs (higher is better) ----\n", params->hw_thread_ids.size() & -2);
+    printf("---- Running throughput benchmarks with up to %zu CPUs, %'d messages, best of %d runs (higher is better) ----\n",
+           params->hw_thread_ids.size() & -2, params->n_msg, RUNS);
 
     int constexpr SIZE = 65536;
 
@@ -672,7 +676,7 @@ ATOMIC_QUEUE_NOINLINE void time_ping_pong(char const* name, Params const* params
 }
 
 void run_ping_pong_benchmarks(Params const* params) {
-    printf("---- Running ping-pong benchmarks with 2 CPUs (lower is better) ----\n");
+    printf("---- Running ping-pong benchmarks with 2 CPUs, %'d messages, best of %d runs (lower is better) ----\n", params->n_msg, RUNS);
 
     // This benchmark doesn't require queue capacity greater than 1, however, capacity of 1 elides
     // some instructions completely because of (x % 1) is always 0. Use something greater than 1 to
