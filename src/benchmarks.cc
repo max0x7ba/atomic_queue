@@ -82,7 +82,10 @@ struct Type {
     using type = T;
 };
 
-using sum_t = long long;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+using sum_t = unsigned long long;
+using isum_t = long long;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -221,9 +224,7 @@ struct Times {
     std::atomic<cycles_t> t[2] = {};
 
     ATOMIC_QUEUE_INLINE void set(unsigned i) noexcept {
-        auto* p = t + i; // Resolve the address into a register before cycles.
-        auto now = cycles();
-        *p = now; // std::memory_order_seq_cst
+        t[i] = cycles(); // std::memory_order_seq_cst
     }
 
     ATOMIC_QUEUE_INLINE cycles_t get(unsigned i) const noexcept {
@@ -362,12 +363,12 @@ ATOMIC_QUEUE_NOINLINE void throughput_consumer(SharedState* ctx0, ThreadState* t
 #if ATOMIC_QUEUE_FULL_THROTTLE
     // Vacate the most desirable i386 registers with the shortest instruction encoding for more frequently accessed objects.
     // Move these rarely accessed objects into callee-saved [r12,15] registers, which often require 1-byte longer instruction encoding
-    register sum_t sum asm("r13") = 1; // Allocate the most undesirable r13 for the sum, to avoid allocating r13 for anything else.
+    register sum_t sum asm("r13") = 0; // Allocate the most undesirable r13 for the sum, to avoid allocating r13 for anything else.
     register auto* ctx asm("r14") = ctx0;
     register auto* thread asm("r15") = thread0;
     asm("": "+r"(sum), "+r"(ctx), "+r"(thread));
 #else
-    sum_t sum = 1; // Set sums are +1 biased.
+    sum_t sum = 0;
     auto* ctx = ctx0;
     auto* thread = thread0;
 #endif
@@ -388,7 +389,7 @@ ATOMIC_QUEUE_NOINLINE void throughput_consumer(SharedState* ctx0, ThreadState* t
         sum += n; // Includes stop value.
     } while(n != 1);
 
-    thread->sum = sum; // std::memory_order_seq_cst
+    thread->sum = sum + 1; // Set sums are +1 biased.
     thread->times.set(1); // std::memory_order_seq_cst
 }
 
@@ -422,63 +423,56 @@ ATOMIC_QUEUE_INLINE cycles_t time_throughput_once(Params const* params, unsigned
 template<class Queue>
 ATOMIC_QUEUE_NOINLINE void time_throughput(char const* name, Params const* params, unsigned n_thread_min, unsigned n_thread_max) {
     int const n_msg = params->n_msg;
-    sum_t const expected_sum = (n_msg + 1) * .5 * n_msg;
+    isum_t const expected_sum = (n_msg + 1) * .5 * n_msg;
     double const expected_sum_inv = 1. / expected_sum;
 
     for(unsigned n_threads = n_thread_min; n_threads <= n_thread_max; ++n_threads) {
         for(bool alternative_placement : {false, true}) {
-            cycles_t min_time = CYCLES_MAX;
+            cycles_t n_cycles_best = CYCLES_MAX;
 
             for(unsigned run = RUNS; run--; HugePages::instance->check_huge_pages_leaks(name)) {
                 ThreadStates threads(n_threads * 2);
-                cycles_t time = time_throughput_once<Queue>(params, n_threads, alternative_placement, threads.data());
-                min_time = min_value(min_time, time);
+                cycles_t n_cycles = time_throughput_once<Queue>(params, n_threads, alternative_placement, threads.data());
+                n_cycles_best = min_value(n_cycles_best, n_cycles);
 
                 // Calculate the checksum.
                 sum_t total_sum = 0;
-                unsigned i = 0;
+                unsigned consumer_idx = 0;
                 for(auto& thr : threads) {
                     auto consumer_sum = thr.sum.load(X);
                     // Set sums are +1 biased.
                     if(consumer_sum--) {
                         total_sum += consumer_sum;
                         // Verify that no consumer was starved.
-                        auto consumer_sum_frac = consumer_sum * expected_sum_inv;
+                        auto consumer_sum_frac = as_signed(consumer_sum) * expected_sum_inv;
                         if(consumer_sum_frac < .1)
                             fprintf(stderr, "%s: producers: %u: consumer %u received too few messages: %.2lf%% of expected.\n",
-                                    name, n_threads, i, consumer_sum_frac);
-                        ++i;
+                                    name, n_threads, consumer_idx, consumer_sum_frac);
+                        ++consumer_idx;
                     }
                 }
                 // Verify that all messages were received exactly once: no duplicates, no omissions.
-                if(auto diff = total_sum - expected_sum * n_threads)
+                if(isum_t total_sum_diff = total_sum - as_unsigned(expected_sum) * n_threads)
                     fprintf(stderr, "%s: wrong checksum error: producers: %u, expected_sum: %'lld, diff: %'lld.\n",
-                            name, n_threads, expected_sum * n_threads, diff);
+                            name, n_threads, expected_sum * n_threads, total_sum_diff);
             }
 
-            double min_seconds = to_seconds(min_time);
-            double msg_per_sec = n_msg * static_cast<int64_t>(n_threads) / min_seconds;
+            double n_seconds_best = to_seconds(n_cycles_best);
+            double msg_per_sec = (n_msg * static_cast<long long>(n_threads)) / n_seconds_best;
             printf("%32s,%2u,%c: %'11.0f msg/sec\n", name, n_threads, alternative_placement ? 'i' : 's', msg_per_sec);
         }
     }
 }
 
 template<class Queue>
-ATOMIC_QUEUE_INLINE void time_throughput_mpmc(char const* name, Params const* params, Type<Queue>, unsigned thread_count_min = 1) {
-    unsigned const thread_count_max = params->hw_thread_ids.size() / 2;
-    time_throughput<Queue>(name, params, thread_count_min, thread_count_max);
-}
-
-template<class... Args>
-ATOMIC_QUEUE_INLINE void time_throughput_spsc(char const* name, Params const* params,
-                                   Type<BoostSpScAdapter<boost::lockfree::spsc_queue<Args...>>>) {
-    using Queue = BoostSpScAdapter<boost::lockfree::spsc_queue<Args...>>;
-    time_throughput<Queue>(name, params, 1, 1); // spsc_queue can only handle 1 producer and 1 consumer.
+ATOMIC_QUEUE_INLINE void time_throughput_mpmc(char const* name, Params const* params, Type<Queue>, unsigned n_thread_min = 1) {
+    unsigned const n_thread_max = params->hw_thread_ids.size() / 2;
+    time_throughput<Queue>(name, params, n_thread_min, n_thread_max);
 }
 
 template<class Queue>
 ATOMIC_QUEUE_INLINE void time_throughput_spsc(char const* name, Params const* params, Type<Queue>) {
-    time_throughput<Queue>(name, params, 1, 1); // Special case for 1 producer and 1 consumer.
+    time_throughput<Queue>(name, params, 1, 1); // 1 producer and 1 consumer only.
 }
 
 ATOMIC_QUEUE_NOINLINE void run_throughput_benchmarks(Params const* params) {

@@ -126,10 +126,15 @@ auto constexpr AR = std::memory_order_acq_rel;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-ATOMIC_QUEUE_INLINE static constexpr int as_signed(unsigned c) noexcept { return c; }
-ATOMIC_QUEUE_INLINE static constexpr int as_signed(int c) noexcept { return c; }
-ATOMIC_QUEUE_INLINE static constexpr unsigned as_unsigned(unsigned c) noexcept { return c; }
-ATOMIC_QUEUE_INLINE static constexpr unsigned as_unsigned(int c) noexcept { return c; }
+ATOMIC_QUEUE_INLINE static constexpr int       as_signed(unsigned c) noexcept { return c; }
+ATOMIC_QUEUE_INLINE static constexpr int       as_signed(int c) noexcept { return c; }
+ATOMIC_QUEUE_INLINE static constexpr long long as_signed(unsigned long long c) noexcept { return c; }
+ATOMIC_QUEUE_INLINE static constexpr long long as_signed(long long c) noexcept { return c; }
+
+ATOMIC_QUEUE_INLINE static constexpr unsigned           as_unsigned(unsigned c) noexcept { return c; }
+ATOMIC_QUEUE_INLINE static constexpr unsigned           as_unsigned(int c) noexcept { return c; }
+ATOMIC_QUEUE_INLINE static constexpr unsigned long long as_unsigned(unsigned long long c) noexcept { return c; }
+ATOMIC_QUEUE_INLINE static constexpr unsigned long long as_unsigned(long long c) noexcept { return c; }
 
 // Do not allow integral promotion, numeric conversions or any other conversions for arguments of as_signed and as_unsigned.
 template<class T> T as_signed(T) noexcept = delete;
