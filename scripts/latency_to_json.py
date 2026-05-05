@@ -5,7 +5,6 @@
 import sys
 import pandas as pd
 import json
-from pprint import pprint
 
 from parse_output import *
 
@@ -16,4 +15,3 @@ for name, data in df.groupby('queue'):
     s = data["sec/round-trip"].describe()
     output[name] = [int(s[f] * 1e9) for f in ['min', 'max', 'mean', 'std']]
 json.dump(output, sys.stdout)
-print()

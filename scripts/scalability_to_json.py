@@ -6,7 +6,6 @@ import sys
 import pandas as pd
 import json
 from collections import defaultdict
-from pprint import pprint
 
 from parse_output import *
 
@@ -19,4 +18,3 @@ for (name, threads), data in df.groupby(['queue', 'threads']):
     threads = int(threads)
     output[name].append([threads, *[int(s[f]) for f in ['min', 'max', 'mean', 'std']]])
 json.dump(output, sys.stdout)
-print()

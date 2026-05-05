@@ -1,5 +1,11 @@
 #!/bin/bash
 
+function raise {
+    local cR="\e[31m" cD="\e[0m"
+    printf "${cR}ERROR in %s:${cD} %s\n" "${FUNCNAME[1]}" "$1" >&2
+    exit 1
+}
+
 function cxx-symbol-to-filename {
     local -n s="$2"
     s=${1//[![:alnum:]_]/-}
@@ -13,6 +19,7 @@ function cxx-symbol-to-filename {
     s=${s/#-}
     s=${s/%-}
 }
+
 
 function disassemble-symbol {(
     set -eu
@@ -35,6 +42,7 @@ function disassemble-symbol {(
     done
 )}
 
+
 function create_system_config_mk {(
     set -eu
     cat <<EOF
@@ -46,6 +54,7 @@ uname_m := $(uname -m)
 use_ld := -fuse-ld=$(type -p lld &> /dev/null && echo -n lld || echo -n bfd)
 EOF
 )}
+
 
 # cd ~/src/atomic_queue; source ./scripts/util.sh; benchmark ryzen_5825u
 # cd ~/src/atomic_queue; source ./scripts/util.sh; N=2 benchmark ryzen_5825u_4
@@ -77,5 +86,24 @@ function benchmark {(
     local -n cpu_lists=$1
     for name in "${!cpu_lists[@]}"; do
         taskset -c "${cpu_lists[$name]}" time ${benchmark_cmd[@]} run_benchmarks_n N=$N TAG=${commit}.${cpu_name}.${name}
+    done
+)}
+
+
+# cd ~/src/atomic_queue; source ./scripts/util.sh; format_benchmark results/bcaff3a.ryzen_5825u.*.33.txt
+# cd ~/src/atomic_queue; source ./scripts/util.sh; format_benchmark results/bcaff3a.ryzen_5950x.*.33.txt
+function format_benchmark {(
+    set -eu
+    local prefix=(cc smt) r m
+    for r in "$@"; do
+        [[ "$r" =~ results/([^.]+)\.([^.]+)\.smt([01])\. ]] || raise "$r"
+        # local commit=${BASH_REMATCH[1]}
+        local cpu_name=${BASH_REMATCH[2]}
+        local -i smt=${BASH_REMATCH[3]}
+        for m in scalability latency; do
+            printf "// %s\n%s_%s_%s: " "$r" ${prefix[$smt]} $m $cpu_name
+            scripts/${m}_to_json.py < "$r"
+            printf ",\n\n"
+        done
     done
 )}
