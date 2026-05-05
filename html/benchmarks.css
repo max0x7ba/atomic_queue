@@ -64,7 +64,7 @@ table.tooltip_scalability {
 }
 
 table.tooltip_scalability tbody {
-    text-indent: 1em;
+    text-indent: .5em;
 }
 
 span.highcharts-caption {
