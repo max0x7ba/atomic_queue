@@ -488,33 +488,6 @@ ATOMIC_QUEUE_NOINLINE void run_throughput_benchmarks(Params const* params) {
         time_throughput_spsc("boost::lockfree::spsc_queue", params,
                              Type<BoostSpScAdapter<boost::lockfree::spsc_queue<unsigned, boost::lockfree::capacity<SIZE>>>>{});
 
-    if(ATOMIC_QUEUE_LIKELY(!params->options.minimal())) {
-        time_throughput_mpmc("boost::lockfree::queue", params,
-                             Type<BoostQueueAdapter<boost::lockfree::queue<unsigned, BoostAllocator, boost::lockfree::capacity<SIZE - 2>>>>{});
-
-        // time_throughput_mpmc("TicketSpinlock", params, Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, TicketSpinlock>>>{});
-        // run_throughput_mpmc_benchmark("UnfairSpinlock", params, Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, UnfairSpinlock>>>{});
-        // run_throughput_mpmc_benchmark<RetryDecorator<AtomicQueueSpinlockHle<unsigned, SIZE>>>("SpinlockHle");
-
-        time_throughput_spsc("moodycamel::ReaderWriterQueue", params, Type<MoodyCamelReaderWriterQueue<unsigned, SIZE>>{});
-        time_throughput_mpmc("moodycamel::ConcurrentQueue", params, Type<MoodyCamelQueue<unsigned, SIZE>>{});
-
-        time_throughput_mpmc("pthread_spinlock", params, Type<RetryDecorator<AtomicQueueSpinlock<unsigned, SIZE>>>{});
-        time_throughput_mpmc("std::mutex", params, Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, std::mutex>>>{});
-        time_throughput_mpmc("tbb::spin_mutex", params, Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, tbb::spin_mutex>>>{});
-        // run_throughput_mpmc_benchmark("adaptive_mutex", params, Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, AdaptiveMutex>>>{});
-        // run_throughput_mpmc_benchmark("tbb::speculative_spin_mutex", params,
-        //                               Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, tbb::speculative_spin_mutex>>>{});
-        time_throughput_mpmc("tbb::concurrent_bounded_queue", params, Type<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, SIZE>>{});
-
-        time_throughput_mpmc("xenium::michael_scott_queue", params,
-            Type<XeniumQueueAdapter<xenium::michael_scott_queue<unsigned, xenium::policy::reclaimer<Reclaimer>>>>{});
-        time_throughput_mpmc("xenium::ramalhete_queue", params,
-            Type<XeniumQueueAdapter<xenium::ramalhete_queue<unsigned, xenium::policy::reclaimer<Reclaimer>>>>{});
-        time_throughput_mpmc("xenium::vyukov_bounded_queue", params,
-            Type<RetryDecorator<CapacityArgAdaptor<xenium::vyukov_bounded_queue<unsigned>, SIZE>>>{});
-    }
-
     using SPSC = QueueTypes<SIZE, true, false, false>;
     using MPMC = QueueTypes<SIZE, false, true, true>; // Enable MAXIMIZE_THROUGHPUT for 2 or more producers/consumers.
 
@@ -560,6 +533,33 @@ ATOMIC_QUEUE_NOINLINE void run_throughput_benchmarks(Params const* params) {
                 time_throughput_spsc("OptimistAtomicQueueB2", params, Type<SPSC::OptimistAtomicQueueB2>{});
             time_throughput_mpmc("OptimistAtomicQueueB2", params, Type<MPMC::OptimistAtomicQueueB2>{}, 2);
         }
+    }
+
+    if(ATOMIC_QUEUE_LIKELY(!params->options.minimal())) {
+        time_throughput_spsc("moodycamel::ReaderWriterQueue", params, Type<MoodyCamelReaderWriterQueue<unsigned, SIZE>>{});
+        time_throughput_mpmc("moodycamel::ConcurrentQueue", params, Type<MoodyCamelQueue<unsigned, SIZE>>{});
+
+        time_throughput_mpmc("tbb::concurrent_bounded_queue", params, Type<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, SIZE>>{});
+
+        time_throughput_mpmc("xenium::michael_scott_queue", params,
+            Type<XeniumQueueAdapter<xenium::michael_scott_queue<unsigned, xenium::policy::reclaimer<Reclaimer>>>>{});
+        time_throughput_mpmc("xenium::ramalhete_queue", params,
+            Type<XeniumQueueAdapter<xenium::ramalhete_queue<unsigned, xenium::policy::reclaimer<Reclaimer>>>>{});
+        time_throughput_mpmc("xenium::vyukov_bounded_queue", params,
+            Type<RetryDecorator<CapacityArgAdaptor<xenium::vyukov_bounded_queue<unsigned>, SIZE>>>{});
+
+        time_throughput_mpmc("boost::lockfree::queue", params,
+                             Type<BoostQueueAdapter<boost::lockfree::queue<unsigned, BoostAllocator, boost::lockfree::capacity<SIZE - 2>>>>{});
+
+        time_throughput_mpmc("pthread_spinlock", params, Type<RetryDecorator<AtomicQueueSpinlock<unsigned, SIZE>>>{});
+        time_throughput_mpmc("std::mutex", params, Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, std::mutex>>>{});
+        time_throughput_mpmc("tbb::spin_mutex", params, Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, tbb::spin_mutex>>>{});
+        // time_throughput_mpmc("TicketSpinlock", params, Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, TicketSpinlock>>>{});
+        // run_throughput_mpmc_benchmark("UnfairSpinlock", params, Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, UnfairSpinlock>>>{});
+        // run_throughput_mpmc_benchmark<RetryDecorator<AtomicQueueSpinlockHle<unsigned, SIZE>>>("SpinlockHle");
+        // run_throughput_mpmc_benchmark("adaptive_mutex", params, Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, AdaptiveMutex>>>{});
+        // run_throughput_mpmc_benchmark("tbb::speculative_spin_mutex", params,
+        //                               Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, tbb::speculative_spin_mutex>>>{});
     }
 
     std::puts("\n");
@@ -683,29 +683,6 @@ void run_ping_pong_benchmarks(Params const* params) {
     time_ping_pong<BoostSpScAdapter<boost::lockfree::spsc_queue<unsigned, boost::lockfree::capacity<SIZE>>>>(
         "boost::lockfree::spsc_queue", params);
 
-    if(ATOMIC_QUEUE_LIKELY(!params->options.minimal())) {
-        time_ping_pong<BoostQueueAdapter<boost::lockfree::queue<unsigned, BoostAllocator, boost::lockfree::capacity<SIZE>>>>(
-            "boost::lockfree::queue", params);
-
-        // time_ping_pong<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, TicketSpinlock>>>("TicketSpinlock", hp, hw_thread_ids);
-        // run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, UnfairSpinlock>>>("UnfairSpinlock", hp, hw_thread_ids);
-        // run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinlockHle<unsigned, SIZE>>>("SpinlockHle");
-
-        time_ping_pong<MoodyCamelReaderWriterQueue<unsigned, SIZE>>("moodycamel::ReaderWriterQueue", params);
-        time_ping_pong<MoodyCamelQueue<unsigned, SIZE>>("moodycamel::ConcurrentQueue", params);
-
-        time_ping_pong<RetryDecorator<AtomicQueueSpinlock<unsigned, SIZE>>>("pthread_spinlock", params);
-        time_ping_pong<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, std::mutex>>>("std::mutex", params);
-        time_ping_pong<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, tbb::spin_mutex>>>("tbb::spin_mutex", params);
-        // run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, AdaptiveMutex>>>("adaptive_mutex", params);
-        // run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, tbb::speculative_spin_mutex>>>("tbb::speculative_spin_mutex", params);
-        time_ping_pong<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, SIZE>>("tbb::concurrent_bounded_queue", params);
-
-        time_ping_pong<XeniumQueueAdapter<xenium::michael_scott_queue<unsigned, xenium::policy::reclaimer<Reclaimer>>>>("xenium::michael_scott_queue", params);
-        time_ping_pong<XeniumQueueAdapter<xenium::ramalhete_queue<unsigned, xenium::policy::reclaimer<Reclaimer>>>>("xenium::ramalhete_queue", params);
-        time_ping_pong<RetryDecorator<CapacityArgAdaptor<xenium::vyukov_bounded_queue<unsigned>, SIZE>>>("xenium::vyukov_bounded_queue", params);
-    }
-
     // Use MAXIMIZE_THROUGHPUT=false for better latency.
     using SPSC = QueueTypes<SIZE, true, false, false>;
 
@@ -731,6 +708,29 @@ void run_ping_pong_benchmarks(Params const* params) {
             time_ping_pong<SPSC::AtomicQueueB2>("AtomicQueueB2", params);
             time_ping_pong<SPSC::OptimistAtomicQueueB2>("OptimistAtomicQueueB2", params);
         }
+    }
+
+    if(ATOMIC_QUEUE_LIKELY(!params->options.minimal())) {
+        time_ping_pong<MoodyCamelReaderWriterQueue<unsigned, SIZE>>("moodycamel::ReaderWriterQueue", params);
+        time_ping_pong<MoodyCamelQueue<unsigned, SIZE>>("moodycamel::ConcurrentQueue", params);
+
+        time_ping_pong<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, SIZE>>("tbb::concurrent_bounded_queue", params);
+
+        time_ping_pong<XeniumQueueAdapter<xenium::michael_scott_queue<unsigned, xenium::policy::reclaimer<Reclaimer>>>>("xenium::michael_scott_queue", params);
+        time_ping_pong<XeniumQueueAdapter<xenium::ramalhete_queue<unsigned, xenium::policy::reclaimer<Reclaimer>>>>("xenium::ramalhete_queue", params);
+        time_ping_pong<RetryDecorator<CapacityArgAdaptor<xenium::vyukov_bounded_queue<unsigned>, SIZE>>>("xenium::vyukov_bounded_queue", params);
+
+        time_ping_pong<BoostQueueAdapter<boost::lockfree::queue<unsigned, BoostAllocator, boost::lockfree::capacity<SIZE>>>>(
+            "boost::lockfree::queue", params);
+
+        time_ping_pong<RetryDecorator<AtomicQueueSpinlock<unsigned, SIZE>>>("pthread_spinlock", params);
+        time_ping_pong<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, std::mutex>>>("std::mutex", params);
+        time_ping_pong<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, tbb::spin_mutex>>>("tbb::spin_mutex", params);
+        // run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, AdaptiveMutex>>>("adaptive_mutex", params);
+        // run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, tbb::speculative_spin_mutex>>>("tbb::speculative_spin_mutex", params);
+        // time_ping_pong<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, TicketSpinlock>>>("TicketSpinlock", hp, hw_thread_ids);
+        // run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, UnfairSpinlock>>>("UnfairSpinlock", hp, hw_thread_ids);
+        // run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinlockHle<unsigned, SIZE>>>("SpinlockHle");
     }
 
     std::puts("\n");
@@ -761,10 +761,11 @@ int main() {
     HugePages hp(HugePages::PAGE_1GB, 32 * MB); // Try allocating a 1GB huge page to minimize TLB misses.
     HugePages::instance = &hp;
 
-    if(!params.options.no_throughput())
-        run_throughput_benchmarks(&params);
     if(!params.options.no_ping_pong())
         run_ping_pong_benchmarks(&params);
+
+    if(!params.options.no_throughput())
+        run_throughput_benchmarks(&params);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
