@@ -321,9 +321,19 @@ struct SharedState2 : SharedState {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<class Queue>
-ATOMIC_QUEUE_NOINLINE void throughput_producer(SharedState* ctx, ThreadState* thread) {
-    Queue* const queue = static_cast<Queue*>(ctx->queue0);
+ATOMIC_QUEUE_NOINLINE void throughput_producer(SharedState* ctx0, ThreadState* thread0) {
+#if ATOMIC_QUEUE_FULL_THROTTLE
+    // Vacate the most desirable i386 registers with the shortest instruction encoding for more frequently accessed objects.
+    // Move these rarely accessed objects into callee-saved [r12,15] registers, which often require 1-byte longer instruction encoding
+    register auto* ctx asm("r14") = ctx0;
+    register auto* thread asm("r15") = thread0;
+    asm("": "+r"(ctx), "+r"(thread));
+#else
+    auto* ctx = ctx0;
+    auto* thread = thread0;
+#endif
 
+    Queue* const queue = static_cast<Queue*>(ctx->queue0);
     [[maybe_unused]] region_guard_t<Queue> guard;
     ProducerOf<Queue> producer{*queue};
     unsigned n = ctx->n_msg;
@@ -345,16 +355,23 @@ ATOMIC_QUEUE_NOINLINE void throughput_producer(SharedState* ctx, ThreadState* th
 }
 
 template<class Queue>
-ATOMIC_QUEUE_NOINLINE void throughput_consumer(SharedState* ctx, ThreadState* thread) {
-    Queue* const queue = static_cast<Queue*>(ctx->queue0);
-
-    [[maybe_unused]] region_guard_t<Queue> guard;
-    ConsumerOf<Queue> consumer{*queue};
+ATOMIC_QUEUE_NOINLINE void throughput_consumer(SharedState* ctx0, ThreadState* thread0) {
 #if ATOMIC_QUEUE_FULL_THROTTLE
-    register sum_t sum asm("r11") = 1; // Allocate undesirable r11 for the sum. To avoid allocating r11 for more frequently accessed values.
+    // Vacate the most desirable i386 registers with the shortest instruction encoding for more frequently accessed objects.
+    // Move these rarely accessed objects into callee-saved [r12,15] registers, which often require 1-byte longer instruction encoding
+    register sum_t sum asm("r13") = 1; // Allocate the most undesirable r13 for the sum, to avoid allocating r13 for anything else.
+    register auto* ctx asm("r14") = ctx0;
+    register auto* thread asm("r15") = thread0;
+    asm("": "+r"(sum), "+r"(ctx), "+r"(thread));
 #else
     sum_t sum = 1; // Set sums are +1 biased.
+    auto* ctx = ctx0;
+    auto* thread = thread0;
 #endif
+
+    Queue* const queue = static_cast<Queue*>(ctx->queue0);
+    [[maybe_unused]] region_guard_t<Queue> guard;
+    ConsumerOf<Queue> consumer{*queue};
     unsigned n;
 
     ctx->barrier.countdown();
@@ -368,7 +385,7 @@ ATOMIC_QUEUE_NOINLINE void throughput_consumer(SharedState* ctx, ThreadState* th
         sum += n; // Includes stop value.
     } while(n != 1);
 
-    thread->sum = sum;
+    thread->sum = sum; // std::memory_order_seq_cst
     thread->times.set(1); // std::memory_order_seq_cst
 }
 
@@ -551,7 +568,18 @@ ATOMIC_QUEUE_NOINLINE void run_throughput_benchmarks(Params const* params) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<class Queue>
-ATOMIC_QUEUE_NOINLINE void ping_pong_receiver(SharedState* ctx, ThreadState* thread) {
+ATOMIC_QUEUE_NOINLINE void ping_pong_receiver(SharedState* ctx0, ThreadState* thread0) {
+#if ATOMIC_QUEUE_FULL_THROTTLE
+    // Vacate the most desirable i386 registers with the shortest instruction encoding for more frequently accessed objects.
+    // Move these rarely accessed objects into callee-saved [r12,15] registers, which often require 1-byte longer instruction encoding
+    register auto* ctx asm("r14") = ctx0;
+    register auto* thread asm("r15") = thread0;
+    asm("":"+r"(ctx), "+r"(thread));
+#else
+    auto* ctx = ctx0;
+    auto* thread = thread0;
+#endif
+
     // C++ strict-aliasing rules assume that q1 and q2 may alias. Specify explicitly these pointers never alias.
     Queue* ATOMIC_QUEUE_RESTRICT q1 = static_cast<Queue*>(ctx->queue0);
     Queue* ATOMIC_QUEUE_RESTRICT q2 = static_cast<Queue*>(ctx->queue1);
@@ -573,7 +601,18 @@ ATOMIC_QUEUE_NOINLINE void ping_pong_receiver(SharedState* ctx, ThreadState* thr
 }
 
 template<class Queue>
-ATOMIC_QUEUE_NOINLINE void ping_pong_sender(SharedState* ctx, ThreadState* thread) {
+ATOMIC_QUEUE_NOINLINE void ping_pong_sender(SharedState* ctx0, ThreadState* thread0) {
+#if ATOMIC_QUEUE_FULL_THROTTLE
+    // Vacate the most desirable i386 registers with the shortest instruction encoding for more frequently accessed objects.
+    // Move these rarely accessed objects into callee-saved [r12,15] registers, which often require 1-byte longer instruction encoding
+    register auto* ctx asm("r14") = ctx0;
+    register auto* thread asm("r15") = thread0;
+    asm("":"+r"(ctx), "+r"(thread));
+#else
+    auto* ctx = ctx0;
+    auto* thread = thread0;
+#endif
+
     // C++ strict-aliasing rules assume that q1 and q2 may alias. Specify explicitly these pointers never alias.
     Queue* ATOMIC_QUEUE_RESTRICT q1 = static_cast<Queue*>(ctx->queue0);
     Queue* ATOMIC_QUEUE_RESTRICT q2 = static_cast<Queue*>(ctx->queue1);
