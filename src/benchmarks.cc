@@ -74,7 +74,7 @@ struct Params {
     std::vector<unsigned> hw_thread_ids;
 
     void operator+=(std::vector<unsigned>&& a) noexcept {
-        hw_thread_ids = move(a);
+        hw_thread_ids = std::move(a);
         unsigned n_producers_max = hw_thread_ids.size() / 2;
         n_msg += as_unsigned(n_msg) % n_producers_max; // Adjust n_msg up to a multiple of n_producers_max.
     }
