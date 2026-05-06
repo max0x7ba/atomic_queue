@@ -224,7 +224,7 @@ struct Times {
     std::atomic<cycles_t> t[2] = {};
 
     ATOMIC_QUEUE_INLINE void set(unsigned i) noexcept {
-        t[i] = cycles(); // std::memory_order_seq_cst
+        t[i].store(cycles(), X);
     }
 
     ATOMIC_QUEUE_INLINE cycles_t get(unsigned i) const noexcept {
@@ -343,7 +343,7 @@ ATOMIC_QUEUE_NOINLINE void throughput_producer(SharedState* ctx0, ThreadState* t
     unsigned n = ctx->n_msg;
 
     ctx->barrier.countdown();
-    thread->times.set(0); // std::memory_order_seq_cst
+    thread->times.set(0);
 
     do {
         producer.push(*queue, n);
@@ -355,7 +355,7 @@ ATOMIC_QUEUE_NOINLINE void throughput_producer(SharedState* ctx0, ThreadState* t
 #endif
     } while(ATOMIC_QUEUE_LIKELY(--n));
 
-    thread->times.set(1); // std::memory_order_seq_cst
+    thread->times.set(1);
 }
 
 template<class Queue>
@@ -379,7 +379,7 @@ ATOMIC_QUEUE_NOINLINE void throughput_consumer(SharedState* ctx0, ThreadState* t
     unsigned n;
 
     ctx->barrier.countdown();
-    thread->times.set(0); // std::memory_order_seq_cst
+    thread->times.set(0);
 
     do {
         n = consumer.pop(*queue);
@@ -389,8 +389,8 @@ ATOMIC_QUEUE_NOINLINE void throughput_consumer(SharedState* ctx0, ThreadState* t
         sum += n; // Includes stop value.
     } while(ATOMIC_QUEUE_LIKELY(n != 1));
 
-    thread->sum = sum; // Set sums are +1 biased.
-    thread->times.set(1); // std::memory_order_seq_cst
+    thread->sum.store(sum, X); // Set sums are +1 biased.
+    thread->times.set(1);
 }
 
 template<class Queue>
@@ -587,7 +587,7 @@ ATOMIC_QUEUE_NOINLINE void ping_pong_receiver(SharedState* ctx0, ThreadState* th
     ProducerOf<Queue> producer_q2{*q2};
 
     ctx->barrier.countdown();
-    thread->times.set(0); // std::memory_order_seq_cst
+    thread->times.set(0);
 
     unsigned n;
     do {
@@ -595,7 +595,7 @@ ATOMIC_QUEUE_NOINLINE void ping_pong_receiver(SharedState* ctx0, ThreadState* th
         producer_q2.push(*q2, n);
     } while(ATOMIC_QUEUE_LIKELY(n > 1));
 
-    thread->times.set(1); // std::memory_order_seq_cst
+    thread->times.set(1);
 }
 
 template<class Queue>
@@ -621,14 +621,14 @@ ATOMIC_QUEUE_NOINLINE void ping_pong_sender(SharedState* ctx0, ThreadState* thre
     unsigned n = ctx->n_msg;
 
     ctx->barrier.countdown();
-    thread->times.set(0); // std::memory_order_seq_cst
+    thread->times.set(0);
 
     do {
         producer_q1.push(*q1, n);
         n = consumer_q2.pop(*q2);
     } while(ATOMIC_QUEUE_LIKELY(n-- > 1));
 
-    thread->times.set(1); // std::memory_order_seq_cst
+    thread->times.set(1);
 }
 
 template<class Queue>
