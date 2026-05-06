@@ -64,13 +64,13 @@ struct RetryDecorator : Queue {
     using Queue::Queue;
 
     ATOMIC_QUEUE_INLINE void push(T element) noexcept {
-        while(!this->try_push(element))
+        while(ATOMIC_QUEUE_UNLIKELY(!this->try_push(element)))
             spin_loop_pause();
     }
 
     ATOMIC_QUEUE_INLINE T pop() noexcept {
         T element;
-        while(!this->try_pop(element))
+        while(ATOMIC_QUEUE_UNLIKELY(!this->try_pop(element)))
             spin_loop_pause();
         return element;
     }
