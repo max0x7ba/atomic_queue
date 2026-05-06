@@ -103,11 +103,11 @@ ATOMIC_QUEUE_SINLINE void spin_loop_pause() noexcept {
      defined(__ARM_ARCH_7S__) || \
      defined(__ARM_ARCH_8A__) || \
      defined(__aarch64__))
-    __asm__("yield" ::: "memory");
+    __asm__("yield");
 #elif defined(_M_ARM64)
     __yield();
 #else
-    __asm__("nop" ::: "memory");
+    __asm__("nop");
 #endif
 }
 
