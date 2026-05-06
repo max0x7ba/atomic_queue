@@ -90,8 +90,8 @@ function benchmark {(
 )}
 
 
-# cd ~/src/atomic_queue; source ./scripts/util.sh; format_benchmark results/bcaff3a.ryzen_5825u.*.33.txt
-# cd ~/src/atomic_queue; source ./scripts/util.sh; format_benchmark results/bcaff3a.ryzen_5950x.*.33.txt
+# cd ~/src/atomic_queue; source ./scripts/util.sh; format_benchmark results/1a3774a.ryzen_5825u.*.33.txt
+# cd ~/src/atomic_queue; source ./scripts/util.sh; format_benchmark results/1a3774a.ryzen_5950x.*.33.txt
 function format_benchmark {(
     set -eu
     local prefix=(cc smt) r m

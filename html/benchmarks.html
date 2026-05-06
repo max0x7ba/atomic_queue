@@ -19,7 +19,7 @@
   <body>
     <h1 class="view-toggle">Scalability Benchmark</h1>
     <div>
-      <p>N producer threads push a 4-byte integer into one same queue, N consumer threads pop the integers from the queue. Each producer posts 1,000,000 messages. Total time taken to send and receive all these messages is measured. With SMT threads, the benchmark is run for from 1 producer and 1 consumer up to (total-number-of-cpus / 2) producers/consumers to measure the scalability of different queues. Without using SMT threads (cross-core communication only) -- up to (total-number-of-cpus / 4) producers/consumers. A benchmark run reports the best msg/sec throughput out of 10 tries for each queue. The charts report mean, stdev, min and max of msg/sec throughput across 33 benchmark runs.</p>
+      <p>N producer threads push a 4-byte integer into one same queue, N consumer threads pop the integers from the queue. Time taken to send and receive a total of 1,000,000 messages through one queue is measured. With SMT threads, the benchmark is run for from 1 producer and 1 consumer up to (total-number-of-cpus / 2) producers/consumers to measure the scalability of different queues. Without using SMT threads (cross-core communication only) -- up to (total-number-of-cpus / 4) producers/consumers. A benchmark run reports the best msg/sec throughput out of 3 tries for each queue. The charts report mean, stdev, min and max of msg/sec throughput across 33 benchmark runs.</p>
 
       <h3 class="view-toggle">Scalability (with SMT) on AMD Ryzen 7 5825U</h3><div><div class="chart" id="smt_scalability_ryzen_5825u" data-ylim="60e6;1e9"></div></div>
       <h3 class="view-toggle">Cross-core (no SMT) scalability on AMD Ryzen 7 5825U</h3><div><div class="chart" id="cc_scalability_ryzen_5825u" data-ylim="60e6;1e9"></div></div>
@@ -35,7 +35,7 @@
 
     <h1 class="view-toggle">Latency Benchmark</h1>
     <div>
-      <p>One thread posts an integer to another thread through one queue and waits for a reply from another queue, 2 queues and 2 threads, in total. A _ping_ is an incoming message, a _pong_ is a reply to that. Only one ping or pong message exists or is being in-flight, at all times. In total, each thread pushes 500,000 _pings_ into its ingress queue, and pops 500,000 pongs from its ingress queue. Contention is minimal here (1-producer-1-consumer, 1 element in the queue) in order to be able to achieve the lowest possible latency a queue can provide. This benchmark measures the total time taken to post 500,000 messages and receive 500,000 replies. A benchmark run reports the best sec/round-trip latency (time taken to push a message and pop its reply) out of 10 tries for each queue. The charts report mean, stdev, min and max of sec/round-trip latency across 33 benchmark runs.</p>
+      <p>One thread posts an integer to another thread through one queue and waits for a reply from another queue, 2 queues and 2 threads, in total. A _ping_ is an incoming message, a _pong_ is a reply to that. Only one ping or pong message exists or is being in-flight, at all times. In total, each thread pushes 500,000 _pings_ into its ingress queue, and pops 500,000 pongs from its ingress queue. Contention is minimal here (1-producer-1-consumer, 1 element in the queue) in order to be able to achieve the lowest possible latency a queue can provide. This benchmark measures the total time taken to post 500,000 messages and receive 500,000 replies. A benchmark run reports the best sec/round-trip latency (time taken to push a message and pop its reply) out of 3 tries for each queue. The charts report mean, stdev, min and max of sec/round-trip latency across 33 benchmark runs.</p>
 
       <h3 class="view-toggle">Latency (with SMT) on AMD Ryzen 7 5825U</h3><div><div class="chart" id="smt_latency_ryzen_5825u"></div></div>
       <h3 class="view-toggle">Cross-core (no SMT) latency on AMD Ryzen 7 5825U</h3><div><div class="chart" id="cc_latency_ryzen_5825u"></div></div>
@@ -55,7 +55,7 @@
         <ul>
           <li>OS: KDE Neon / Ubuntu 24.04 LTS, kernel 6.8.0-110-lowlatency (mitigations=off norandmaps noautogroup transparent_hugepage=always)
           <li>Compiler: gcc-14.2.0
-          <li>atomic_queue version: commit e1aa92c3d4cebea3b8cd3e46608b0bc954860688
+          <li>atomic_queue version: commit 1a3774a89c86ecfdf08753dbd41018ace5a833a4
           <li>Boost version: 1.83.0
           <li>TBB version: 2021.11.0-2ubuntu2
           <li>moodycamel concurrentqueue version: commit dea078cf5b6e742cd67a0d725e36f872feca4de4
@@ -66,7 +66,7 @@
         <ul>
           <li>OS: KDE Neon / Ubuntu 24.04 LTS, kernel 6.8.0-1051-nvidia-lowlatency (mitigations=off norandmaps noautogroup transparent_hugepage=always)
           <li>Compiler: gcc-14.2.0
-          <li>atomic_queue version: commit e1aa92c3d4cebea3b8cd3e46608b0bc954860688
+          <li>atomic_queue version: commit 1a3774a89c86ecfdf08753dbd41018ace5a833a4
           <li>Boost version: 1.83.0
           <li>TBB version: 2021.11.0-2ubuntu2
           <li>moodycamel concurrentqueue version: commit dea078cf5b6e742cd67a0d725e36f872feca4de4

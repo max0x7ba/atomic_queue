@@ -115,13 +115,6 @@ GNU Make `Makefile` is the original/reference build system this project has been
 
 `CMake` and `Meson` build systems provide the greatest portability and easy usage/consumption of the library, build and run the unit-tests on their supported platforms. They provide the best library user experience, as opposed to best library developer experience.
 
-Some most desirable developer features in GNU Make not found elsewhere:
-
-* Ultimate totalitarian control of compilers, tools and their options with no friction or indirection. Having to invoke CMake or Meson is undesirable extra friction.
-* Unconditionally robust builds, which never require invoking `make clean`. That's possible only when tracking complete actual compiler and linker options, which this `Makefile` does at 0-cost.
-* Fast parallel builds and unit-test runs, unmatched by anything else, for rapid R&D cycles.
-* Fast _**multi-toolset parallel builds**_ and unit-test runs, with no idling CPUs at all times, for fastest possible exhaustive pre-deployment tests. That's impossible for/with build file generators, for `ninja` in principle, and/or anything else.
-
 GNU Make command line options with the greatest impact on built time:
 
 * `-j` sets the number of worker processes to build with in parallel. `-j$(($(nproc)/2))` sets it to half the number of available CPUs.
@@ -320,11 +313,11 @@ echo -1 | sudo tee /proc/sys/kernel/sched_rt_runtime_us >/dev/null
 ```
 
 ### Throughput and scalability benchmark
-N producer threads push a 4-byte integer into one same queue, N consumer threads pop the integers from the queue. Each producer posts 1,000,000 messages. Total time taken to send and receive all these messages is measured.
+N producer threads push a 4-byte integer into one same queue, N consumer threads pop the integers from the queue. Time taken to send and receive a total of 1,000,000 messages through one queue is measured.
 
 With SMT threads, the benchmark is run for from 1 producer and 1 consumer up to `(total-number-of-cpus / 2)` producers/consumers to measure the scalability of different queues. Without using SMT threads (cross-core communication only) -- up to `(total-number-of-cpus / 4)` producers/consumers.
 
-A benchmark run reports the best msg/sec throughput out of 10 tries for each queue.
+A benchmark run reports the best msg/sec throughput out of 3 tries for each queue.
 
 The charts report mean, stdev, min and max of msg/sec throughput across 33 benchmark runs.
 
@@ -335,7 +328,7 @@ Contention is minimal here (1-producer-1-consumer, 1 element in the queue) in or
 
 This benchmark measures the total time taken to post 500,000 messages and receive 500,000 replies.
 
-A benchmark run reports the best sec/round-trip latency (time taken to `push` a message and `pop` its reply) out of 10 tries for each queue.
+A benchmark run reports the best sec/round-trip latency (time taken to `push` a message and `pop` its reply) out of 3 tries for each queue.
 
 The charts report mean, stdev, min and max of sec/round-trip latency across 33 benchmark runs.
 
@@ -349,13 +342,9 @@ When the threads run on **different cores**, latency increases by **3× or more*
 - **Recommendation**: Always benchmark your specific thread placement (same core vs. different cores vs. different CCX) for latency-critical or throughput-critical applications.
 
 ### Notable exceptions
-`moodycamel::ConcurrentQueue` is the notable exception here, with its 1-producer-1-consumer throughput being the worst, yet scaling up in almost perfect linear fashion when the benchmark adds another pair of producer-consumer threads. Such impressive scaling, unmatched by anything else, feels too good to be true.
+`moodycamel::ConcurrentQueue` is the notable exception here, with its 1-producer-1-consumer throughput being the worst, yet scaling up in almost perfect linear fashion when the benchmark adds another pair of producer-consumer threads. It tries to emulate a MPMC queue with a bunch of SPSC queues under the hood.
 
-Thinking more reminds of [Amdahl's law][21]: perfectly linear scaling is possible only when adding another producer-consumer-thread-pair does not increase contention on the queue object. This realization makes `moodycamel::ConcurrentQueue` architecture immediately obvious, without having to examine its source code -- `moodycamel::ConcurrentQueue` tries to emulate a multiple-producer-multiple-consumer queue with a bunch of single-producer-single-consumer queues, where different threads `push` into different internal SPSC queues, different threads `pop` from different internal SPSC queues. That makes it unable to `pop` elements in the same _global time order_ matching that of _global time order_ of `push` calls, unlike true MPMC queues.
-
-While `moodycamel::ConcurrentQueue` could still, technically, be called an MPMC queue, in practice, it is not a feasible/fungible/compatible drop-in replacement for any other (true) MPMC queue benchmarked here. Whereas all the other MPMC queues are perfectly fungible compatible drop-in replacements for another, including pseudo-MPMC `moodycamel::ConcurrentQueue` too.
-
-`moodycamel::ConcurrentQueue` probably aspired to combine the _global time order_ feature of MPMC queues with the _low-latency_ feature of SPSC queues. But ended up gaming MPMC throughput benchmarks while delivering neither the _global time order_ nor the _low-latency_. Thusly epitomizing ["_When a measure becomes a target, it ceases to be a good measure_"][20] better than anything else.
+`moodycamel::ConcurrentQueue` is not a feasible/fungible/compatible drop-in replacement for any other (true) MPMC queues benchmarked here. Whereas all the other MPMC queues are perfectly fungible compatible drop-in replacements for another, including `moodycamel::ConcurrentQueue` too.
 
 ## Reading material
 Some books on the subject of multi-threaded programming I found quite instructive:
