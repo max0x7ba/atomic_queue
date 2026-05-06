@@ -75,8 +75,8 @@ struct Params {
 
     void operator+=(std::vector<unsigned>&& a) noexcept {
         hw_thread_ids = std::move(a);
-        unsigned n_producers_max = hw_thread_ids.size() / 2;
-        n_msg += as_unsigned(n_msg) % n_producers_max; // Adjust n_msg up to a multiple of n_producers_max.
+        // unsigned n_producers_max = hw_thread_ids.size() / 2;
+        // n_msg += as_unsigned(n_msg) % n_producers_max; // Adjust n_msg up to a multiple of n_producers_max.
     }
 };
 
@@ -207,21 +207,21 @@ using BoostAllocator = boost::lockfree::allocator<Allocator>;
 // * For SPSC: SPSC=true,  MINIMIZE_CONTENTION=false, MAXIMIZE_THROUGHPUT=false.
 // * For MPMC: SPSC=false, MINIMIZE_CONTENTION=true,  MAXIMIZE_THROUGHPUT=true.
 // However, I am not sure that conflating these 3 parameters into 1 would be the right thing for every scenario.
-template<unsigned SIZE, bool SPSC, bool MINIMIZE_CONTENTION, bool MAXIMIZE_THROUGHPUT>
+template<unsigned C, bool SPSC, bool MINIMIZE_CONTENTION, bool MAXIMIZE_THROUGHPUT>
 struct QueueTypes {
     using T = unsigned;
 
     // For atomic elements only.
-    using AtomicQueue =                            RetryDecorator<A::AtomicQueue<T, SIZE, T{}, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, false, SPSC>>;
-    using OptimistAtomicQueue =                                   A::AtomicQueue<T, SIZE, T{}, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, false, SPSC>;
-    using AtomicQueueB =        RetryDecorator<CapacityArgAdaptor<A::AtomicQueueB<T, Allocator, T{}, MAXIMIZE_THROUGHPUT, false, SPSC>, SIZE>>;
-    using OptimistAtomicQueueB =               CapacityArgAdaptor<A::AtomicQueueB<T, Allocator, T{}, MAXIMIZE_THROUGHPUT, false, SPSC>, SIZE>;
+    using AtomicQueue =                            RetryDecorator<A::AtomicQueue<T, C, T{}, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, false, SPSC>>;
+    using OptimistAtomicQueue =                                   A::AtomicQueue<T, C, T{}, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, false, SPSC>;
+    using AtomicQueueB =        RetryDecorator<CapacityArgAdaptor<A::AtomicQueueB<T, Allocator, T{}, MAXIMIZE_THROUGHPUT, false, SPSC>, C>>;
+    using OptimistAtomicQueueB =               CapacityArgAdaptor<A::AtomicQueueB<T, Allocator, T{}, MAXIMIZE_THROUGHPUT, false, SPSC>, C>;
 
     // For non-atomic elements.
-    using AtomicQueue2 =                     RetryDecorator<A::AtomicQueue2<T, SIZE, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, false, SPSC>>;
-    using OptimistAtomicQueue2 =                            A::AtomicQueue2<T, SIZE, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, false, SPSC>;
-    using AtomicQueueB2 = RetryDecorator<CapacityArgAdaptor<A::AtomicQueueB2<T, Allocator, MAXIMIZE_THROUGHPUT, false, SPSC>, SIZE>>;
-    using OptimistAtomicQueueB2 =        CapacityArgAdaptor<A::AtomicQueueB2<T, Allocator, MAXIMIZE_THROUGHPUT, false, SPSC>, SIZE>;
+    using AtomicQueue2 =                     RetryDecorator<A::AtomicQueue2<T, C, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, false, SPSC>>;
+    using OptimistAtomicQueue2 =                            A::AtomicQueue2<T, C, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, false, SPSC>;
+    using AtomicQueueB2 = RetryDecorator<CapacityArgAdaptor<A::AtomicQueueB2<T, Allocator, MAXIMIZE_THROUGHPUT, false, SPSC>, C>>;
+    using OptimistAtomicQueueB2 =        CapacityArgAdaptor<A::AtomicQueueB2<T, Allocator, MAXIMIZE_THROUGHPUT, false, SPSC>, C>;
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -254,8 +254,8 @@ using ThreadStates = std::vector<ThreadState, HugePageAllocator<ThreadState>>;
 struct SharedState {
     // These remain constant.
     alignas(CACHE_LINE_SIZE)
-    unsigned const n_msg;
-    unsigned const n_threads;
+    unsigned const n_producer_msg;
+    unsigned n_threads = 0;
 
     void* queue0 = 0;
     void* queue1 = 0;
@@ -263,37 +263,34 @@ struct SharedState {
     ThreadState* const threads;
     unsigned const* ATOMIC_QUEUE_RESTRICT hw_thread_ids;
 
-    unsigned thread_idx = 0;
-
     // These are modified at the start.
     alignas(CACHE_LINE_SIZE)
     Barrier2 barrier;
 
-    ATOMIC_QUEUE_INLINE SharedState(Params const* params, unsigned thread_count, ThreadState* consumer_sums) noexcept
-        : n_msg(params->n_msg)
-        , n_threads(thread_count)
+    ATOMIC_QUEUE_INLINE SharedState(Params const* params, int n_threads, ThreadState* consumer_sums) noexcept
+        : n_producer_msg((params->n_msg + (n_threads - 1)) / n_threads)
         , threads(consumer_sums)
         , hw_thread_ids{params->hw_thread_ids.data()}
-        , barrier{thread_count * 2}
+        , barrier{n_threads * 2}
     {
         assert(is_suitably_aligned(this));
     }
 
     ATOMIC_QUEUE_INLINE auto as_thread_range() const noexcept {
-        return as_range(threads, n_threads * 2);
+        return as_range(threads, n_threads);
     }
 
     ATOMIC_QUEUE_NOINLINE auto* use_this_thread() noexcept {
-        set_thread_affinity(hw_thread_ids[thread_idx]); // Use this thread#0 for the first producer. Pin to the same CPU.
-        return threads + thread_idx++;
+        set_thread_affinity(hw_thread_ids[n_threads]); // Use this thread#0 for the first producer. Pin to the same CPU.
+        return threads + n_threads++;
     }
 
     template<class... Args>
     ATOMIC_QUEUE_NOINLINE void create_thread(Args... args) {
-        set_default_thread_affinity(hw_thread_ids[thread_idx]);
-        auto& thr = threads[thread_idx];
+        set_default_thread_affinity(hw_thread_ids[n_threads]);
+        auto& thr = threads[n_threads];
         thr.thread = std::thread(args..., this, &thr);
-        ++thread_idx;
+        ++n_threads;
     }
 
     ATOMIC_QUEUE_NOINLINE void join() {
@@ -322,7 +319,7 @@ struct SharedState2 : SharedState {
 
     template<class... Args>
     constexpr ATOMIC_QUEUE_INLINE SharedState2(Params const* params, unsigned const (&cpus)[2])
-        : SharedState{params, 1u, threads2}
+        : SharedState{params, 1, threads2}
     {
         this->hw_thread_ids = cpus;
     }
@@ -346,7 +343,7 @@ ATOMIC_QUEUE_NOINLINE void throughput_producer(SharedState* ctx0, ThreadState* t
     Queue* const queue = static_cast<Queue*>(ctx->queue0);
     [[maybe_unused]] region_guard_t<Queue> guard;
     ProducerOf<Queue> producer{*queue};
-    unsigned n = ctx->n_msg;
+    unsigned n = ctx->n_producer_msg;
 
     ctx->barrier.countdown();
     thread->times.set(0);
@@ -400,23 +397,23 @@ ATOMIC_QUEUE_NOINLINE void throughput_consumer(SharedState* ctx0, ThreadState* t
 }
 
 template<class Queue>
-ATOMIC_QUEUE_INLINE cycles_t time_throughput_once(Params const* params, unsigned thread_count, bool alternative_placement, ThreadState* consumer_sums) {
-    auto ctx = HugePages::instance->create_unique_ptr<SharedState>(params, thread_count, consumer_sums);
-    auto queue = HugePages::instance->create_unique_ptr<Queue>(ContextOf<Queue>{thread_count, thread_count});
+ATOMIC_QUEUE_INLINE cycles_t time_throughput_once(Params const* params, int n_threads, bool alternative_placement, ThreadState* consumer_sums) {
+    auto ctx = HugePages::instance->create_unique_ptr<SharedState>(params, n_threads, consumer_sums);
+    auto queue = HugePages::instance->create_unique_ptr<Queue>(ContextOf<Queue>{n_threads, n_threads});
     ctx->queue0 = queue.get();
 
     auto* producer0 = ctx->use_this_thread(); // Use this thread#0 for the first producer.
 
     if(alternative_placement) {
-        for(unsigned i = 0; i < thread_count; ++i) {
+        for(int i = 0; i < n_threads; ++i) {
             if(i) // This thread#0 is the first producer.
                 ctx->create_thread(throughput_producer<Queue>);
             ctx->create_thread(throughput_consumer<Queue>);
         }
     } else {
-        for(unsigned i = 1; i < thread_count; ++i)  // This thread#0 is the first producer.
+        for(int i = 1; i < n_threads; ++i)  // This thread#0 is the first producer.
             ctx->create_thread(throughput_producer<Queue>);
-        for(unsigned i = 0; i < thread_count; ++i)
+        for(int i = 0; i < n_threads; ++i)
             ctx->create_thread(throughput_consumer<Queue>);
     }
 
@@ -427,13 +424,15 @@ ATOMIC_QUEUE_INLINE cycles_t time_throughput_once(Params const* params, unsigned
 }
 
 template<class Queue>
-ATOMIC_QUEUE_NOINLINE void time_throughput(char const* name, Params const* params, unsigned n_thread_min, unsigned n_thread_max) {
-    int const n_msg = params->n_msg;
-    isum_t const expected_sum = (n_msg + 1) * .5 * n_msg;
-    double const expected_sum_inv = 1. / expected_sum;
+ATOMIC_QUEUE_NOINLINE void time_throughput(char const* name, Params const* params, int n_thread_min, int n_thread_max) {
+    for(auto n_threads = n_thread_min; n_threads <= n_thread_max; ++n_threads) {
+        int const n_producer_msg = (params->n_msg + (n_threads - 1)) / n_threads;
+        int const n_msg = n_producer_msg * n_threads;
+        isum_t const expected_sum = (n_producer_msg + 1) * .5 * n_producer_msg;
+        double const expected_avg_sum_inv = 1. / expected_sum;
 
-    for(unsigned n_threads = n_thread_min; n_threads <= n_thread_max; ++n_threads) {
         for(bool alternative_placement : {false, true}) {
+            // auto const n_producer_msg = n_msg / n_threads;
             cycles_t n_cycles_best = CYCLES_MAX;
 
             for(unsigned run = RUNS; run--; HugePages::instance->check_huge_pages_leaks(name)) {
@@ -450,7 +449,8 @@ ATOMIC_QUEUE_NOINLINE void time_throughput(char const* name, Params const* param
                     if(consumer_sum--) {
                         total_sum += consumer_sum;
                         // Verify that no consumer was starved.
-                        auto consumer_sum_frac = as_signed(consumer_sum) * expected_sum_inv;
+                        auto consumer_sum_frac = as_signed(consumer_sum) * expected_avg_sum_inv;
+                        // Verify that the consumer received at least 10% of its expected average consumer sum.
                         if(consumer_sum_frac < .1)
                             fprintf(stderr, "%s: producers: %u: consumer %u received too few messages: %.2lf%% of expected.\n",
                                     name, n_threads, consumer_idx, consumer_sum_frac);
@@ -458,21 +458,21 @@ ATOMIC_QUEUE_NOINLINE void time_throughput(char const* name, Params const* param
                     }
                 }
                 // Verify that all messages were received exactly once: no duplicates, no omissions.
-                if(isum_t total_sum_diff = total_sum - as_unsigned(expected_sum) * n_threads)
+                if(isum_t total_sum_diff = total_sum - expected_sum * n_threads)
                     fprintf(stderr, "%s: wrong checksum error: producers: %u, expected_sum: %'lld, diff: %'lld.\n",
                             name, n_threads, expected_sum * n_threads, total_sum_diff);
             }
 
             double n_seconds_best = to_seconds(n_cycles_best);
-            double msg_per_sec = (n_msg * static_cast<long long>(n_threads)) / n_seconds_best;
+            double msg_per_sec = n_msg / n_seconds_best;
             printf("%32s,%2u,%c: %'11.0f msg/sec\n", name, n_threads, alternative_placement ? 'i' : 's', msg_per_sec);
         }
     }
 }
 
 template<class Queue>
-ATOMIC_QUEUE_INLINE void time_throughput_mpmc(char const* name, Params const* params, Type<Queue>, unsigned n_thread_min = 1) {
-    unsigned const n_thread_max = params->hw_thread_ids.size() / 2;
+ATOMIC_QUEUE_INLINE void time_throughput_mpmc(char const* name, Params const* params, Type<Queue>, int n_thread_min = 1) {
+    int const n_thread_max = params->hw_thread_ids.size() / 2;
     time_throughput<Queue>(name, params, n_thread_min, n_thread_max);
 }
 
@@ -485,15 +485,15 @@ ATOMIC_QUEUE_NOINLINE void run_throughput_benchmarks(Params const* params) {
     printf("---- Running throughput benchmarks with up to %zu CPUs, %'d messages, best of %d runs (higher is better) ----\n",
            params->hw_thread_ids.size() & -2, params->n_msg, RUNS);
 
-    int constexpr SIZE = 0x10000;
+    unsigned constexpr C = 128 * 1024; // Capacity.
 
     // The reference.
     if(ATOMIC_QUEUE_LIKELY(!params->options.no_spsc()))
         time_throughput_spsc("boost::lockfree::spsc_queue", params,
-                             Type<BoostSpScAdapter<boost::lockfree::spsc_queue<unsigned, boost::lockfree::capacity<SIZE>>>>{});
+                             Type<BoostSpScAdapter<boost::lockfree::spsc_queue<unsigned, boost::lockfree::capacity<C>>>>{});
 
-    using SPSC = QueueTypes<SIZE, true, false, false>;
-    using MPMC = QueueTypes<SIZE, false, true, true>; // Enable MAXIMIZE_THROUGHPUT for 2 or more producers/consumers.
+    using SPSC = QueueTypes<C, true, false, false>;
+    using MPMC = QueueTypes<C, false, true, true>; // Enable MAXIMIZE_THROUGHPUT for 2 or more producers/consumers.
 
     if(ATOMIC_QUEUE_LIKELY(!params->options.no_variant_1())) {
         if(ATOMIC_QUEUE_LIKELY(!params->options.no_variant_a())) {
@@ -540,32 +540,32 @@ ATOMIC_QUEUE_NOINLINE void run_throughput_benchmarks(Params const* params) {
     }
 
     if(ATOMIC_QUEUE_LIKELY(!params->options.minimal())) {
-        time_throughput_spsc("moodycamel::ReaderWriterQueue", params, Type<MoodyCamelReaderWriterQueue<unsigned, SIZE>>{});
-        time_throughput_mpmc("moodycamel::ConcurrentQueue", params, Type<MoodyCamelQueue<unsigned, SIZE>>{});
+        time_throughput_spsc("moodycamel::ReaderWriterQueue", params, Type<MoodyCamelReaderWriterQueue<unsigned, C>>{});
+        time_throughput_mpmc("moodycamel::ConcurrentQueue", params, Type<MoodyCamelQueue<unsigned, C>>{});
 
-        time_throughput_mpmc("tbb::concurrent_bounded_queue", params, Type<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, SIZE>>{});
+        time_throughput_mpmc("tbb::concurrent_bounded_queue", params, Type<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, C>>{});
 
         time_throughput_mpmc("xenium::michael_scott_queue", params,
             Type<XeniumQueueAdapter<xenium::michael_scott_queue<unsigned, xenium::policy::reclaimer<Reclaimer>>>>{});
         time_throughput_mpmc("xenium::ramalhete_queue", params,
             Type<XeniumQueueAdapter<xenium::ramalhete_queue<unsigned, xenium::policy::reclaimer<Reclaimer>>>>{});
         time_throughput_mpmc("xenium::vyukov_bounded_queue", params,
-            Type<RetryDecorator<CapacityArgAdaptor<xenium::vyukov_bounded_queue<unsigned>, SIZE>>>{});
+            Type<RetryDecorator<CapacityArgAdaptor<xenium::vyukov_bounded_queue<unsigned>, C>>>{});
 
-        int constexpr BLQ_SIZE_MAX = 0x10000 - 2;
-        int constexpr BLQ_SIZE = min_value(SIZE, BLQ_SIZE_MAX);
+        unsigned constexpr BLQ_C_MAX = 0x10000 - 2;
+        unsigned constexpr BLQ_C = min_value(C, BLQ_C_MAX);
         time_throughput_mpmc("boost::lockfree::queue", params,
-            Type<BoostQueueAdapter<boost::lockfree::queue<unsigned, BoostAllocator, boost::lockfree::capacity<BLQ_SIZE>>>>{});
+            Type<BoostQueueAdapter<boost::lockfree::queue<unsigned, BoostAllocator, boost::lockfree::capacity<BLQ_C>>>>{});
 
-        time_throughput_mpmc("pthread_spinlock", params, Type<RetryDecorator<AtomicQueueSpinlock<unsigned, SIZE>>>{});
-        time_throughput_mpmc("std::mutex", params, Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, std::mutex>>>{});
-        time_throughput_mpmc("tbb::spin_mutex", params, Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, tbb::spin_mutex>>>{});
-        // time_throughput_mpmc("TicketSpinlock", params, Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, TicketSpinlock>>>{});
-        // run_throughput_mpmc_benchmark("UnfairSpinlock", params, Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, UnfairSpinlock>>>{});
-        // run_throughput_mpmc_benchmark<RetryDecorator<AtomicQueueSpinlockHle<unsigned, SIZE>>>("SpinlockHle");
-        // run_throughput_mpmc_benchmark("adaptive_mutex", params, Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, AdaptiveMutex>>>{});
+        time_throughput_mpmc("pthread_spinlock", params, Type<RetryDecorator<AtomicQueueSpinlock<unsigned, C>>>{});
+        time_throughput_mpmc("std::mutex", params, Type<RetryDecorator<AtomicQueueMutex<unsigned, C, std::mutex>>>{});
+        time_throughput_mpmc("tbb::spin_mutex", params, Type<RetryDecorator<AtomicQueueMutex<unsigned, C, tbb::spin_mutex>>>{});
+        // time_throughput_mpmc("TicketSpinlock", params, Type<RetryDecorator<AtomicQueueMutex<unsigned, C, TicketSpinlock>>>{});
+        // run_throughput_mpmc_benchmark("UnfairSpinlock", params, Type<RetryDecorator<AtomicQueueMutex<unsigned, C, UnfairSpinlock>>>{});
+        // run_throughput_mpmc_benchmark<RetryDecorator<AtomicQueueSpinlockHle<unsigned, C>>>("SpinlockHle");
+        // run_throughput_mpmc_benchmark("adaptive_mutex", params, Type<RetryDecorator<AtomicQueueMutex<unsigned, C, AdaptiveMutex>>>{});
         // run_throughput_mpmc_benchmark("tbb::speculative_spin_mutex", params,
-        //                               Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, tbb::speculative_spin_mutex>>>{});
+        //                               Type<RetryDecorator<AtomicQueueMutex<unsigned, C, tbb::speculative_spin_mutex>>>{});
     }
 
     std::puts("\n");
@@ -626,7 +626,7 @@ ATOMIC_QUEUE_NOINLINE void ping_pong_sender(SharedState* ctx0, ThreadState* thre
     [[maybe_unused]] region_guard_t<Queue> guard;
     ProducerOf<Queue> producer_q1{*q1};
     ConsumerOf<Queue> consumer_q2{*q2};
-    unsigned n = ctx->n_msg;
+    unsigned n = ctx->n_producer_msg;
 
     ctx->barrier.countdown();
     thread->times.set(0);
@@ -660,7 +660,7 @@ ATOMIC_QUEUE_INLINE cycles_t time_ping_pong_once(Params const* params, unsigned 
 template<class Queue>
 ATOMIC_QUEUE_NOINLINE void time_ping_pong(char const* name, Params const* params) {
     // Select the best times of RUNS runs.
-    cycles_t shortest_total_time = CYCLES_MAX;
+    cycles_t n_cycles_best = CYCLES_MAX;
 
     // Ping-pong between the first available CPU and every othery next power-of-2 to find its SMT sibling, if any.
     auto& hw_thread_ids = params->hw_thread_ids;
@@ -668,13 +668,13 @@ ATOMIC_QUEUE_NOINLINE void time_ping_pong(char const* name, Params const* params
     for(unsigned cpu2 = 1; cpu2 < n_cpus; cpu2 *= 2) {
         unsigned const cpus[2] = {hw_thread_ids[0], hw_thread_ids[cpu2]};
         for(unsigned run = RUNS; run--; HugePages::instance->check_huge_pages_leaks(name)) {
-            auto total_time = time_ping_pong_once<Queue>(params, cpus);
-            shortest_total_time = min_value(shortest_total_time, total_time);
+            auto n_cycles = time_ping_pong_once<Queue>(params, cpus);
+            n_cycles_best = min_value(n_cycles_best, n_cycles);
         }
     }
 
-    auto round_trip_time = to_seconds(shortest_total_time * 2) / params->n_msg;
-    printf("%32s: %.9f sec/round-trip\n", name, round_trip_time);
+    auto sec_round_trip = to_seconds(n_cycles_best * 2) / params->n_msg;
+    printf("%32s: %.9f sec/round-trip\n", name, sec_round_trip);
 }
 
 void run_ping_pong_benchmarks(Params const* params) {
@@ -683,14 +683,14 @@ void run_ping_pong_benchmarks(Params const* params) {
     // This benchmark doesn't require queue capacity greater than 1, however, capacity of 1 elides
     // some instructions completely because of (x % 1) is always 0. Use something greater than 1 to
     // preclude aggressive optimizations.
-    constexpr unsigned SIZE = 8;
+    constexpr unsigned C = 8; // Capacity.
 
     // The reference.
-    time_ping_pong<BoostSpScAdapter<boost::lockfree::spsc_queue<unsigned, boost::lockfree::capacity<SIZE>>>>(
+    time_ping_pong<BoostSpScAdapter<boost::lockfree::spsc_queue<unsigned, boost::lockfree::capacity<C>>>>(
         "boost::lockfree::spsc_queue", params);
 
     // Use MAXIMIZE_THROUGHPUT=false for better latency.
-    using SPSC = QueueTypes<SIZE, true, false, false>;
+    using SPSC = QueueTypes<C, true, false, false>;
 
     if(ATOMIC_QUEUE_LIKELY(!params->options.no_variant_1())) {
         if(ATOMIC_QUEUE_LIKELY(!params->options.no_variant_a())) {
@@ -717,26 +717,26 @@ void run_ping_pong_benchmarks(Params const* params) {
     }
 
     if(ATOMIC_QUEUE_LIKELY(!params->options.minimal())) {
-        time_ping_pong<MoodyCamelReaderWriterQueue<unsigned, SIZE>>("moodycamel::ReaderWriterQueue", params);
-        time_ping_pong<MoodyCamelQueue<unsigned, SIZE>>("moodycamel::ConcurrentQueue", params);
+        time_ping_pong<MoodyCamelReaderWriterQueue<unsigned, C>>("moodycamel::ReaderWriterQueue", params);
+        time_ping_pong<MoodyCamelQueue<unsigned, C>>("moodycamel::ConcurrentQueue", params);
 
-        time_ping_pong<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, SIZE>>("tbb::concurrent_bounded_queue", params);
+        time_ping_pong<TbbAdapter<tbb::concurrent_bounded_queue<unsigned>, C>>("tbb::concurrent_bounded_queue", params);
 
         time_ping_pong<XeniumQueueAdapter<xenium::michael_scott_queue<unsigned, xenium::policy::reclaimer<Reclaimer>>>>("xenium::michael_scott_queue", params);
         time_ping_pong<XeniumQueueAdapter<xenium::ramalhete_queue<unsigned, xenium::policy::reclaimer<Reclaimer>>>>("xenium::ramalhete_queue", params);
-        time_ping_pong<RetryDecorator<CapacityArgAdaptor<xenium::vyukov_bounded_queue<unsigned>, SIZE>>>("xenium::vyukov_bounded_queue", params);
+        time_ping_pong<RetryDecorator<CapacityArgAdaptor<xenium::vyukov_bounded_queue<unsigned>, C>>>("xenium::vyukov_bounded_queue", params);
 
-        time_ping_pong<BoostQueueAdapter<boost::lockfree::queue<unsigned, BoostAllocator, boost::lockfree::capacity<SIZE>>>>(
+        time_ping_pong<BoostQueueAdapter<boost::lockfree::queue<unsigned, BoostAllocator, boost::lockfree::capacity<C>>>>(
             "boost::lockfree::queue", params);
 
-        time_ping_pong<RetryDecorator<AtomicQueueSpinlock<unsigned, SIZE>>>("pthread_spinlock", params);
-        time_ping_pong<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, std::mutex>>>("std::mutex", params);
-        time_ping_pong<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, tbb::spin_mutex>>>("tbb::spin_mutex", params);
-        // run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, AdaptiveMutex>>>("adaptive_mutex", params);
-        // run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, tbb::speculative_spin_mutex>>>("tbb::speculative_spin_mutex", params);
-        // time_ping_pong<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, TicketSpinlock>>>("TicketSpinlock", hp, hw_thread_ids);
-        // run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, UnfairSpinlock>>>("UnfairSpinlock", hp, hw_thread_ids);
-        // run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinlockHle<unsigned, SIZE>>>("SpinlockHle");
+        time_ping_pong<RetryDecorator<AtomicQueueSpinlock<unsigned, C>>>("pthread_spinlock", params);
+        time_ping_pong<RetryDecorator<AtomicQueueMutex<unsigned, C, std::mutex>>>("std::mutex", params);
+        time_ping_pong<RetryDecorator<AtomicQueueMutex<unsigned, C, tbb::spin_mutex>>>("tbb::spin_mutex", params);
+        // run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, C, AdaptiveMutex>>>("adaptive_mutex", params);
+        // run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, C, tbb::speculative_spin_mutex>>>("tbb::speculative_spin_mutex", params);
+        // time_ping_pong<RetryDecorator<AtomicQueueMutex<unsigned, C, TicketSpinlock>>>("TicketSpinlock", hp, hw_thread_ids);
+        // run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, C, UnfairSpinlock>>>("UnfairSpinlock", hp, hw_thread_ids);
+        // run_ping_pong_benchmark<RetryDecorator<AtomicQueueSpinlockHle<unsigned, C>>>("SpinlockHle");
     }
 
     std::puts("\n");

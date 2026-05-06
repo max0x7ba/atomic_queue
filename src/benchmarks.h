@@ -13,8 +13,8 @@ namespace atomic_queue {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct Context {
-    unsigned producers;
-    unsigned consumers;
+    int producers;
+    int consumers;
 };
 
 template<class T> typename T::ContextType context_of_(int);
