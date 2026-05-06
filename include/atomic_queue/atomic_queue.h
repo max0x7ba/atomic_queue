@@ -57,27 +57,27 @@ struct GetIndexShuffleBits<false, array_size, elements_per_cache_line> {
 // the element within the cache line) with the next N bits (which are the index of the cache line)
 // of the element index.
 
-template<int N_BITS>
+template<unsigned N_BITS>
 struct IndexBits {
     enum : unsigned {
         mask_elem_idx = ~(~0u << N_BITS),
         mask_line_idx = mask_elem_idx << N_BITS,
         mask_hi = ~0u << (2 * N_BITS),
         count = N_BITS,
-        count2 = count << 8 | count,
+        count2 = N_BITS << 8 | N_BITS,
     };
 };
 
 struct RemapXor {
     // Each step depends on the previous, a serial chain of ~6 instructions, ~6 cycles.
-    template<class Bits>
-    ATOMIC_QUEUE_INLINE static constexpr unsigned remap(unsigned index, Bits) noexcept {
-        unsigned const mix{(index ^ (index >> Bits::count)) & Bits::mask_elem_idx};
-        return index ^ mix ^ (mix << Bits::count);
+    template<class B>
+    ATOMIC_QUEUE_SINLINE constexpr unsigned remap(unsigned index, B) noexcept {
+        unsigned const mix{(index ^ (index >> B::count)) & B::mask_elem_idx};
+        return index ^ mix ^ (mix << B::count);
     }
 
-    template<class Bits>
-    ATOMIC_QUEUE_INLINE static constexpr unsigned remap(unsigned index, unsigned size, Bits b) noexcept {
+    template<class B>
+    ATOMIC_QUEUE_SINLINE constexpr unsigned remap(unsigned index, unsigned size, B b) noexcept {
         return remap(index & (size - 1), b);
     }
 };
@@ -86,68 +86,67 @@ struct RemapAnd {
     // Faster index remapping with independent parallel computations of index components.
     // The shifts and ands dispatch in parallel, ~8 instructions, ~4 cycles.
     // At least +1% faster throughput benchmark relative to RemapXor.
-    template<class Bits>
-    ATOMIC_QUEUE_INLINE static constexpr unsigned remap(unsigned index, unsigned size, Bits) noexcept {
+    template<class B>
+    ATOMIC_QUEUE_SINLINE constexpr unsigned remap(unsigned index, unsigned size, B) noexcept {
         return
-            ((index >> Bits::count) & Bits::mask_elem_idx) |
-            ((index & Bits::mask_elem_idx) << Bits::count) |
-            (index & (Bits::mask_hi & (size - 1)));
+            ((index >> B::count) & B::mask_elem_idx) |
+            ((index & B::mask_elem_idx) << B::count) |
+            (index & (B::mask_hi & (size - 1)));
     }
 
-    template<class Bits>
-    ATOMIC_QUEUE_INLINE static constexpr unsigned remap(unsigned index, Bits b) noexcept {
+    template<class B>
+    ATOMIC_QUEUE_SINLINE constexpr unsigned remap(unsigned index, B b) noexcept {
         return remap(index, 0, b);
     }
 };
 
 #ifdef __BMI__
-
 struct RemapBmi {
     // Shorter and faster machine code for swapping bits with BMI instructions, if available.
     // BMI1 (and, bextr, mov + and) dispatch in parallel, 7 instructions, ~3 cycles.
     // BMI2 (and, bextr, bzhi) dispatch in parallel, 6 instructions, ~3 cycles.
     // At least +1.5% faster throughput benchmark relative to RemapXor.
-    template<class Bits>
-    ATOMIC_QUEUE_INLINE static unsigned remap(unsigned index, unsigned size, Bits) noexcept {
+    template<class B>
+    ATOMIC_QUEUE_SINLINE unsigned remap(unsigned index, unsigned size, B) noexcept {
         static_assert(ATOMIC_QUEUE_FULL_THROTTLE == 1, "Unexpected ATOMIC_QUEUE_FULL_THROTTLE value.");
-
-        unsigned nn  = Bits::count2;
+        unsigned nn  = B::count2;
         ATOMIC_QUEUE_REG(nn); // Disable constant propagation for nn to prevent the compiler from transforming the following code.
 
 #ifdef __BMI2__
-        unsigned new_line_idx = _bzhi_u32(index, nn) << Bits::count; // BMI2 bzhi supersedes mov + and.
-        // unsigned new_line_idx = (index << nn) & Bits::mask_line_idx; // BMI2 shlx supersedes mov + shl.
+        unsigned new_line_idx = _bzhi_u32(index, nn) << B::count; // BMI2 bzhi supersedes mov + and.
+        // unsigned new_line_idx = (index << nn) & B::mask_line_idx; // BMI2 shlx supersedes mov + shl.
         unsigned new_elem_idx = __bextr_u32(index, nn); // BMI1 bextr supersedes mov + shr + and.
 #else
         unsigned new_elem_idx = __bextr_u32(index, nn); // BMI1 bextr supersedes mov + shr + and.
-        unsigned new_line_idx = (index & Bits::mask_elem_idx) << Bits::count;
+        unsigned new_line_idx = (index & B::mask_elem_idx) << B::count;
 #endif
-        new_elem_idx |= index & (Bits::mask_hi & (size - 1));
+
+        new_elem_idx |= index & (B::mask_hi & (size - 1));
         ATOMIC_QUEUE_ORDER(new_elem_idx, new_line_idx); // Do not commute the arguments of the adjacent two or instructions.
         return new_elem_idx | new_line_idx; // Or with new_line_idx last.
     }
 
-    template<class Bits>
-    ATOMIC_QUEUE_INLINE static unsigned remap(unsigned index, Bits b) noexcept {
+    template<class B>
+    ATOMIC_QUEUE_SINLINE unsigned remap(unsigned index, B b) noexcept {
         return remap(index, 0, b);
     }
 };
-#endif
+#endif // __BMI__
 
 template<class Remap>
 struct Remap0 : Remap {
     using Remap::remap;
 
-    ATOMIC_QUEUE_INLINE static constexpr unsigned remap(unsigned index, unsigned size, IndexBits<0>) noexcept {
+    ATOMIC_QUEUE_SINLINE constexpr unsigned remap(unsigned index, unsigned size, IndexBits<0>) noexcept {
         return index % size;
     }
 
-    ATOMIC_QUEUE_INLINE static constexpr unsigned remap(unsigned index, IndexBits<0>) noexcept {
+    ATOMIC_QUEUE_SINLINE constexpr unsigned remap(unsigned index, IndexBits<0>) noexcept {
         return index;
     }
 
-    template<class Bits, class... A>
-    ATOMIC_QUEUE_INLINE auto operator()(Bits bits, A... a) const noexcept {
+    template<class B, class... A>
+    ATOMIC_QUEUE_INLINE auto operator()(B bits, A... a) const noexcept {
         return this->remap(a..., bits);
     }
 };
@@ -161,8 +160,8 @@ using Remap = Remap0<RemapBmi>;
 using Remap = Remap0<RemapAnd>;
 #endif
 
-template<int N_BITS>
-ATOMIC_QUEUE_INLINE static constexpr unsigned remap(unsigned index, unsigned size, IndexBits<N_BITS> b) noexcept {
+template<unsigned N_BITS>
+ATOMIC_QUEUE_SINLINE constexpr unsigned remap(unsigned index, unsigned size, IndexBits<N_BITS> b) noexcept {
     return Remap::remap(index, size, b);
 }
 
@@ -181,30 +180,30 @@ ATOMIC_QUEUE_INLINE static constexpr unsigned remap(unsigned index, unsigned siz
 // ++a;
 
 template<class T>
-ATOMIC_QUEUE_INLINE static constexpr T decrement(T x) noexcept {
+ATOMIC_QUEUE_SINLINE constexpr T decrement(T x) noexcept {
     return x - 1;
 }
 
 template<class T>
-ATOMIC_QUEUE_INLINE static constexpr T increment(T x) noexcept {
+ATOMIC_QUEUE_SINLINE constexpr T increment(T x) noexcept {
     return x + 1;
 }
 
 template<class T>
-ATOMIC_QUEUE_INLINE static constexpr T or_equal(T x, unsigned u) noexcept {
+ATOMIC_QUEUE_SINLINE constexpr T or_equal(T x, unsigned u) noexcept {
     return x | x >> u;
 }
 
 template<class T, class... Args>
-ATOMIC_QUEUE_INLINE static constexpr T or_equal(T x, unsigned u, Args... rest) noexcept {
+ATOMIC_QUEUE_SINLINE constexpr T or_equal(T x, unsigned u, Args... rest) noexcept {
     return or_equal(or_equal(x, u), rest...);
 }
 
-ATOMIC_QUEUE_INLINE static constexpr uint32_t round_up_to_power_of_2(uint32_t a) noexcept {
+ATOMIC_QUEUE_SINLINE constexpr uint32_t round_up_to_power_of_2(uint32_t a) noexcept {
     return increment(or_equal(decrement(a), 1, 2, 4, 8, 16));
 }
 
-ATOMIC_QUEUE_INLINE static constexpr uint64_t round_up_to_power_of_2(uint64_t a) noexcept {
+ATOMIC_QUEUE_SINLINE constexpr uint64_t round_up_to_power_of_2(uint64_t a) noexcept {
     return increment(or_equal(decrement(a), 1, 2, 4, 8, 16, 32));
 }
 
@@ -219,20 +218,20 @@ constexpr T nil() noexcept {
 }
 
 template<class T>
-ATOMIC_QUEUE_INLINE static void destroy_n(T* ATOMIC_QUEUE_RESTRICT p, unsigned n) noexcept {
+ATOMIC_QUEUE_SINLINE void destroy_n(T* ATOMIC_QUEUE_RESTRICT p, unsigned n) noexcept {
     for(auto q = p + n; p != q;)
         (p++)->~T();
 }
 
 template<class T>
-ATOMIC_QUEUE_INLINE static void swap_relaxed(std::atomic<T>& a, std::atomic<T>& b) noexcept {
+ATOMIC_QUEUE_SINLINE void swap_relaxed(std::atomic<T>& a, std::atomic<T>& b) noexcept {
     auto a2 = a.load(X);
     a.store(b.load(X), X);
     b.store(a2, X);
 }
 
 template<class T>
-ATOMIC_QUEUE_INLINE static void copy_relaxed(std::atomic<T>& a, std::atomic<T> const& b) noexcept {
+ATOMIC_QUEUE_SINLINE void copy_relaxed(std::atomic<T>& a, std::atomic<T> const& b) noexcept {
     a.store(b.load(X), X);
 }
 
@@ -290,7 +289,7 @@ protected:
     }
 
     template<class T>
-    ATOMIC_QUEUE_INLINE static T do_pop(std::atomic<T>* ATOMIC_QUEUE_RESTRICT elements, unsigned index) noexcept {
+    ATOMIC_QUEUE_SINLINE T do_pop(std::atomic<T>* ATOMIC_QUEUE_RESTRICT elements, unsigned index) noexcept {
         constexpr T NIL = Derived::nil_;
         T element;
         auto& q_element = elements[index];
@@ -320,7 +319,7 @@ protected:
     }
 
     template<class T>
-    ATOMIC_QUEUE_INLINE static void do_push(T element, std::atomic<T>* ATOMIC_QUEUE_RESTRICT elements, unsigned index) noexcept {
+    ATOMIC_QUEUE_SINLINE void do_push(T element, std::atomic<T>* ATOMIC_QUEUE_RESTRICT elements, unsigned index) noexcept {
         constexpr T NIL = Derived::nil_;
         assert(element != NIL);
         auto& q_element = elements[index];
@@ -341,7 +340,7 @@ protected:
     }
 
     template<class T>
-    ATOMIC_QUEUE_INLINE static T do_pop(std::atomic<State>* ATOMIC_QUEUE_RESTRICT states, T* ATOMIC_QUEUE_RESTRICT elements, unsigned index) noexcept {
+    ATOMIC_QUEUE_SINLINE T do_pop(std::atomic<State>* ATOMIC_QUEUE_RESTRICT states, T* ATOMIC_QUEUE_RESTRICT elements, unsigned index) noexcept {
         auto& state = states[index];
 
         if(Derived::spsc_) {
@@ -366,7 +365,7 @@ protected:
     }
 
     template<class U, class T>
-    ATOMIC_QUEUE_INLINE static void do_push(U&& element, std::atomic<State>* ATOMIC_QUEUE_RESTRICT states, T* ATOMIC_QUEUE_RESTRICT elements, unsigned index) noexcept {
+    ATOMIC_QUEUE_SINLINE void do_push(U&& element, std::atomic<State>* ATOMIC_QUEUE_RESTRICT states, T* ATOMIC_QUEUE_RESTRICT elements, unsigned index) noexcept {
         auto& state = states[index];
 
         if(Derived::spsc_) {
@@ -473,7 +472,7 @@ public:
         return downcast().size_;
     }
 
-    ATOMIC_QUEUE_INLINE static constexpr bool is_spsc() noexcept {
+    ATOMIC_QUEUE_SINLINE constexpr bool is_spsc() noexcept {
         return Derived::spsc_;
     }
 };
@@ -487,7 +486,7 @@ class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL, MINIMIZE_
 
     static constexpr unsigned size_ = MINIMIZE_CONTENTION ? details::round_up_to_power_of_2(SIZE) : SIZE;
     static constexpr int SHUFFLE_BITS = details::GetIndexShuffleBits<MINIMIZE_CONTENTION, size_, CACHE_LINE_SIZE / sizeof(std::atomic<T>)>::value;
-    using Bits = details::IndexBits<SHUFFLE_BITS>;
+    using B = details::IndexBits<SHUFFLE_BITS>;
     static constexpr bool total_order_ = TOTAL_ORDER;
     static constexpr bool spsc_ = SPSC;
     static constexpr bool maximize_throughput_ = MAXIMIZE_THROUGHPUT;
@@ -496,12 +495,12 @@ class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, SIZE, NIL, MINIMIZE_
     alignas(CACHE_LINE_SIZE) std::atomic<T> elements_[size_];
 
     ATOMIC_QUEUE_INLINE T do_pop(unsigned tail) noexcept {
-        unsigned index = remap(tail, size_, Bits{});
+        auto index = remap(tail, size_, B{});
         return Base::do_pop(elements_, index);
     }
 
     ATOMIC_QUEUE_INLINE void do_push(T element, unsigned head) noexcept {
-        unsigned index = remap(head, size_, Bits{});
+        auto index = remap(head, size_, B{});
         Base::do_push(element, elements_, index);
     }
 
@@ -527,7 +526,7 @@ class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE, MINIMIZE_CON
 
     static constexpr unsigned size_ = MINIMIZE_CONTENTION ? details::round_up_to_power_of_2(SIZE) : SIZE;
     static constexpr int SHUFFLE_BITS = details::GetIndexShuffleBits<MINIMIZE_CONTENTION, size_, CACHE_LINE_SIZE / sizeof(AtomicState)>::value;
-    using Bits = details::IndexBits<SHUFFLE_BITS>;
+    using B = details::IndexBits<SHUFFLE_BITS>;
     static constexpr bool total_order_ = TOTAL_ORDER;
     static constexpr bool spsc_ = SPSC;
     static constexpr bool maximize_throughput_ = MAXIMIZE_THROUGHPUT;
@@ -536,13 +535,13 @@ class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, SIZE, MINIMIZE_CON
     alignas(CACHE_LINE_SIZE) T elements_[size_] = {};
 
     ATOMIC_QUEUE_INLINE T do_pop(unsigned tail) noexcept {
-        unsigned index = remap(tail, size_, Bits{});
+        auto index = remap(tail, size_, B{});
         return Base::do_pop(states_, elements_, index);
     }
 
     template<class U>
     ATOMIC_QUEUE_INLINE void do_push(U&& element, unsigned head) noexcept {
-        unsigned index = remap(head, size_, Bits{});
+        auto index = remap(head, size_, B{});
         Base::do_push(std::forward<U>(element), states_, elements_, index);
     }
 
@@ -573,7 +572,7 @@ class AtomicQueueB : private std::allocator_traits<A>::template rebind_alloc<std
 
     static constexpr auto SHUFFLE_BITS = details::GetCacheLineIndexBits<ELEMENTS_PER_CACHE_LINE>::value;
     static_assert(SHUFFLE_BITS, "Unexpected SHUFFLE_BITS.");
-    using Bits = details::IndexBits<SHUFFLE_BITS>;
+    using B = details::IndexBits<SHUFFLE_BITS>;
 
     // AtomicQueueCommon members are stored into by readers and writers.
     // Allocate these immutable members on another cache line which never gets invalidated by stores.
@@ -587,12 +586,12 @@ class AtomicQueueB : private std::allocator_traits<A>::template rebind_alloc<std
     std::atomic<T>* ATOMIC_QUEUE_RESTRICT elements_;
 
     ATOMIC_QUEUE_INLINE T do_pop(unsigned tail) noexcept {
-        unsigned index = remap(tail, size_, Bits{});
+        auto index = remap(tail, size_, B{});
         return Base::do_pop(elements_, index);
     }
 
     ATOMIC_QUEUE_INLINE void do_push(T element, unsigned head) noexcept {
-        unsigned index = remap(head, size_, Bits{});
+        auto index = remap(head, size_, B{});
         Base::do_push(element, elements_, index);
     }
 
@@ -677,16 +676,16 @@ class AtomicQueueB2 : private std::allocator_traits<A>::template rebind_alloc<un
 
     static constexpr auto SHUFFLE_BITS = details::GetCacheLineIndexBits<STATES_PER_CACHE_LINE>::value;
     static_assert(SHUFFLE_BITS, "Unexpected SHUFFLE_BITS.");
-    using Bits = details::IndexBits<SHUFFLE_BITS>;
+    using B = details::IndexBits<SHUFFLE_BITS>;
 
     ATOMIC_QUEUE_INLINE T do_pop(unsigned tail) noexcept {
-        unsigned index = remap(tail, size_, Bits{});
+        auto index = remap(tail, size_, B{});
         return Base::do_pop(states_, elements_, index);
     }
 
     template<class U>
     ATOMIC_QUEUE_INLINE void do_push(U&& element, unsigned head) noexcept {
-        unsigned index = remap(head, size_, Bits{});
+        auto index = remap(head, size_, B{});
         Base::do_push(std::forward<U>(element), states_, elements_, index);
     }
 

@@ -72,6 +72,12 @@ struct Params {
     Options options{"AQB"};
     int n_msg = EnvBits64{"AQN", N_MSG, 1, INT_MAX}.value;
     std::vector<unsigned> hw_thread_ids;
+
+    void operator+=(std::vector<unsigned>&& a) noexcept {
+        hw_thread_ids = move(a);
+        unsigned n_producers_max = hw_thread_ids.size() / 2;
+        n_msg += as_unsigned(n_msg) % n_producers_max; // Adjust n_msg up to a multiple of n_producers_max.
+    }
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -107,7 +113,7 @@ static_assert(std::is_unsigned<cycles_t>::value);
 using icycles_t = std::make_signed<cycles_t>::type; // Signed integers convert into double with one AVX instruction, unlike unsigned.
 cycles_t constexpr CYCLES_MAX = -1;
 
-ATOMIC_QUEUE_INLINE static cycles_t cycles() noexcept {
+ATOMIC_QUEUE_SINLINE cycles_t cycles() noexcept {
     // If software requires RDTSC to be executed only after all previous instructions have executed and all previous loads are
     // globally visible, it can execute LFENCE immediately before RDTSC.
     _mm_lfence();
@@ -479,7 +485,7 @@ ATOMIC_QUEUE_NOINLINE void run_throughput_benchmarks(Params const* params) {
     printf("---- Running throughput benchmarks with up to %zu CPUs, %'d messages, best of %d runs (higher is better) ----\n",
            params->hw_thread_ids.size() & -2, params->n_msg, RUNS);
 
-    int constexpr SIZE = 65536;
+    int constexpr SIZE = 0x10000;
 
     // The reference.
     if(ATOMIC_QUEUE_LIKELY(!params->options.no_spsc()))
@@ -546,8 +552,10 @@ ATOMIC_QUEUE_NOINLINE void run_throughput_benchmarks(Params const* params) {
         time_throughput_mpmc("xenium::vyukov_bounded_queue", params,
             Type<RetryDecorator<CapacityArgAdaptor<xenium::vyukov_bounded_queue<unsigned>, SIZE>>>{});
 
+        int constexpr BLQ_SIZE_MAX = 0x10000 - 2;
+        int constexpr BLQ_SIZE = min_value(SIZE, BLQ_SIZE_MAX);
         time_throughput_mpmc("boost::lockfree::queue", params,
-                             Type<BoostQueueAdapter<boost::lockfree::queue<unsigned, BoostAllocator, boost::lockfree::capacity<SIZE - 2>>>>{});
+            Type<BoostQueueAdapter<boost::lockfree::queue<unsigned, BoostAllocator, boost::lockfree::capacity<BLQ_SIZE>>>>{});
 
         time_throughput_mpmc("pthread_spinlock", params, Type<RetryDecorator<AtomicQueueSpinlock<unsigned, SIZE>>>{});
         time_throughput_mpmc("std::mutex", params, Type<RetryDecorator<AtomicQueueMutex<unsigned, SIZE, std::mutex>>>{});
@@ -752,7 +760,7 @@ int main() {
     if(cpu_topology.size() < 2)
         throw std::runtime_error("A CPU with at least 2 hardware threads is required.");
 
-    params.hw_thread_ids = hw_thread_id(cpu_topology); // Sorted by hw_thread_id.
+    params += hw_thread_id(cpu_topology); // Sorted by hw_thread_id.
     set_thread_affinity(params.hw_thread_ids[0]); // Pin the main thread#0 to CPU#0 prior to allocating memory.
 
     size_t constexpr MB = 1024 * 1024;
