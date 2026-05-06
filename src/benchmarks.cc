@@ -353,7 +353,7 @@ ATOMIC_QUEUE_NOINLINE void throughput_producer(SharedState* ctx0, ThreadState* t
         // Hint the compiler to delay decrementing n prior to this point.
         asm(""::"r"(n));
 #endif
-    } while(--n);
+    } while(ATOMIC_QUEUE_LIKELY(--n));
 
     thread->times.set(1); // std::memory_order_seq_cst
 }
@@ -387,7 +387,7 @@ ATOMIC_QUEUE_NOINLINE void throughput_consumer(SharedState* ctx0, ThreadState* t
         asm("":"+r"(sum));
 #endif
         sum += n; // Includes stop value.
-    } while(n != 1);
+    } while(ATOMIC_QUEUE_LIKELY(n != 1));
 
     thread->sum = sum + 1; // Set sums are +1 biased.
     thread->times.set(1); // std::memory_order_seq_cst
@@ -626,7 +626,7 @@ ATOMIC_QUEUE_NOINLINE void ping_pong_sender(SharedState* ctx0, ThreadState* thre
     do {
         producer_q1.push(*q1, n);
         n = consumer_q2.pop(*q2);
-    } while(as_signed(--n) > 0);
+    } while(ATOMIC_QUEUE_LIKELY(n--));
 
     thread->times.set(1); // std::memory_order_seq_cst
 }
