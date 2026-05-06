@@ -363,12 +363,12 @@ ATOMIC_QUEUE_NOINLINE void throughput_consumer(SharedState* ctx0, ThreadState* t
 #if ATOMIC_QUEUE_FULL_THROTTLE
     // Vacate the most desirable i386 registers with the shortest instruction encoding for more frequently accessed objects.
     // Move these rarely accessed objects into callee-saved [r12,15] registers, which often require 1-byte longer instruction encoding
-    register sum_t sum asm("r13") = 0; // Allocate the most undesirable r13 for the sum, to avoid allocating r13 for anything else.
+    register sum_t sum asm("r13") = 1; // Allocate the most undesirable r13 for the sum, to avoid allocating r13 for anything else.
     register auto* ctx asm("r14") = ctx0;
     register auto* thread asm("r15") = thread0;
     asm("": "+r"(sum), "+r"(ctx), "+r"(thread));
 #else
-    sum_t sum = 0;
+    sum_t sum = 1;
     auto* ctx = ctx0;
     auto* thread = thread0;
 #endif
@@ -389,7 +389,7 @@ ATOMIC_QUEUE_NOINLINE void throughput_consumer(SharedState* ctx0, ThreadState* t
         sum += n; // Includes stop value.
     } while(ATOMIC_QUEUE_LIKELY(n != 1));
 
-    thread->sum = sum + 1; // Set sums are +1 biased.
+    thread->sum = sum; // Set sums are +1 biased.
     thread->times.set(1); // std::memory_order_seq_cst
 }
 
