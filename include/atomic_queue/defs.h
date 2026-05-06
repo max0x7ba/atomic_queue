@@ -45,10 +45,12 @@
 #endif
 
 #if ATOMIC_QUEUE_FULL_THROTTLE
-#define ATOMIC_QUEUE_REG(id)      asm("":"+r"(id))
-#define ATOMIC_QUEUE_LEAN_REG(id) asm("":"+R"(id))
+#define ATOMIC_QUEUE_REG(id)              asm("":"+r"(id))
+#define ATOMIC_QUEUE_ORDER(first, second) asm(""::"r"(first),"r"(second))
+#define ATOMIC_QUEUE_LEAN_REG(id)         asm("":"+R"(id))
 #else
 #define ATOMIC_QUEUE_REG(id)
+#define ATOMIC_QUEUE_ORDER(first, second)
 #define ATOMIC_QUEUE_LEAN_REG(id)
 #endif
 
