@@ -313,7 +313,7 @@ protected:
                 // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
                 do
                     spin_loop_pause();
-                while(Derived::maximize_throughput_ && q_element.load(X) == NIL);
+                while(ATOMIC_QUEUE_UNLIKELY(Derived::maximize_throughput_ && q_element.load(X) == NIL));
             }
         }
         return element;
@@ -336,7 +336,7 @@ protected:
             while(ATOMIC_QUEUE_UNLIKELY(!q_element.compare_exchange_weak((expected = NIL), element, AR, X))) // Hint the branch as not taken when the queue is not full.
                 do // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
                     spin_loop_pause(); // (1) Wait for store (2) to complete.
-                while(Derived::maximize_throughput_ && q_element.load(X) != NIL);
+                while(ATOMIC_QUEUE_UNLIKELY(Derived::maximize_throughput_ && q_element.load(X) != NIL));
         }
     }
 
@@ -350,11 +350,14 @@ protected:
                     spin_loop_pause();
         }
         else {
-            State expected;
-            while(ATOMIC_QUEUE_UNLIKELY(!state.compare_exchange_weak((expected = STORED), LOADING, A, X))) // Hint the branch as not taken when the queue is not empty.
+            State expected, desired = LOADING;
+            ATOMIC_QUEUE_LEAN_REG(desired);
+            while(ATOMIC_QUEUE_UNLIKELY(!state.compare_exchange_weak((expected = STORED), desired, A, X))) { // Hint the branch as not taken when the queue is not empty.
                 do // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
                     spin_loop_pause();
-                while(Derived::maximize_throughput_ && state.load(X) != STORED);
+                while(ATOMIC_QUEUE_UNLIKELY(Derived::maximize_throughput_ && state.load(X) != STORED));
+                ATOMIC_QUEUE_LEAN_REG(desired);
+            }
         }
 
         T element{std::move(elements[index])};
@@ -372,11 +375,14 @@ protected:
                     spin_loop_pause();
         }
         else {
-            State expected;
-            while(ATOMIC_QUEUE_UNLIKELY(!state.compare_exchange_weak((expected = EMPTY), STORING, A, X))) // Hint the branch as not taken when the queue is not full.
+            State expected, desired = STORING;
+            ATOMIC_QUEUE_LEAN_REG(desired);
+            while(ATOMIC_QUEUE_UNLIKELY(!state.compare_exchange_weak((expected = EMPTY), desired, A, X))) {// Hint the branch as not taken when the queue is not full.
                 do // Do speculative loads while busy-waiting to avoid broadcasting RFO messages.
                     spin_loop_pause();
-                while(Derived::maximize_throughput_ && state.load(X) != EMPTY);
+                while(ATOMIC_QUEUE_UNLIKELY(Derived::maximize_throughput_ && state.load(X) != EMPTY));
+                ATOMIC_QUEUE_LEAN_REG(desired);
+            }
         }
 
         elements[index] = std::forward<U>(element);

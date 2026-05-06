@@ -626,7 +626,7 @@ ATOMIC_QUEUE_NOINLINE void ping_pong_sender(SharedState* ctx0, ThreadState* thre
     do {
         producer_q1.push(*q1, n);
         n = consumer_q2.pop(*q2);
-    } while(ATOMIC_QUEUE_LIKELY(n--));
+    } while(ATOMIC_QUEUE_LIKELY(n-- > 1));
 
     thread->times.set(1); // std::memory_order_seq_cst
 }

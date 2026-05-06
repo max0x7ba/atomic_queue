@@ -40,8 +40,16 @@
 
 #endif
 
-#if !defined(ATOMIC_QUEUE_FULL_THROTTLE)
+#ifndef ATOMIC_QUEUE_FULL_THROTTLE
 #define ATOMIC_QUEUE_FULL_THROTTLE 0
+#endif
+
+#if ATOMIC_QUEUE_FULL_THROTTLE
+#define ATOMIC_QUEUE_REG(id)      asm("":"+r"(id))
+#define ATOMIC_QUEUE_LEAN_REG(id) asm("":"+R"(id))
+#else
+#define ATOMIC_QUEUE_REG(id)
+#define ATOMIC_QUEUE_LEAN_REG(id)
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
