@@ -115,11 +115,6 @@ GNU Make `Makefile` is the original/reference build system this project has been
 
 `CMake` and `Meson` build systems provide the greatest portability and easy usage/consumption of the library, build and run the unit-tests on their supported platforms. They provide the best library user experience, as opposed to best library developer experience.
 
-GNU Make command line options with the greatest impact on built time:
-
-* `-j` sets the number of worker processes to build with in parallel. `-j$(($(nproc)/2))` sets it to half the number of available CPUs.
-* `-R` disables GNU Make legacy built-in variables and rules for at least +25% faster dependency checking. `make -R` is the right default invocation for GNU Make. Not specifying `-R` command line option for GNU Make is wasting time and energy for no good reason. (`ninja` docs never mention `make -R` because `ninja` is unable to build as fast as `make -R` does.)
-
 #### Build and run unit-tests
 Building and running the unit-tests require Boost.Test library (e.g. `libboost-test-dev` on Debian/Ubuntu). Installing the complete set of Boost development libraries is the easiest (e.g. `libboost-all-dev` on Debian/Ubuntu).
 
@@ -281,6 +276,26 @@ Using smaller pages cripple CPU performance with TLB cache misses.
 ## Benchmarks
 [View throughput and latency benchmarks charts][1].
 
+### Throughput and scalability benchmark
+N producer threads push a 4-byte integer into one same queue, N consumer threads pop the integers from the queue. Time taken to send and receive a total of 1,000,000 messages through one queue is measured.
+
+With SMT threads, the benchmark is run for from 1 producer and 1 consumer up to `(total-number-of-cpus / 2)` producers/consumers to measure the scalability of different queues. Without using SMT threads (cross-core communication only) -- up to `(total-number-of-cpus / 4)` producers/consumers.
+
+A benchmark run reports the best msg/sec throughput out of 3 tries for each queue.
+
+The charts report mean, stdev, min and max of msg/sec throughput across 33 benchmark runs.
+
+### Ping-pong benchmark
+One thread posts an integer to another thread through one queue and waits for a reply from another queue and repeats. There are 2 queues and 2 threads, and only one message exist at any given time. In total, each thread `push`es 500,000 messages into its egress queue, and `pop`s 500,000 from its ingress queue.
+
+Contention is minimal here (1-producer-1-consumer, 1 element in the queue) in order to be able to achieve the lowest possible latency a queue could possibly deliver.
+
+This benchmark measures the total time taken to post 500,000 messages and receive 500,000 replies.
+
+A benchmark run reports the best sec/round-trip latency (time taken to `push` a message and `pop` its reply) out of 3 tries for each queue.
+
+The charts report mean, stdev, min and max of sec/round-trip latency across 33 benchmark runs.
+
 ### Methodology
 There are a few OS behaviours that complicate benchmarking, make benchmark runs irreproducible, and introduce otherwise unnecessary timing noise into benchmark timings:
 
@@ -311,26 +326,6 @@ By default, Linux scheduler throttles real-time threads from consuming 100% of C
 ```bash
 echo -1 | sudo tee /proc/sys/kernel/sched_rt_runtime_us >/dev/null
 ```
-
-### Throughput and scalability benchmark
-N producer threads push a 4-byte integer into one same queue, N consumer threads pop the integers from the queue. Time taken to send and receive a total of 1,000,000 messages through one queue is measured.
-
-With SMT threads, the benchmark is run for from 1 producer and 1 consumer up to `(total-number-of-cpus / 2)` producers/consumers to measure the scalability of different queues. Without using SMT threads (cross-core communication only) -- up to `(total-number-of-cpus / 4)` producers/consumers.
-
-A benchmark run reports the best msg/sec throughput out of 3 tries for each queue.
-
-The charts report mean, stdev, min and max of msg/sec throughput across 33 benchmark runs.
-
-### Ping-pong benchmark
-One thread posts an integer to another thread through one queue and waits for a reply from another queue, 2 queues and 2 threads, in total. A _ping_ is an incoming message, a _pong_ is a reply to that. Only one `ping` or `pong` message exists or is being in-flight, at all times. In total, each thread `push`es 500,000 _pings_ into its ingress queue, and `pop`s 500,000 pongs from its ingress queue.
-
-Contention is minimal here (1-producer-1-consumer, 1 element in the queue) in order to be able to achieve the lowest possible latency a queue could possibly deliver.
-
-This benchmark measures the total time taken to post 500,000 messages and receive 500,000 replies.
-
-A benchmark run reports the best sec/round-trip latency (time taken to `push` a message and `pop` its reply) out of 3 tries for each queue.
-
-The charts report mean, stdev, min and max of sec/round-trip latency across 33 benchmark runs.
 
 ## Benchmarks Notes
 - The lowest latency for cross-thread communication is achieved when both threads run on the **same CPU core** (2 SMT threads). Moving communication to a different core adds noticeable latency, and crossing CCX boundaries or CPU sockets increases it further.
