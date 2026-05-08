@@ -61,9 +61,9 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #if ATOMIC_QUEUE_FULL_THROTTLE
-#   define ATOMIC_QUEUE_ORDER(a, b)  __asm__(""::"r"(a),"r"(b))
-#   define ATOMIC_QUEUE_REG(a)       __asm__("":"+r"(a))
-#   define ATOMIC_QUEUE_LEAN_REG(a)  __asm__("":"+R"(a))
+#   define ATOMIC_QUEUE_ORDER(a, b)  asm(""::"r"(a),"r"(b))
+#   define ATOMIC_QUEUE_REG(a)       asm("":"+r"(a))
+#   define ATOMIC_QUEUE_LEAN_REG(a)  asm("":"+R"(a))
 #else
 #   define ATOMIC_QUEUE_ORDER(a, b)
 #   define ATOMIC_QUEUE_REG(a)
@@ -103,11 +103,11 @@ ATOMIC_QUEUE_SINLINE void spin_loop_pause() noexcept {
      defined(__ARM_ARCH_7S__) || \
      defined(__ARM_ARCH_8A__) || \
      defined(__aarch64__))
-    __asm__("yield");
+    asm("yield");
 #elif defined(_M_ARM64)
     __yield();
 #else
-    __asm__("nop");
+    asm("nop");
 #endif
 }
 
@@ -116,7 +116,7 @@ ATOMIC_QUEUE_SINLINE void spin_loop_pause() noexcept {
 #elif defined(__ppc64__) || defined(__powerpc64__)
 constexpr int CACHE_LINE_SIZE = 128;
 ATOMIC_QUEUE_SINLINE void spin_loop_pause() noexcept {
-    __asm__("or 31,31,31 # very low priority");
+    asm("or 31,31,31 # very low priority");
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -130,7 +130,7 @@ ATOMIC_QUEUE_SINLINE void spin_loop_pause() noexcept {} // TODO: Find the right 
 #elif defined(__riscv)
 constexpr int CACHE_LINE_SIZE = 64;
 ATOMIC_QUEUE_SINLINE void spin_loop_pause() noexcept {
-    __asm__(".insn i 0x0F, 0, x0, x0, 0x010");
+    asm(".insn i 0x0F, 0, x0, x0, 0x010");
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -138,7 +138,7 @@ ATOMIC_QUEUE_SINLINE void spin_loop_pause() noexcept {
 #elif defined(__loongarch__)
 constexpr int CACHE_LINE_SIZE = 64;
 ATOMIC_QUEUE_SINLINE void spin_loop_pause() noexcept {
-    __asm__("nop \n nop \n nop \n nop \n nop \n nop \n nop \n nop");
+    asm("nop \n nop \n nop \n nop \n nop \n nop \n nop \n nop");
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
