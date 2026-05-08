@@ -22,12 +22,10 @@
 #
 #   AQB=1 taskset -c 8-15:2 /bin/time make -C ~/src/atomic_queue -Rj4 T=1 TOOLSET=gcc-14 run_benchmarks_n N=2 TAG=5825u_4-smt0
 #
-#	cd ~/src/atomic_queue; make -Rj8 T=1 TOOLSET=gcc-14 run_tests asm_throughput asm_latency & make -Rj8 T=2 CXXFLAGS="-mno-bmi2" TOOLSET=gcc-14 run_tests asm_throughput asm_latency & wait
-#
 # Build and run with multiple toolsets in parallel:
 #
-#   /bin/time make -C ~/src/atomic_queue -Rj$(nproc) T=3 TOOLSET=gcc-11,gcc-12,gcc-13,gcc-14,clang-18,clang-19,clang-20 BUILD=debug all run_tests
 #   cd ~/src/atomic_queue && make T=3 distclean && /bin/time make -k -Rj$(nproc) T=3 TOOLSET=gcc-11,gcc-12,gcc-13,gcc-14,clang-18,clang-19,clang-20
+#   /bin/time make -C ~/src/atomic_queue -Rj$(nproc) T=3 TOOLSET=gcc-11,gcc-12,gcc-13,gcc-14,clang-18,clang-19,clang-20 BUILD=debug all run_tests
 #
 # Additional CPPFLAGS, CXXFLAGS, LDLIBS, LDFLAGS can come from the command line, e.g. make CPPFLAGS='-I<my-include-dir>', or from environment variables.  For example, also produce assembly outputs:
 #
@@ -310,8 +308,8 @@ env2 : env
 
 ifdef not_cleaning # Not cleanining.
 
-asm_throughput : private symbol_regex = "throughput_(consumer|producer)<atomic_queue::AtomicQueue"
-asm_latency : private symbol_regex = "ping_pong_(receiver|sender)<atomic_queue::AtomicQueue"
+asm_throughput : private symbol_regex = '::throughput_(consumer|producer).+atomic_queue::AtomicQueue[B]?[2]?<'
+asm_latency : private symbol_regex = '::ping_pong_(receiver|sender).+atomic_queue::AtomicQueue[B]?[2]?<'
 
 asm_% : scripts/util.sh ${build_dir}/benchmarks $$(if $${symbol_regex},force,$$(error $$@ is not defined))
 	source $< && disassemble-symbol ${symbol_regex} ${build_dir}/benchmarks.o
