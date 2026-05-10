@@ -13,56 +13,51 @@
 
     <link rel="stylesheet" href="benchmarks.css">
 
+    <link rel="icon" href="data:,">
+
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Scalability and Latency Benchmarks</title>
   </head>
   <body>
-    <h1 class="view-toggle">Scalability Benchmark</h1>
+    <h1 class="view-toggle">Latency Benchmark</h1>
     <div>
-      <p>N producer threads push a 4-byte integer into one same queue, N consumer threads pop the integers from the queue. Time taken to send and receive a total of 1,000,000 messages through one queue is measured. With SMT threads, the benchmark is run for from 1 producer and 1 consumer up to (total-number-of-cpus / 2) producers/consumers to measure the scalability of different queues. Without using SMT threads (cross-core communication only) -- up to (total-number-of-cpus / 4) producers/consumers. A benchmark run reports the best msg/sec throughput out of 3 tries for each queue. The charts report mean, stdev, min and max of msg/sec throughput across 33 benchmark runs.</p>
+      <p>Two threads ping-pong one 4-byte integer counter via two queue objects. The counter is decremented and sent as a reply, until reaching 0. There are 2 queues and 2 threads, the counter is initialized with 1,000,000 (each of the two threads pushes/pops 500,000 messages).</p>
+      <p>Contention is minimal here: each queue has 1 producer 1 consumer, up to 1 element in the queue -- the best case ideal scenario for a queue to demonstrate its lowest possible latency. The dependency chains on popped counter exist to prevent CPUs from pipe-lining out-of-order execution in order to measure the true round-trip latency.</p>
+      <p>This benchmark measures the total time taken for the 2 threads to exchange the 1,000,000 messages. The charts report mean, stdev, min and max of sec/round-trip latency across 33 benchmark runs.</p>
 
-      <h3 class="view-toggle">Scalability (with SMT) on AMD Ryzen 7 5825U</h3><div><div class="chart" id="smt_scalability_ryzen_5825u" data-ylim="60e6;1e9"></div></div>
-      <h3 class="view-toggle">Cross-core (no SMT) scalability on AMD Ryzen 7 5825U</h3><div><div class="chart" id="cc_scalability_ryzen_5825u" data-ylim="60e6;1e9"></div></div>
+      <h3 class="view-toggle">Latency (with SMT) on AMD Ryzen 5950X</h3><div><div class="chart" id="smt_latency_ryzen_5950x"></div></div>
+      <h3 class="view-toggle">Cross-core (no SMT) latency on AMD Ryzen 5950X</h3><div><div class="chart" id="cc_latency_ryzen_5950x"></div></div>
 
-      <h3 class="view-toggle">Scalability (with SMT) on AMD Ryzen 9 5950X</h3><div><div class="chart" id="smt_scalability_ryzen_5950x" data-ylim="20e6;500e6"></div></div>
-      <h3 class="view-toggle">Cross-core (no SMT) scalability on AMD Ryzen 9 5950X</h3><div><div class="chart" id="cc_scalability_ryzen_5950x" data-ylim="20e6;500e6"></div></div>
+      <h3 class="view-toggle">Latency (with SMT) on AMD Ryzen 5825U</h3><div><div class="chart" id="smt_latency_ryzen_5825u"></div></div>
+      <h3 class="view-toggle">Cross-core (no SMT) latency on AMD Ryzen 5825U</h3><div><div class="chart" id="cc_latency_ryzen_5825u"></div></div>
 
-      <h3 class="view-toggle">Scalability (with SMT) on Intel i9-9900KS</h3><div><div class="chart" id="smt_scalability_9900ks" data-ylim="60e6;1e9"></div></div>
-
-      <h3 class="view-toggle">Scalability (with SMT) on Intel Xeon Gold 6132</h3><div><div class="chart" id="smt_scalability_xeon_gold_6132" data-ylim="15e6; 300e6"></div></div>
+      <h3 class="view-toggle">Legacy latency (with SMT) on Intel Xeon Gold 6132</h3><div><div class="chart" id="smt_latency_xeon_gold_6132"></div></div>
+      <h3 class="view-toggle">Legacy latency (with SMT) on Intel i9-9900KS</h3><div><div class="chart" id="smt_latency_9900ks"></div></div>
 
     </div>
 
-    <h1 class="view-toggle">Latency Benchmark</h1>
+    <h1 class="view-toggle">Scalability Benchmark</h1>
     <div>
-      <p>One thread posts an integer to another thread through one queue and waits for a reply from another queue and repeats. There are 2 queues and 2 threads, and only one message exist at any given time. In total, each thread pushes 500,000 messages into its egress queue, and pops 500,000 from its ingress queue. Contention is minimal here (1-producer-1-consumer, 1 element in the queue) in order to be able to achieve the lowest possible latency a queue can provide. This benchmark measures the total time taken to post 500,000 messages and receive 500,000 replies. A benchmark run reports the best sec/round-trip latency (time taken to push a message and pop its reply) out of 3 tries for each queue. The charts report mean, stdev, min and max of sec/round-trip latency across 33 benchmark runs.</p>
+      <p>N producer threads push a 4-byte integer into one same queue, N consumer threads pop the integers from the queue. With SMT threads, the benchmark is run for from 1 producer and 1 consumer up to <code>(total-number-of-cpus / 2)</code> producers/consumers to measure the scalability of different queues. Without using SMT threads (cross-core communication only) -- up to <code>(total-number-of-cpus / 4)</code> producers/consumers.</p>
+      <p>There are no dependency chains on messages in producer and consumer threads in this benchmark in order to let the queues demonstrate their highest possible throughputs. The reported throughputs are higher than the inverse of latencies because of no dependency chains stalling CPU pipe-lining and out-of-order execution (as intended).</p>
+      <p>This benchmark measures the total time taken to send and receive a total of 1,000,000 messages through one queue. The charts report mean, stdev, min and max of msg/sec throughput across 33 benchmark runs.</p>
 
-      <h3 class="view-toggle">Latency (with SMT) on AMD Ryzen 7 5825U</h3><div><div class="chart" id="smt_latency_ryzen_5825u"></div></div>
-      <h3 class="view-toggle">Cross-core (no SMT) latency on AMD Ryzen 7 5825U</h3><div><div class="chart" id="cc_latency_ryzen_5825u"></div></div>
+      <h3 class="view-toggle">Scalability (with SMT) on AMD Ryzen 5950X</h3><div><div class="chart" id="smt_scalability_ryzen_5950x" data-ylim="20e6;500e6"></div></div>
+      <h3 class="view-toggle">Cross-core (no SMT) scalability on AMD Ryzen 5950X</h3><div><div class="chart" id="cc_scalability_ryzen_5950x" data-ylim="20e6;500e6"></div></div>
 
-      <h3 class="view-toggle">Latency (with SMT) on AMD Ryzen 7 5950X</h3><div><div class="chart" id="smt_latency_ryzen_5950x"></div></div>
-      <h3 class="view-toggle">Cross-core (no SMT) latency on AMD Ryzen 7 5950X</h3><div><div class="chart" id="cc_latency_ryzen_5950x"></div></div>
+      <h3 class="view-toggle">Scalability (with SMT) on AMD Ryzen 5825U</h3><div><div class="chart" id="smt_scalability_ryzen_5825u" data-ylim="60e6;1e9"></div></div>
+      <h3 class="view-toggle">Cross-core (no SMT) scalability on AMD Ryzen 5825U</h3><div><div class="chart" id="cc_scalability_ryzen_5825u" data-ylim="60e6;1e9"></div></div>
 
-      <h3 class="view-toggle">Latency (with SMT) on Intel i9-9900KS</h3><div><div class="chart" id="smt_latency_9900ks"></div></div>
+      <h3 class="view-toggle">Legacy scalability (with SMT) on Intel Xeon Gold 6132</h3><div><div class="chart" id="smt_scalability_xeon_gold_6132" data-ylim="15e6; 300e6"></div></div>
+      <h3 class="view-toggle">Legacy scalability (with SMT) on Intel i9-9900KS</h3><div><div class="chart" id="smt_scalability_9900ks" data-ylim="60e6;1e9"></div></div>
 
-      <h3 class="view-toggle">Latency (with SMT) on Intel Xeon Gold 6132</h3><div><div class="chart" id="smt_latency_xeon_gold_6132"></div></div>
 
     </div>
 
     <h1 class="view-toggle">Systems details</h1>
     <div>
-        <h3 class="view-toggle">AMD Ryzen 7 5825U system</h3>
-        <ul>
-          <li>OS: KDE Neon / Ubuntu 24.04 LTS, kernel 6.8.0-110-lowlatency (mitigations=off norandmaps noautogroup transparent_hugepage=always)
-          <li>Compiler: gcc-14.2.0
-          <li>atomic_queue version: commit 1a3774a89c86ecfdf08753dbd41018ace5a833a4
-          <li>Boost version: 1.83.0
-          <li>TBB version: 2021.11.0-2ubuntu2
-          <li>moodycamel concurrentqueue version: commit dea078cf5b6e742cd67a0d725e36f872feca4de4
-          <li>moodycamel readerwriterqueue version: commit 2ae710de996a1d02bbc7696b2cdff2c6078e76f8
-          <li>xenium library version: commit f6416d30043a7d025405038d5ddd4794aaaab4a3
-        </ul>
-        <h3 class="view-toggle">AMD Ryzen 9 5950X system</h3>
+        <h3 class="view-toggle">AMD Ryzen 5950X system</h3>
         <ul>
           <li>OS: KDE Neon / Ubuntu 24.04 LTS, kernel 6.8.0-1051-nvidia-lowlatency (mitigations=off norandmaps noautogroup transparent_hugepage=always)
           <li>Compiler: gcc-14.2.0
@@ -73,13 +68,13 @@
           <li>moodycamel readerwriterqueue version: commit 2ae710de996a1d02bbc7696b2cdff2c6078e76f8
           <li>xenium library version: commit f6416d30043a7d025405038d5ddd4794aaaab4a3
         </ul>
-        <h3 class="view-toggle">Intel i9-9900KS system</h3>
+        <h3 class="view-toggle">AMD Ryzen 5825U system</h3>
         <ul>
-          <li>OS: Kubuntu-18.04.4 LTS
-          <li>Compiler: gcc-8.4.0
-          <li>atomic_queue version: commit 7e138d21fcd4bad95e030d8d6c8b77d5a4538baa
-          <li>Boost version: 1.65.1
-          <li>TBB version: 2019_U7, commit 4233fef583b4f8cbf9f781311717600feaaa0694
+          <li>OS: KDE Neon / Ubuntu 24.04 LTS, kernel 6.8.0-110-lowlatency (mitigations=off norandmaps noautogroup transparent_hugepage=always)
+          <li>Compiler: gcc-14.2.0
+          <li>atomic_queue version: commit 1a3774a89c86ecfdf08753dbd41018ace5a833a4
+          <li>Boost version: 1.83.0
+          <li>TBB version: 2021.11.0-2ubuntu2
           <li>moodycamel concurrentqueue version: commit dea078cf5b6e742cd67a0d725e36f872feca4de4
           <li>moodycamel readerwriterqueue version: commit 2ae710de996a1d02bbc7696b2cdff2c6078e76f8
           <li>xenium library version: commit f6416d30043a7d025405038d5ddd4794aaaab4a3
@@ -95,12 +90,23 @@
           <li>moodycamel readerwriterqueue version: commit 2ae710de996a1d02bbc7696b2cdff2c6078e76f8
           <li>xenium library version: commit f6416d30043a7d025405038d5ddd4794aaaab4a3
         </ul>
+        <h3 class="view-toggle">Intel i9-9900KS system</h3>
+        <ul>
+          <li>OS: Kubuntu-18.04.4 LTS
+          <li>Compiler: gcc-8.4.0
+          <li>atomic_queue version: commit 7e138d21fcd4bad95e030d8d6c8b77d5a4538baa
+          <li>Boost version: 1.65.1
+          <li>TBB version: 2019_U7, commit 4233fef583b4f8cbf9f781311717600feaaa0694
+          <li>moodycamel concurrentqueue version: commit dea078cf5b6e742cd67a0d725e36f872feca4de4
+          <li>moodycamel readerwriterqueue version: commit 2ae710de996a1d02bbc7696b2cdff2c6078e76f8
+          <li>xenium library version: commit f6416d30043a7d025405038d5ddd4794aaaab4a3
+        </ul>
     </div>
 
     <h1 class="view-toggle homepage">Homepage</h1>
     <div>
       <p class="homepage"><a href="https://github.com/max0x7ba/atomic_queue">github.com/max0x7ba/atomic_queue</a></p>
-      <p class="copyright">Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file LICENSE.</p>
+      <p class="copyright">Copyright (c) Maxim Egorushkin. MIT License. See the full licence in file LICENSE.</p>
     </div>
   </body>
 </html>

@@ -37,19 +37,9 @@ $(function() {
            "OptimistAtomicQueueB2": ['#FFBFBF', 18]
     };
 
-    // function getSeriesColor(c) { return c?.pattern?.color ?? c; }
-
     function prec0(v) {
         return Highcharts.numberFormat(v, 0);
     }
-
-    // function get_caption(div) {
-    //     const caption = $(div).data("caption");
-    //     return {
-    //         text: caption,
-    //         useHTML: true,
-    //     };
-    // }
 
     function plot_scalability(div, results, max_lin, max_log) {
         const modes = [
@@ -135,7 +125,6 @@ $(function() {
                 formatter: tooltip_formatter,
                 shared: true,
             },
-            // caption: get_caption(div),
         });
     }
 
@@ -167,7 +156,6 @@ $(function() {
                 if(!stats)
                     continue;
                 const [color, index] = s;
-                // const color2 = getSeriesColor(color);
                 const [min, max, mean, stdev] = stats;
                 const q1 = Math.max(min, mean - stdev);
                 const q3 = Math.min(max, mean + stdev);
@@ -223,7 +211,6 @@ $(function() {
     function plot_latency(div, results) {
         function createChart(chartType) {
             const viewOptions = latencyViewOptions[chartType](results, createChart);
-            // Highcharts.chart(div, $.extend({caption: get_caption(div)}, viewOptions, latencyChartOptions));
             Highcharts.chart(div, $.extend(true, viewOptions, latencyChartOptions));
         };
         createChart("bar");

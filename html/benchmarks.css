@@ -4,7 +4,7 @@ body {
     visibility: hidden;
     background-color: black;
     color: white;
-    font-family: 'Roboto Slab', sans-serif;
+    font-family: 'Roboto Slab', serif;
     overflow-y: scroll;
 }
 
@@ -23,7 +23,9 @@ ul {
 }
 
 div.chart {
-    height: 580px;
+    height: 600px;
+    max-width: 100%;
+    overflow-x: auto;
 }
 
 p.copyright {

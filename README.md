@@ -55,7 +55,7 @@ Several other well established and popular thread-safe containers are used for r
 | `pthread_spinlock` | MPMC | A fixed size ring-buffer with `pthread_spinlock_t`. |
 | `boost::lockfree::spsc_queue` | SPSC | A wait-free queue from Boost library. |
 | `boost::lockfree::queue` | MPMC | A lock-free queue from Boost library. |
-| `moodycamel::ConcurrentQueue` | MPMC | A lock-free queue used in non-blocking mode. Designed to maximize throughput at the expense of latency, eschewing global time order. Not equivalent to other queues benchmarked here in this respect. |
+| `moodycamel::ConcurrentQueue` | quasi-MPMC | A lock-free queue used in non-blocking mode. Designed to maximize throughput at the expense of latency, eschewing global time order, by emulating a MPMC queue with a bunch of SPSC queues under the hood. It is not equivalent to other queues benchmarked here in this respect. |
 | `moodycamel::ReaderWriterQueue` | SPSC | A lock-free queue used in non-blocking mode. |
 | `xenium::michael_scott_queue` | MPMC | A lock-free queue proposed by [Michael and Scott](http://www.cs.rochester.edu/~scott/papers/1996_PODC_queues.pdf) (similar to `boost::lockfree::queue` which is also based on the same proposal). |
 | `xenium::ramalhete_queue` | MPMC | A lock-free queue proposed by [Ramalhete and Correia](http://concurrencyfreaks.blogspot.com/2016/11/faaarrayqueue-mpmc-lock-free-queue-part.html). |
@@ -122,7 +122,8 @@ Building and running the unit-tests require Boost.Test library (e.g. `libboost-t
 git clone https://github.com/max0x7ba/atomic_queue.git
 cd atomic_queue
 ```
-After succeeding the above commands,
+
+Then:
 ```
 # Build and run the unit-tests with gcc (default).
 make -R -j$(($(nproc)/2)) BUILD=debug run_tests
@@ -146,8 +147,7 @@ git clone https://github.com/max0x7ba/atomic_queue.git
 cd atomic_queue
 ```
 
-After succeeding the above commands,
-
+Then:
 ```
 make -R -j$(($(nproc)/2)) run_benchmarks_n       # Build and run the benchmarks once.
 make -R -j$(($(nproc)/2)) run_benchmarks_n N=3   # Build and run the benchmarks 3 times.
@@ -276,25 +276,34 @@ Using smaller pages cripple CPU performance with TLB cache misses.
 ## Benchmarks
 [View throughput and latency benchmarks charts][1].
 
+### Latency benchmark
+Two threads ping-pong one 4-byte integer counter via two queue objects. The counter is decremented and sent as a reply, until reaching 0. There are 2 queues and 2 threads, the counter is initialized with 1,000,000 (each of the two threads pushes/pops 500,000 messages).
+
+Contention is minimal here: each queue has 1 producer 1 consumer, up to 1 element in the queue -- the best case ideal scenario for a queue to demonstrate its lowest possible latency. The dependency chains on popped counter exist to prevent CPUs from pipe-lining out-of-order execution in order to measure the true round-trip latency.
+
+This benchmark measures the total time taken for the 2 threads to exchange the 1,000,000 messages. A benchmark run reports the best sec/round-trip latency (time taken to `push` a message and `pop` its reply) out of 3 tries for each queue. The charts report mean, stdev, min and max of sec/round-trip latency across 33 benchmark runs.
+
 ### Throughput and scalability benchmark
-N producer threads push a 4-byte integer into one same queue, N consumer threads pop the integers from the queue. Time taken to send and receive a total of 1,000,000 messages through one queue is measured.
+N producer threads push a 4-byte integer into one same queue, N consumer threads pop the integers from the queue.
 
 With SMT threads, the benchmark is run for from 1 producer and 1 consumer up to `(total-number-of-cpus / 2)` producers/consumers to measure the scalability of different queues. Without using SMT threads (cross-core communication only) -- up to `(total-number-of-cpus / 4)` producers/consumers.
 
-A benchmark run reports the best msg/sec throughput out of 3 tries for each queue.
+There are no dependency chains on messages in producer and consumer threads in this benchmark in order to let the queues demonstrate their highest possible throughputs. The reported throughputs are higher than the inverse of latencies because of no dependency chains stalling CPU pipe-lining and out-of-order execution (as intended).
 
-The charts report mean, stdev, min and max of msg/sec throughput across 33 benchmark runs.
+This benchmark measures the total time taken to send and receive a total of 1,000,000 messages through one queue. A benchmark run reports the best msg/sec throughput out of 3 tries for each queue. The charts report mean, stdev, min and max of msg/sec throughput across 33 benchmark runs.
 
-### Ping-pong benchmark
-One thread posts an integer to another thread through one queue and waits for a reply from another queue and repeats. There are 2 queues and 2 threads, and only one message exist at any given time. In total, each thread `push`es 500,000 messages into its egress queue, and `pop`s 500,000 from its ingress queue.
+### Results Notes
+- The lowest latency for cross-thread communication is achieved when both threads run on the **same CPU core** (2 SMT threads). Moving communication to a different core adds noticeable latency, and crossing CCX boundaries or CPU sockets increases it further.
+- In the round-trip latency benchmark, **every tested queue** achieves its best latency only when the producer and consumer threads share the same CPU core.
+When the threads run on **different cores**, latency increases by **3× or more**.
+- When producer and consumer threads run on different cores, **all queues** show **at least 1.5× lower** throughput.
+- The numbers shown for each queue reflect the **best-case** result across within-core, cross-core, and cross-CCX/socket scenarios.
+- **Important**: These scenarios behave very differently in practice. Excellent performance with two SMT threads on a single core is often irrelevant for real-world use cases where threads must run on different cores.
+- **Recommendation**: Always benchmark your specific thread placement (same core vs. different cores vs. different CCX) for latency-critical or throughput-critical applications.
 
-Contention is minimal here (1-producer-1-consumer, 1 element in the queue) in order to be able to achieve the lowest possible latency a queue could possibly deliver.
+#### Notable exceptions
+`moodycamel::ConcurrentQueue` is the notable exception here, with its 1-producer-1-consumer throughput being the worst, yet scaling up in almost perfect linear fashion when the benchmark adds another pair of producer-consumer threads. It tries to emulate a MPMC queue with a bunch of SPSC queues under the hood. `moodycamel::ConcurrentQueue` is not a drop-in replacement for the other true MPMC queues benchmarked here. Whereas all the other MPMC queues are drop-in replacements for another (interface adaptors may be required), including `moodycamel::ConcurrentQueue` too.
 
-This benchmark measures the total time taken to post 500,000 messages and receive 500,000 replies.
-
-A benchmark run reports the best sec/round-trip latency (time taken to `push` a message and `pop` its reply) out of 3 tries for each queue.
-
-The charts report mean, stdev, min and max of sec/round-trip latency across 33 benchmark runs.
 
 ### Methodology
 There are a few OS behaviours that complicate benchmarking, make benchmark runs irreproducible, and introduce otherwise unnecessary timing noise into benchmark timings:
@@ -326,20 +335,6 @@ By default, Linux scheduler throttles real-time threads from consuming 100% of C
 ```bash
 echo -1 | sudo tee /proc/sys/kernel/sched_rt_runtime_us >/dev/null
 ```
-
-## Benchmarks Notes
-- The lowest latency for cross-thread communication is achieved when both threads run on the **same CPU core** (2 SMT threads). Moving communication to a different core adds noticeable latency, and crossing CCX boundaries or CPU sockets increases it further.
-- In the round-trip latency benchmark, **every tested queue** achieves its best latency only when the producer and consumer threads share the same CPU core.
-When the threads run on **different cores**, latency increases by **3× or more**.
-- When producer and consumer threads run on different cores, **all queues** show **at least 1.5× lower** throughput.
-- The numbers shown for each queue reflect the **best-case** result across within-core, cross-core, and cross-CCX/socket scenarios.
-- **Important**: These scenarios behave very differently in practice. Excellent performance with two SMT threads on a single core is often irrelevant for real-world use cases where threads must run on different cores.
-- **Recommendation**: Always benchmark your specific thread placement (same core vs. different cores vs. different CCX) for latency-critical or throughput-critical applications.
-
-### Notable exceptions
-`moodycamel::ConcurrentQueue` is the notable exception here, with its 1-producer-1-consumer throughput being the worst, yet scaling up in almost perfect linear fashion when the benchmark adds another pair of producer-consumer threads. It tries to emulate a MPMC queue with a bunch of SPSC queues under the hood.
-
-`moodycamel::ConcurrentQueue` is not a feasible/fungible/compatible drop-in replacement for any other (true) MPMC queues benchmarked here. Whereas all the other MPMC queues are perfectly fungible compatible drop-in replacements for another, including `moodycamel::ConcurrentQueue` too.
 
 ## Reading material
 Some books on the subject of multi-threaded programming I found quite instructive:
