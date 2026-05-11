@@ -2,6 +2,14 @@
 <!-- Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file LICENSE. -->
 <html lang="en">
   <head>
+    <meta charset="utf-8">
+    <meta name="description" content="atomic_queue is a C++ concurrent lock-free low-latency queue. Latency and throughput benchmarks of atomic_queue and popular C++ concurrent lock-free queues.">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Latency and Throughput Benchmarks</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
     <script defer src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
     <script defer src="https://code.highcharts.com/highcharts.js"></script>
     <script defer src="https://code.highcharts.com/highcharts-more.js"></script>
@@ -15,9 +23,6 @@
 
     <link rel="icon" href="data:,">
 
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Scalability and Latency Benchmarks</title>
   </head>
   <body>
     <h1 class="view-toggle">Latency Benchmark</h1>
@@ -37,7 +42,7 @@
 
     </div>
 
-    <h1 class="view-toggle">Scalability Benchmark</h1>
+    <h1 class="view-toggle">Throughput Benchmark</h1>
     <div>
       <p>N producer threads push a 4-byte integer into one same queue, N consumer threads pop the integers from the queue. With SMT threads, the benchmark is run for from 1 producer and 1 consumer up to <code>(total-number-of-cpus / 2)</code> producers/consumers to measure the scalability of different queues. Without using SMT threads (cross-core communication only) -- up to <code>(total-number-of-cpus / 4)</code> producers/consumers.</p>
       <p>There are no dependency chains on messages in producer and consumer threads in this benchmark in order to let the queues demonstrate their highest possible throughputs. The reported throughputs are higher than the inverse of latencies because of no dependency chains stalling CPU pipe-lining and out-of-order execution (as intended).</p>

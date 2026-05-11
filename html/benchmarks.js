@@ -41,7 +41,9 @@ $(function() {
         return Highcharts.numberFormat(v, 0);
     }
 
-    function plot_scalability(div, results, max_lin, max_log) {
+    function plot_scalability(div, results) {
+        const [max_lin, max_log] = $(div).data("ylim").split(";").map(parseFloat);
+
         const modes = [
             {
                 yAxis: { type: 'linear', title: { text: 'throughput, msg/sec (linear scale)' }, max: max_lin, min: 0 },
@@ -218,14 +220,8 @@ $(function() {
 
     $("div.chart").each(function() {
         const id = this.id;
-        const results = atomic_queue_benchmarks[id];
-        if(id.includes("scalability")) {
-            const [max_lin, max_log] = $(this).data("ylim").split(";").map(parseFloat);
-            plot_scalability(this, results, max_lin, max_log);
-        }
-        else {
-            plot_latency(this, results);
-        }
+        const plot_fn = id.includes("latency") ? plot_latency : plot_scalability;
+        plot_fn(this, atomic_queue_benchmarks[id]);
     });
 
     $(".view-toggle")

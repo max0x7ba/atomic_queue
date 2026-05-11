@@ -274,7 +274,7 @@ Using huge pages improves performance of memory intensive applications dramatica
 Using smaller pages cripple CPU performance with TLB cache misses.
 
 ## Benchmarks
-[View throughput and latency benchmarks charts][1].
+[View latency and throughput benchmarks charts][1].
 
 ### Latency benchmark
 Two threads ping-pong one 4-byte integer counter via two queue objects. The counter is decremented and sent as a reply, until reaching 0. There are 2 queues and 2 threads, the counter is initialized with 1,000,000 (each of the two threads pushes/pops 500,000 messages).
