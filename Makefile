@@ -58,11 +58,16 @@ TAG := results
 N := 1
 
 ################################################################################################################################
-# Enables GNU Make to enable the jobserver protocol for the toolset programs to request allocating more threads.
+# Boiler-plate begin.
+
+################################################################################################################################
+# Enable GNU Make jobserver protocol for the recipe programs to request allocating more threads.
 JOBSERVER := 1
 J.0 :=
 J.1 := +
 J := ${J.${JOBSERVER}}
+
+n_cpus := $(or $(subst -j,,$(filter -j%,${MAKEFLAGS})),1)
 
 ################################################################################################################################
 
@@ -76,19 +81,6 @@ include ${BUILD_ROOT}/system_config.mk
 endif
 
 ################################################################################################################################
-
-colors := $(shell echo "\033[97m \033[0m")
-c7 := $(word 1,${colors})
-c0 := $(word 2,${colors})
-
-log_src := $(firstword ${MAKEFILE_LIST})
-log = $(info ${log_src}: ${c7}${1}${c0})
-log_kv = $(let head tail,${1},$(call log,$(head)=$(value $(head)))$(and $(tail),$(call log_kv,$(tail))))
-
-n_cpus := $(or $(subst -j,,$(filter -j%,${MAKEFLAGS})),1)
-
-################################################################################################################################
-# Boiler-plate begin.
 
 SHELL := /bin/bash
 .SHELLFLAGS := --norc -o pipefail -e -c
@@ -114,6 +106,16 @@ mutli_toolset := $(intcmp $(words ${toolsets}),2,,1)
 
 all :
 .SECONDEXPANSION :
+
+################################################################################################################################
+
+colors := $(shell echo "\033[97m \033[0m")
+c7 := $(word 1,${colors})
+c0 := $(word 2,${colors})
+
+log_src := $(firstword ${MAKEFILE_LIST})
+log = $(info ${log_src}: ${c7}${1}${c0})
+log_kv = $(let head tail,${1},$(call log,$(head)=$(value $(head)))$(and $(tail),$(call log_kv,$(tail))))
 
 ################################################################################################################################
 ifeq (,${mutli_toolset}) # Build with a single toolset.
@@ -340,8 +342,9 @@ distclean :
 	rm -rf ${BUILD_ROOT}
 
 env :
-	uname --all
-	env | sort --ignore-case
+	uname --all; echo
+	ulimit -a; echo
+	env | sort --ignore-case; echo
 
 # Prerequisites of .PHONY are always interpreted as literal target names, never as patterns (even if they contain ‘%’ characters). To always rebuild a pattern rule consider using a "force target".
 # If a rule has no prerequisites or recipe, and the target of the rule is a nonexistent file, then make imagines this target to have been updated whenever its rule is run. This implies that all targets depending on this one will always have their recipe run.
