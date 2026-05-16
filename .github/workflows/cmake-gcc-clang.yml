@@ -37,7 +37,6 @@ jobs:
       matrix:
         include:
           # --- Linux x64 ---
-          # We define 'compiler' as a dictionary (object) here
           - os: ubuntu-latest
             build_type: Release
             compiler: { c: gcc, cpp: g++ }
@@ -74,7 +73,7 @@ jobs:
       if: startsWith(matrix.os, 'ubuntu')
       run: |
         sudo apt-get update
-        sudo apt-get install --yes -qq libboost-all-dev
+        sudo apt-get install --yes -qq libboost-test-dev
 
     - name: Install boost on windows
       if: startsWith(matrix.os, 'windows') && matrix.compiler.cpp == 'cl'
@@ -82,7 +81,7 @@ jobs:
       id: install-boost-windows
       with:
         boost_version: 1.89.0
-        platform_version: 2022
+        platform_version: 2025
         toolset: msvc
 
     - name: Configure CMake Ubuntu
