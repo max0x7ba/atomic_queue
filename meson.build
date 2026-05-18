@@ -5,7 +5,7 @@
 project(
   'atomic_queue', 'cpp',
   license : 'MIT License',
-  default_options : ['cpp_std=gnu++14', 'buildtype=release', 'b_ndebug=if-release']
+  default_options : ['cpp_std=c++14', 'buildtype=release', 'b_ndebug=if-release']
 )
 
 threads_dep = dependency('threads')
@@ -15,6 +15,7 @@ atomic_queue_dep = declare_dependency(include_directories : ['include'], depende
 if get_option('tests')
   unit_test_framework_dep = dependency('boost', modules : ['unit_test_framework'])
 
+  # Tests still compile with C++14, but benchmarks and example require C++17.
   tests_exe = executable(
     'tests',
     'src/tests.cc',
@@ -26,6 +27,7 @@ if get_option('tests')
     'example',
     'src/example.cc',
     dependencies : [atomic_queue_dep],
+    cpp_args: ['-std=c++17']
   )
   test('example', example_exe)
 endif
@@ -48,6 +50,7 @@ if get_option('benchmarks')
     ['src/benchmarks.cc', 'src/cpu_base_frequency.cc', 'src/huge_pages.cc'],
     include_directories : ['src'],
     dependencies : [atomic_queue_dep, dl_dep, xenium_dep, boost_dep, tbb_dep, moodycamel_dep],
+    cpp_args: ['-std=c++17']
   )
   benchmark('benchmarks', benchmarks_exe)
 endif
@@ -65,6 +68,6 @@ install_headers(
 pkg = import('pkgconfig')
 pkg.generate(
   name: 'atomic_queue',
-  description: 'C++14 multiple-producer-multiple-consumer lock-free queues based on circular buffers',
+  description: 'C++14 concurrent lock-free low-latency queue',
   libraries: [threads_dep]
 )
