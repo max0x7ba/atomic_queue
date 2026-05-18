@@ -13,12 +13,18 @@ threads_dep = dependency('threads')
 atomic_queue_dep = declare_dependency(include_directories : ['include'], dependencies : threads_dep)
 
 if get_option('tests')
+  cxx = meson.get_compiler('cpp')
+  wno_unused_variable = []
+  if cxx.get_id() == 'gcc' or cxx.get_id() == 'clang'
+    wno_unused_variable = ['-Wno-unused-variable']
+  endif
+
   unit_test_framework_dep = dependency('boost', modules : ['unit_test_framework'])
 
-  # Tests still compile with C++14, but benchmarks and example require C++17.
   tests_exe = executable(
     'tests',
     'src/tests.cc',
+    cpp_args : wno_unused_variable,
     dependencies : [atomic_queue_dep, unit_test_framework_dep],
   )
   test('tests', tests_exe)
@@ -26,8 +32,8 @@ if get_option('tests')
   example_exe = executable(
     'example',
     'src/example.cc',
+    cpp_args : wno_unused_variable,
     dependencies : [atomic_queue_dep],
-    cpp_args: ['-std=c++17']
   )
   test('example', example_exe)
 endif
@@ -50,7 +56,7 @@ if get_option('benchmarks')
     ['src/benchmarks.cc', 'src/cpu_base_frequency.cc', 'src/huge_pages.cc'],
     include_directories : ['src'],
     dependencies : [atomic_queue_dep, dl_dep, xenium_dep, boost_dep, tbb_dep, moodycamel_dep],
-    cpp_args: ['-std=c++17']
+    override_options : ['cpp_std=c++17']
   )
   benchmark('benchmarks', benchmarks_exe)
 endif

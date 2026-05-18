@@ -151,7 +151,7 @@ cxxflags.gcc.debug := -Og -f{stack-protector-all,no-omit-frame-pointer} # -D_GLI
 cxxflags.gcc.release := -O3 -mtune=native -fno-{stack-protector,stack-clash-protection,move-loop-invariants} -falign-functions=64 -DNDEBUG ${cxxflags.gcc.asm.${ASM}}
 cxxflags.gcc.sanitize := ${cxxflags.gcc.debug} -fsanitize=thread
 cxxflags.gcc.sanitize2 := ${cxxflags.gcc.debug} -fsanitize=undefined,address
-cxxflags.gcc := -march=native -f{no-plt,no-math-errno,finite-math-only,message-length=0} -W{all,extra,error,no-maybe-uninitialized} ${cxxflags.gcc.${BUILD}}
+cxxflags.gcc := -march=native -f{no-plt,no-math-errno,finite-math-only,message-length=0} -W{all,extra,error,no-maybe-uninitialized,no-unused-variable} ${cxxflags.gcc.${BUILD}}
 ldflags.gcc.sanitize := ${ldflags.gcc.debug} -fsanitize=thread
 ldflags.gcc.sanitize2 := ${ldflags.gcc.debug} -fsanitize=undefined,address
 # ldflags.gcc := -fuse-ld=${use-ld.gcc} -Wl,--compress-debug-sections=zstd,-O2,--gc-sections ${ldflags.gcc.${BUILD}}
@@ -163,7 +163,7 @@ cxxflags.clang.debug := -O0 -fstack-protector-all $(and ${has_native},-march=nat
 cxxflags.clang.release := -O3 -fno-stack-protector -falign-functions=64 -DNDEBUG $(and ${has_native},-march=native -mtune=native)
 cxxflags.clang.sanitize := ${cxxflags.clang.debug} -fsanitize=thread
 cxxflags.clang.sanitize2 := ${cxxflags.clang.debug} -fsanitize=undefined,address
-cxxflags.clang := -stdlib=libstdc++ -f{no-plt,no-math-errno,finite-math-only,message-length=0} -W{all,extra,error} ${cxxflags.clang.${BUILD}}
+cxxflags.clang := -stdlib=libstdc++ -f{no-plt,no-math-errno,finite-math-only,message-length=0} -W{all,extra,error,no-unused-variable} ${cxxflags.clang.${BUILD}}
 ldflags.clang.debug := -latomic # A work-around for clang bug.
 ldflags.clang.sanitize := ${ldflags.clang.debug} -fsanitize=thread
 ldflags.clang.sanitize2 := ${ldflags.clang.debug} -fsanitize=undefined,address
@@ -208,7 +208,6 @@ endif
 exes := example tests benchmarks
 
 example_src := example.cc
-${build_dir}/example.o : cxxflags += -std=c++17 # example.cc uses c++17 features.
 
 tests_src := tests.cc
 ${build_dir}/tests.o : cppflags += -DBOOST_TEST_DYN_LINK=1
