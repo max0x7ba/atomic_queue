@@ -69,11 +69,13 @@ public:
     }
 
     ATOMIC_QUEUE_INLINE bool was_empty() const noexcept {
-        return static_cast<int>(head_ - tail_) <= 0;
+        ScopedLock lock(mutex_);
+        return head_ == tail_;
     }
 
     ATOMIC_QUEUE_INLINE bool was_full() const noexcept {
-        return static_cast<int>(head_ - tail_) >= static_cast<int>(size_);
+        ScopedLock lock(mutex_);
+        return head_ - tail_ == size_;
     }
 };
 
