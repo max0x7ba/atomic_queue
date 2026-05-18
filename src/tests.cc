@@ -59,8 +59,8 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(stress, Queue, stress_queues) {
     Barrier2 barrier = {{PRODUCERS + CONSUMERS}};
 
     std::thread producers[PRODUCERS];
-    for(unsigned i = 0; i < PRODUCERS; ++i)
-        producers[i] = std::thread([&q, &barrier]() {
+    for(auto& producer : producers)
+        producer = std::thread([&q, &barrier]() {
             barrier.countdown();
             for(T n = N_STRESS_MSG; n; --n)
                 q.push(n);
@@ -68,8 +68,8 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(stress, Queue, stress_queues) {
 
     uint64_t results[CONSUMERS];
     std::thread consumers[CONSUMERS];
-    for(unsigned i = 0; i < CONSUMERS; ++i)
-        consumers[i] = std::thread([&q, &barrier, &r = results[i]]() {
+    for(auto& consumer : consumers)
+        consumer = std::thread([&q, &barrier, &r = results[&consumer - consumers]]() {
             barrier.countdown();
             uint64_t result = 0;
             for(T n; (n = q.pop()) != static_cast<T>(STOP_MSG);)
@@ -79,12 +79,12 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(stress, Queue, stress_queues) {
 
     for(auto& t : producers)
         t.join();
-    for(int i = CONSUMERS; i--;)
+    for([[maybe_unused]] auto& consumer : consumers)
         q.push(STOP_MSG);
     for(auto& t : consumers)
         t.join();
 
-    constexpr uint64_t expected_result = (N_STRESS_MSG + 1) / 2. * N_STRESS_MSG * PRODUCERS;
+    constexpr uint64_t expected_result = (N_STRESS_MSG + 1) * .5 * N_STRESS_MSG * PRODUCERS;
     constexpr uint64_t consumer_result_min = expected_result / CONSUMERS / 10;
     uint64_t result = 0;
     for(auto& r : results) {

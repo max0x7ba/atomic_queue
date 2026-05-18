@@ -208,6 +208,7 @@ endif
 exes := example tests benchmarks
 
 example_src := example.cc
+${build_dir}/example.o : cxxflags += -std=c++17 # example.cc uses c++17 features.
 
 tests_src := tests.cc
 ${build_dir}/tests.o : cppflags += -DBOOST_TEST_DYN_LINK=1
