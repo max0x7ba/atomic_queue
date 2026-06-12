@@ -6,7 +6,7 @@
 
 project(
   'atomic_queue', 'cpp',
-  version : '1.9.1',
+  version : '1.9.2',
   license : 'MIT License',
   default_options : ['cpp_std=c++14', 'buildtype=release', 'b_ndebug=if-release']
 )
