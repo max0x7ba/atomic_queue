@@ -60,12 +60,13 @@ N := 1
 ################################################################################################################################
 # Boiler-plate begin.
 
+override dry_run := $(if $(findstring n,$(firstword -${MAKEFLAGS})),1,0)
+
 ################################################################################################################################
 # Enable GNU Make jobserver protocol for the recipe programs to request allocating more threads.
-JOBSERVER := 1
-J.0 :=
-J.1 := +
-J := ${J.${JOBSERVER}}
+J.0 := +
+J.1 :=
+J := ${J.${dry_run}}
 
 n_cpus := $(or $(subst -j,,$(filter -j%,${MAKEFLAGS})),1)
 
@@ -109,7 +110,7 @@ all :
 
 ################################################################################################################################
 
-colors := $(shell echo "\033[97m \033[0m")
+colors := $(shell printf "\033[97m \033[0m")
 c7 := $(word 1,${colors})
 c0 := $(word 2,${colors})
 
@@ -193,8 +194,10 @@ LINK.EXE = ${LD} -o $@ $(ldflags) $(filter-out ${relink},$^) $(ldlibs)
 LINK.SO = ${LD} -o $@ -shared $(ldflags) $(filter-out ${relink},$^) $(ldlibs)
 LINK.A = ${AR} rscT $@ $(filter-out ${relink},$^)
 
+
+# $(call log_kv,MAKEFLAGS dry_run cleaning not_cleaning)
 ifneq (,$(findstring n,$(firstword -${MAKEFLAGS})))
-# Perform bash parameter expansion when --just-print for rtags.
+# Perform bash parameter expansion when --just-print, for bear.
 strip2 = $(shell printf '%q ' ${1})
 else
 # Unduplicate whitespace.
@@ -294,8 +297,20 @@ run_% : ${build_dir}/% force
 compile_commands compile_commands.json TAGS :
 	bear -- ${MAKE} -R --always-make --no-print-directory all
 
+make_commands.txt :
+	${MAKE} -R --always-make --dry-run --no-print-directory | tee $@
+
+# make -C ~/src/atomic_queue -R T=1 TAGS2
+bear2 := ~/.local/bin/bear
+TAGS2 : make_commands.txt
+	rm -f compile_commands.json
+	${bear2} parse-sh < $< | ${bear2} semantic --input -
+
 clean :
 	rm -rf ${build_dir}
+
+distclean :
+	rm -rf ${BUILD_ROOT} compile_commands.json make_commands.txt
 
 versions:
 	${MAKE} --version | ${head1}
@@ -319,7 +334,7 @@ asm_% : scripts/util.sh ${build_dir}/benchmarks $$(if $${symbol_regex},force,$$(
 -include $(sort ${auto_generated_header_d}) # Remove duplicates and include.
 endif # Not cleanining.
 
-.PHONY : update_env_txt env versions run_benchmarks_quick clean all compile_commands compile_commands.json TAGS run_tests run_benchmarks_n run_benchmarks_perf env2
+.PHONY : update_env_txt env versions run_benchmarks_quick clean distclean all compile_commands compile_commands.json make_commands.txt TAGS TAGS2 run_tests run_benchmarks_n run_benchmarks_perf env2
 
 endif # Build with a single toolset.
 
@@ -336,10 +351,6 @@ endif # Not cleanining.
 
 ${BUILD_ROOT}/ :
 	mkdir -p $@
-
-.PHONY :  distclean
-distclean :
-	rm -rf ${BUILD_ROOT}
 
 env :
 	uname --all; echo
