@@ -300,7 +300,8 @@ compile_commands compile_commands.json TAGS :
 make_commands.txt :
 	${MAKE} -R --always-make --dry-run --no-print-directory | tee $@
 
-# make -C ~/src/atomic_queue -R T=1 TAGS2
+# https://github.com/rizsotto/Bear/issues/284
+# make -RC ~/src/atomic_queue T=1 TAGS2
 bear2 := ~/.local/bin/bear
 TAGS2 : make_commands.txt
 	rm -f compile_commands.json
