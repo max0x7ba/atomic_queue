@@ -228,14 +228,18 @@ The containers use `unsigned` type for size and internal indexes. On x86-64 plat
 While the atomic queues can be used with any moveable element types (including `std::unique_ptr`), for best throughput and latency the queue elements should be cheap to copy and lock-free (e.g. `unsigned` or `T*`), so that `push` and `pop` operations complete fastest.
 
 ### Lock-free guarantees
-*Conceptually*, a `push` or `pop` operation does two atomic steps:
+A `push` or `pop` operation does two atomic steps:
 
 1. Atomically and exclusively claims the queue slot index to store/load an element to/from. That's producers incrementing `head` index, consumers incrementing `tail` index. Each slot is accessed by one producer and one consumer threads only.
 2. Atomically store/load the element into/from the slot. Producer storing into a slot changes its state to be non-`NIL`, consumer loading from a slot changes its state to be `NIL`. The slot is a spinlock for its one producer and one consumer threads.
 
 These queues anticipate that a thread doing `push` or `pop` may complete step 1 and then be preempted before completing step 2.
 
-When a thread completes step 1 and terminates (for any reason) without completing step 2, the queue slot remains locked and deadlocks the next thread attempting to `try_pop`/`try_push`/`pop`/`push` from/into that slot. A thread can be terminated by the OS (e.g., `oomkiller`), or throw/crash in the user-defined copy/move constructor/assignment of queue element (if any). Should that happen, the game is over, and the best course of action is to terminate the process as soon as possible and address the root cause of one's threads crashing.
+When a thread completes step 1 and terminates (for any reason) without completing step 2, the queue slot remains locked and deadlocks the next thread attempting to `try_pop`/`try_push`/`pop`/`push` from/into that slot. A thread can be terminated by the OS (e.g., `oomkiller`), _asynchronously_ cancelled, or throw/crash in the user-defined copy/move constructor/assignment of queue element (if any). Should that happen, the game is over, and the best course of action is to terminate the process as soon as possible and address the root cause of one's threads crashing.
+
+Forcefully terminating/cancelling threads is rarely a good idea. However, there are no _cancellation points_ in any `push`/`pop` functions, so that cancelling a thread with its default _deferred_ cancellation type shouldn't terminate the thread while it is half-way through `push`/`pop` functions. Yet, thread cancellation is OS-specific, so that the best course of action after cancelling/terminating a thread is to terminate the process as soon as possible.
+
+Thread preemption, on the other hand, can happen at the worst possible moment, unless the thread is assigned a high enough real-time FIFO priority to prevent it from being [preempted](#preemption) by higher priority processes/threads in the system.
 
 Once constructed/allocated, queue objects maintain their invariants and never throw exceptions, provided that:
 * Queue elements copy/move constructor/assignment never throw.
