@@ -54,6 +54,11 @@ jobs:
             build_type: Release
             compiler: { c: clang, cpp: clang++ }
 
+          # --- macOS ---
+          - os: macos-latest
+            build_type: Release
+            compiler: { c: clang, cpp: clang++ }
+
           # --- Windows ---
           - os: windows-latest
             build_type: Release
@@ -75,6 +80,11 @@ jobs:
         sudo apt-get update
         sudo apt-get install --yes -qq libboost-test-dev
 
+    - name: Install boost on macos
+      if: startsWith(matrix.os, 'macos')
+      run: |
+        brew install boost
+
     - name: Install boost on windows
       if: startsWith(matrix.os, 'windows') && matrix.compiler.cpp == 'cl'
       uses: MarkusJx/install-boost@v2.6.0
@@ -84,10 +94,10 @@ jobs:
         platform_version: 2025
         toolset: msvc
 
-    - name: Configure CMake Ubuntu
+    - name: Configure CMake Unix (Linux/macOS)
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
       # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
-      if: startsWith(matrix.os, 'ubuntu')
+      if: startsWith(matrix.os, 'ubuntu') || startsWith(matrix.os, 'macos')
       run: >
         cmake -B ${{ steps.strings.outputs.build-output-dir }}
         -DCMAKE_CXX_COMPILER=${{ matrix.compiler.cpp }}

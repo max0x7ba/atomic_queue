@@ -90,7 +90,11 @@ ATOMIC_QUEUE_SINLINE void spin_loop_pause() noexcept {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #elif defined(__arm__) || defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__APPLE__) && defined(__aarch64__)
+constexpr int CACHE_LINE_SIZE = 128;
+#else
 constexpr int CACHE_LINE_SIZE = 64;
+#endif
 ATOMIC_QUEUE_SINLINE void spin_loop_pause() noexcept {
 #if (defined(__ARM_ARCH_6K__) || \
      defined(__ARM_ARCH_6Z__) || \
