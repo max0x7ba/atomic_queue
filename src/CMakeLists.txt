@@ -10,6 +10,11 @@ if ( ATOMIC_QUEUE_BUILD_EXAMPLES )
         atomic_queue_example
         atomic_queue
     )
+
+    add_test(
+        NAME atomic_queue_example
+        COMMAND atomic_queue_example
+    )
 endif()
 
 if ( ATOMIC_QUEUE_BUILD_TESTS )
