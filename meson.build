@@ -29,7 +29,7 @@ if get_option('tests')
     cpp_args : wno_unused_variable,
     dependencies : [atomic_queue_dep, unit_test_framework_dep],
   )
-  test('tests', tests_exe)
+  test('tests', tests_exe, args : ['--log_level=unit_scope', '--report_level=short'])
 
   example_exe = executable(
     'example',

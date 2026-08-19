@@ -28,6 +28,6 @@ if ( ATOMIC_QUEUE_BUILD_TESTS )
 
     add_test(
         NAME atomic_queue_tests
-        COMMAND atomic_queue_tests
+        COMMAND atomic_queue_tests --log_level=unit_scope --report_level=short
     )
 endif()

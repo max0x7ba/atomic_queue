@@ -46,4 +46,4 @@ jobs:
         run: meson compile -C build
 
       - name: Test
-        run: meson test -C build --print-errorlogs
+        run: meson test -v -C build
