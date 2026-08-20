@@ -35,3 +35,4 @@ Contributors:
 - Weihang Ding (https://github.com/max0x7ba/atomic_queue/pull/98)
 - Aurelian-Ionut Tomos (https://github.com/max0x7ba/atomic_queue/pull/104)
 - Alasdair Pan (https://github.com/max0x7ba/atomic_queue/pull/106)
+- Li Fenghao (https://github.com/max0x7ba/atomic_queue/pull/107)
