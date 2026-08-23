@@ -16,6 +16,10 @@ on:
       - '**.cc'
       - .github/workflows/ci-cross.yml
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   unit-test:
     name: ${{ matrix.arch }}
@@ -66,9 +70,11 @@ jobs:
 
     - name: Build the unit-tests and the example
       # Build with optimization, assertions and debug info.
+      env:
+        CXX: ${{ matrix.triplet }}-g++ -std=c++14 -O2 -g -pthread -Wall -Wextra -Wno-unused-variable -Iinclude
       run: |
-        ${{ matrix.triplet }}-g++ -std=c++14 -O2 -g -pthread -Wall -Wextra -Wno-unused-variable -Iinclude -DBOOST_TEST_DYN_LINK=1 src/tests.cc -o tests -lboost_unit_test_framework
-        ${{ matrix.triplet }}-g++ -std=c++14 -O2 -g -pthread -Wall -Wextra -Wno-unused-variable -Iinclude src/example.cc -o example
+        ${{ env.CXX }} -o tests -DBOOST_TEST_DYN_LINK=1 src/tests.cc -lboost_unit_test_framework
+        ${{ env.CXX }} -o example src/example.cc
         file tests example
 
     - name: Run the example
