@@ -57,8 +57,7 @@ jobs:
       run: |
         dpkg --add-architecture ${{ matrix.arch }}
         apt-get update
-        apt-get install --yes -qq --no-install-recommends \
-            g++-${{ matrix.triplet }} qemu-user file libboost-test-dev:${{ matrix.arch }}
+        apt-get install --yes -qq --no-install-recommends g++-${{ matrix.triplet }} qemu-user file libboost-test-dev:${{ matrix.arch }}
 
     - name: Toolset versions
       run: |
@@ -67,10 +66,8 @@ jobs:
 
     - name: Build the unit-tests and the example
       run: |
-        ${{ matrix.triplet }}-g++ -std=c++14 -O2 -pthread -Wall -Wextra -Wno-unused-variable -Iinclude -Isrc \
-            -DBOOST_TEST_DYN_LINK=1 src/tests.cc -o tests -lboost_unit_test_framework
-        ${{ matrix.triplet }}-g++ -std=c++14 -O2 -pthread -Wall -Wextra -Wno-unused-variable -Iinclude -Isrc \
-            src/example.cc -o example
+        ${{ matrix.triplet }}-g++ -std=c++14 -O2 -pthread -Wall -Wextra -Wno-unused-variable -Iinclude -Isrc -DBOOST_TEST_DYN_LINK=1 src/tests.cc -o tests -lboost_unit_test_framework
+        ${{ matrix.triplet }}-g++ -std=c++14 -O2 -pthread -Wall -Wextra -Wno-unused-variable -Iinclude -Isrc src/example.cc -o example
         file tests example
 
     - name: Run the example
