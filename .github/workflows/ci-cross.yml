@@ -61,13 +61,14 @@ jobs:
 
     - name: Toolset versions
       run: |
-        ${{ matrix.triplet }}-g++ --version
+        ${{ matrix.triplet }}-g++ --version | head -1
         ${{ matrix.qemu }} -version | head -1
 
     - name: Build the unit-tests and the example
+      # Build with optimization, assertions and debug info.
       run: |
-        ${{ matrix.triplet }}-g++ -std=c++14 -O2 -pthread -Wall -Wextra -Wno-unused-variable -Iinclude -Isrc -DBOOST_TEST_DYN_LINK=1 src/tests.cc -o tests -lboost_unit_test_framework
-        ${{ matrix.triplet }}-g++ -std=c++14 -O2 -pthread -Wall -Wextra -Wno-unused-variable -Iinclude -Isrc src/example.cc -o example
+        ${{ matrix.triplet }}-g++ -std=c++14 -O2 -g -pthread -Wall -Wextra -Wno-unused-variable -Iinclude -DBOOST_TEST_DYN_LINK=1 src/tests.cc -o tests -lboost_unit_test_framework
+        ${{ matrix.triplet }}-g++ -std=c++14 -O2 -g -pthread -Wall -Wextra -Wno-unused-variable -Iinclude src/example.cc -o example
         file tests example
 
     - name: Run the example
