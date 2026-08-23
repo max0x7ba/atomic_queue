@@ -27,6 +27,7 @@ jobs:
         cpp_compiler: [g++, clang++]
         sanitize: [address, undefined, thread]
 
+    name: ${{ matrix.os }}, ${{ matrix.cpp_compiler }}, ${{ matrix.sanitize }}
     runs-on: ${{ matrix.os }}
 
     steps:

@@ -30,6 +30,7 @@ jobs:
         toolset: [gcc, clang]
         os: [ubuntu-22.04, ubuntu-24.04, ubuntu-22.04-arm, ubuntu-24.04-arm]
 
+    name: ${{ matrix.os }}, ${{ matrix.toolset }}
     runs-on: ${{ matrix.os }}
 
     env:
