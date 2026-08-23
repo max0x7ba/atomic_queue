@@ -156,7 +156,7 @@ cxxflags.gcc := -march=native -f{no-plt,no-math-errno,finite-math-only,message-l
 ldflags.gcc.sanitize := ${ldflags.gcc.debug} -fsanitize=thread
 ldflags.gcc.sanitize2 := ${ldflags.gcc.debug} -fsanitize=undefined,address
 # ldflags.gcc := -fuse-ld=${use-ld.gcc} -Wl,--compress-debug-sections=zstd,-O2,--gc-sections ${ldflags.gcc.${BUILD}}
-ldflags.gcc := -g ${use_ld} ${ldflags.gcc.${BUILD}}
+ldflags.gcc := -g ${ldflags.gcc.${BUILD}}
 
 # clang-14 for arm doesn't support -march=native.
 has_native := $(if $(and $(findstring clang,${CXX}), $(findstring aarch64,${uname_m}), $(shell ${CXX} -march=native -c -xc++ -o/dev/null /dev/null 2>&1)),,1)
@@ -168,7 +168,7 @@ cxxflags.clang := -stdlib=libstdc++ -f{no-plt,no-math-errno,finite-math-only,mes
 ldflags.clang.debug := -latomic # A work-around for clang bug.
 ldflags.clang.sanitize := ${ldflags.clang.debug} -fsanitize=thread
 ldflags.clang.sanitize2 := ${ldflags.clang.debug} -fsanitize=undefined,address
-ldflags.clang := -g ${use_ld} -stdlib=libstdc++ ${ldflags.clang.${BUILD}}
+ldflags.clang := -g -stdlib=libstdc++ ${ldflags.clang.${BUILD}}
 
 # Additional CPPFLAGS, CXXFLAGS, LDLIBS, LDFLAGS can come from the command line, e.g. make CPPFLAGS='-I<my-include-dir>', or from environment variables.
 cxxflags := -std=c++14 -pthread -g $(call toolset_flags,cxxflags) ${cxxflags.${uname_m}} ${CXXFLAGS}

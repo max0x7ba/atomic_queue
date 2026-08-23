@@ -18,6 +18,10 @@ on:
       - Makefile
       - .github/workflows/ci.yml
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   unit-test:
     strategy:
@@ -28,25 +32,28 @@ jobs:
 
     runs-on: ${{ matrix.os }}
 
+    env:
+      make: make -R TOOLSET=${{ matrix.toolset }}
+
     steps:
     - uses: actions/checkout@v7
 
     - name: Install Boost.Test
       run: |
         sudo apt-get update
-        sudo apt-get install --yes -qq libboost-test-dev lld
+        sudo apt-get install --yes -qq libboost-test-dev
 
     - name: Environment variables
-      run: make -r TOOLSET=${{ matrix.toolset }} env
+      run: ${{ env.make }} env
 
     - name: Toolset versions
-      run: make -r TOOLSET=${{ matrix.toolset }} versions
+      run: ${{ env.make }} versions
 
     - name: Build and run unit tests
-      run: make -rj2 TOOLSET=${{ matrix.toolset }} example run_tests
+      run: ${{ env.make }} run_example run_tests
 
     - name: Build and run unit tests with address sanitizer
-      run: make -rj2 TOOLSET=${{ matrix.toolset }} BUILD=sanitize2 run_tests
+      run: ${{ env.make }} BUILD=sanitize2 run_example run_tests
 
     - name: Build and run unit tests with thread sanitizer
-      run: make -rj2 TOOLSET=${{ matrix.toolset }} BUILD=sanitize run_tests
+      run: ${{ env.make }} BUILD=sanitize run_example run_tests
