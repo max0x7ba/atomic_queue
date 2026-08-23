@@ -50,10 +50,10 @@ jobs:
       run: ${{ env.make }} versions
 
     - name: Build and run unit tests
-      run: ${{ env.make }} run_example run_tests
+      run: ${{ env.make }} -j2 run_ci
 
     - name: Build and run unit tests with address sanitizer
-      run: ${{ env.make }} BUILD=sanitize2 run_example run_tests
+      run: ${{ env.make }} -j2 BUILD=sanitize2 run_ci
 
     - name: Build and run unit tests with thread sanitizer
-      run: ${{ env.make }} BUILD=sanitize run_example run_tests
+      run: ${{ env.make }} -j2 BUILD=sanitize run_ci

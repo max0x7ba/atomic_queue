@@ -209,6 +209,7 @@ endif
 # Build targets definitions begin.
 
 exes := example tests benchmarks
+test_exes := example tests
 
 example_src := example.cc
 
@@ -294,6 +295,10 @@ run_tests : ${build_dir}/tests
 run_% : ${build_dir}/% force
 	@echo -n "$@ "; set -x; $<
 
+# Build tests in parallel, but execute serially.
+run_ci : ${test_exes}
+	${MAKE} -j1 ${test_exes:%=run_%}
+
 compile_commands compile_commands.json TAGS :
 	bear -- ${MAKE} -R --always-make --no-print-directory all
 
@@ -335,7 +340,7 @@ asm_% : scripts/util.sh ${build_dir}/benchmarks $$(if $${symbol_regex},force,$$(
 -include $(sort ${auto_generated_header_d}) # Remove duplicates and include.
 endif # Not cleanining.
 
-.PHONY : update_env_txt env versions run_benchmarks_quick clean distclean all compile_commands compile_commands.json make_commands.txt TAGS TAGS2 run_tests run_benchmarks_n run_benchmarks_perf env2
+.PHONY : update_env_txt env versions run_benchmarks_quick clean distclean all compile_commands compile_commands.json make_commands.txt TAGS TAGS2 run_tests run_benchmarks_n run_benchmarks_perf env2 run_ci
 
 endif # Build with a single toolset.
 
