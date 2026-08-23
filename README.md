@@ -4,10 +4,10 @@
 [![Conan Center](https://img.shields.io/conan/v/atomic_queue)](https://conan.io/center/recipes/atomic_queue)
 [![Vcpkg Version](https://img.shields.io/vcpkg/v/atomic-queue)](https://vcpkg.io/en/package/atomic-queue)
 <br>
-[![Makefile Continuous Integrations](https://github.com/max0x7ba/atomic_queue/actions/workflows/ci.yml/badge.svg)](https://github.com/max0x7ba/atomic_queue/actions/workflows/ci.yml)
-[![CMake Continuous Integrations](https://github.com/max0x7ba/atomic_queue/actions/workflows/cmake-gcc-clang.yml/badge.svg)](https://github.com/max0x7ba/atomic_queue/actions/workflows/cmake-gcc-clang.yml)
-[![Meson Continuous Integrations](https://github.com/max0x7ba/atomic_queue/actions/workflows/ci-meson.yml/badge.svg)](https://github.com/max0x7ba/atomic_queue/actions/workflows/ci-meson.yml)
-[![Cross-architecture Continuous Integrations](https://github.com/max0x7ba/atomic_queue/actions/workflows/ci-cross.yml/badge.svg)](https://github.com/max0x7ba/atomic_queue/actions/workflows/ci-cross.yml)
+[![Makefile CI](https://github.com/max0x7ba/atomic_queue/actions/workflows/ci.yml/badge.svg)](https://github.com/max0x7ba/atomic_queue/actions/workflows/ci.yml)
+[![CMake CI](https://github.com/max0x7ba/atomic_queue/actions/workflows/cmake-gcc-clang.yml/badge.svg)](https://github.com/max0x7ba/atomic_queue/actions/workflows/cmake-gcc-clang.yml)
+[![Meson CI](https://github.com/max0x7ba/atomic_queue/actions/workflows/ci-meson.yml/badge.svg)](https://github.com/max0x7ba/atomic_queue/actions/workflows/ci-meson.yml)
+[![Cross-architecture CI](https://github.com/max0x7ba/atomic_queue/actions/workflows/ci-cross.yml/badge.svg)](https://github.com/max0x7ba/atomic_queue/actions/workflows/ci-cross.yml)
 <br>
 ![platform Linux x86_64](https://img.shields.io/badge/platform-Linux%20x86_64--bit-gold)
 ![platform Linux ARM](https://img.shields.io/badge/platform-Linux%20ARM-gold)
@@ -16,6 +16,7 @@
 ![platform Linux IBM System/390](https://img.shields.io/badge/platform-Linux%20IBM%20System/390-gold)
 ![platform Linux LoongArch](https://img.shields.io/badge/platform-Linux%20LoongArch-gold)
 ![platform Windows x86_64](https://img.shields.io/badge/platform-Windows%20x86_64--bit-gold)
+![platform macOS ARM](https://img.shields.io/badge/platform-macOS%20ARM-gold)
 
 # atomic_queue
 C++14 multiple-producer-multiple-consumer *lock-free* queues based on circular buffers and [`std::atomic`][3].
