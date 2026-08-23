@@ -8,24 +8,30 @@
 [![CMake CI](https://github.com/max0x7ba/atomic_queue/actions/workflows/cmake-gcc-clang.yml/badge.svg)](https://github.com/max0x7ba/atomic_queue/actions/workflows/cmake-gcc-clang.yml)
 [![Meson CI](https://github.com/max0x7ba/atomic_queue/actions/workflows/ci-meson.yml/badge.svg)](https://github.com/max0x7ba/atomic_queue/actions/workflows/ci-meson.yml)
 [![Cross-architecture CI](https://github.com/max0x7ba/atomic_queue/actions/workflows/ci-cross.yml/badge.svg)](https://github.com/max0x7ba/atomic_queue/actions/workflows/ci-cross.yml)
-<br>
-![platform Linux x86_64](https://img.shields.io/badge/platform-Linux%20x86_64--bit-gold)
-![platform Linux ARM](https://img.shields.io/badge/platform-Linux%20ARM-gold)
-![platform Linux RISC-V](https://img.shields.io/badge/platform-Linux%20RISC--V-gold)
-![platform Linux PowerPC](https://img.shields.io/badge/platform-Linux%20PowerPC-gold)
-![platform Linux IBM System/390](https://img.shields.io/badge/platform-Linux%20IBM%20System/390-gold)
-![platform Linux LoongArch](https://img.shields.io/badge/platform-Linux%20LoongArch-gold)
-![platform Windows x86_64](https://img.shields.io/badge/platform-Windows%20x86_64--bit-gold)
-![platform macOS ARM](https://img.shields.io/badge/platform-macOS%20ARM-gold)
 
 # atomic_queue
 C++14 multiple-producer-multiple-consumer *lock-free* queues based on circular buffers and [`std::atomic`][3].
 
 Designed with a goal to minimize the latency between one thread pushing an element into a queue and another thread popping it from the queue.
 
-It has been developed, tested and benchmarked on Linux. Yet, any C++14 platform implementing `std::atomic` is expected to compile the unit-tests and run them without failures just as well.
+It has been developed, tested and benchmarked on Linux x86_64. Yet, any C++14 platform implementing `std::atomic` is expected to compile the unit-tests and run them without failures just as well.
 
-Continuous integrations running the unit-tests on GitHub are set up for x86_64 and arm64 platforms, Ubuntu-22.04, Ubuntu-24.04 and Windows, and for loong64, ppc64el, riscv64 and s390x under QEMU user-mode emulation. Pull requests to extend the [continuous integrations][18] to run the unit-tests on other architectures/platforms are most welcome.
+## Continuous Integrations
+
+GitHub Actions run continuous integrations unit-tests on the following platforms:
+
+| OS | Arch | CI |
+|--------|---------------|-------------|
+Linux | x86_64 | [Makefile][22], [Meson][24], [CMake][23] |
+Linux | ARM | [Makefile][22], [Meson][24], [CMake][23] |
+Linux | RISC-V | [Cross-architecture][25] |
+Linux | PowerPC | [Cross-architecture][25] |
+Linux | IBM System/390 | [Cross-architecture][25] |
+Linux | LoongArch | [Cross-architecture][25] |
+Windows | x86_64 | [CMake][23] |
+macOS | ARM | [CMake][23] |
+
+Pull requests to extend the [continuous integrations][18] to run on other architectures/platforms are most welcome.
 
 ## Design Principles
 When minimizing latency a good design is not when there is nothing left to add, but rather when there is nothing left to remove, as these queues exemplify.
@@ -372,6 +378,10 @@ Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file L
 [19]: https://man7.org/linux/man-pages/man2/sched_yield.2.html
 [20]: https://en.wikipedia.org/wiki/Goodhart%27s_law
 [21]: https://en.wikipedia.org/wiki/Amdahl%27s_law
+[22]: https://github.com/max0x7ba/atomic_queue/actions/workflows/ci.yml
+[23]: https://github.com/max0x7ba/atomic_queue/actions/workflows/cmake-gcc-clang.yml
+[24]: https://github.com/max0x7ba/atomic_queue/actions/workflows/ci-meson.yml
+[25]: https://github.com/max0x7ba/atomic_queue/actions/workflows/ci-cross.yml
 
 [^1]: A security feature that cripples CPU performance to protect against someone else's threat vectors. Always disabled in my workstations.
 [^2]: Always enabled in my workstations for best performance in memory/compute-intensive workloads, such as linear algebra computations with `numpy` and `Pandas`, training ANNs on GPUs with `PyTorch`.
