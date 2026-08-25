@@ -4,7 +4,6 @@ on:
   push:
     branches: [ master, maxim ]
     paths:
-      - '!**'
       - '**.h'
       - '**.cc'
       - Makefile
@@ -12,7 +11,6 @@ on:
   pull_request:
     branches: [ master ]
     paths:
-      - '!**'
       - '**.h'
       - '**.cc'
       - Makefile

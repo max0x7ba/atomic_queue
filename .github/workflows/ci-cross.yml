@@ -4,14 +4,12 @@ on:
   push:
     branches: [ master, maxim ]
     paths:
-      - '!**'
       - '**.h'
       - '**.cc'
       - .github/workflows/ci-cross.yml
   pull_request:
     branches: [ master ]
     paths:
-      - '!**'
       - '**.h'
       - '**.cc'
       - .github/workflows/ci-cross.yml
