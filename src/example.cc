@@ -50,7 +50,7 @@ int main() {
         producer.join();
 
     // Tell consumers to terminate by pushing one 0 element for each consumer.
-    for(auto& consumer : consumers)
+    for(int i = N_CONSUMERS; i--;)
         q.push(0);
     // Wait till consumers have terminated.
     for(auto& consumer : consumers)

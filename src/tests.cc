@@ -79,7 +79,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(stress, Queue, stress_queues) {
 
     for(auto& t : producers)
         t.join();
-    for(auto& consumer : consumers)
+    for(int i = CONSUMERS; i--;)
         q.push(STOP_MSG);
     for(auto& t : consumers)
         t.join();

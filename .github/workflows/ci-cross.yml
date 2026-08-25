@@ -69,7 +69,7 @@ jobs:
     - name: Build the unit-tests and the example
       # Build with optimization, assertions and debug info.
       env:
-        CXX: ${{ matrix.triplet }}-g++ -std=c++14 -O2 -g -pthread -Wall -Wextra -Wno-unused-variable -Iinclude
+        CXX: ${{ matrix.triplet }}-g++ -std=c++14 -O2 -g -pthread -Wall -Wextra -Werror -Iinclude
       run: |
         ${{ env.CXX }} -o tests -DBOOST_TEST_DYN_LINK=1 src/tests.cc -lboost_unit_test_framework
         ${{ env.CXX }} -o example src/example.cc

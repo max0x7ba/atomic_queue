@@ -19,14 +19,11 @@ atomic_queue_dep = declare_dependency(include_directories : ['include'], depende
 meson.override_dependency('atomic_queue', atomic_queue_dep)
 
 if get_option('tests')
-  wno_unused_variable = cxx.get_supported_arguments('-Wno-unused-variable')
-
   unit_test_framework_dep = dependency('boost', modules : ['unit_test_framework'])
 
   tests_exe = executable(
     'tests',
     'src/tests.cc',
-    cpp_args : wno_unused_variable,
     dependencies : [atomic_queue_dep, unit_test_framework_dep],
   )
   test('tests', tests_exe, args : ['--log_level=unit_scope', '--report_level=short'])
@@ -34,7 +31,6 @@ if get_option('tests')
   example_exe = executable(
     'example',
     'src/example.cc',
-    cpp_args : wno_unused_variable,
     dependencies : [atomic_queue_dep],
   )
   test('example', example_exe)
