@@ -174,11 +174,15 @@ ATOMIC_QUEUE_SINLINE constexpr int       as_signed(unsigned c) noexcept { return
 ATOMIC_QUEUE_SINLINE constexpr int       as_signed(int c) noexcept { return c; }
 ATOMIC_QUEUE_SINLINE constexpr long long as_signed(unsigned long long c) noexcept { return c; }
 ATOMIC_QUEUE_SINLINE constexpr long long as_signed(long long c) noexcept { return c; }
+ATOMIC_QUEUE_SINLINE constexpr long      as_signed(unsigned long c) noexcept { return c; }
+ATOMIC_QUEUE_SINLINE constexpr long      as_signed(long c) noexcept { return c; }
 
 ATOMIC_QUEUE_SINLINE constexpr unsigned           as_unsigned(unsigned c) noexcept { return c; }
 ATOMIC_QUEUE_SINLINE constexpr unsigned           as_unsigned(int c) noexcept { return c; }
 ATOMIC_QUEUE_SINLINE constexpr unsigned long long as_unsigned(unsigned long long c) noexcept { return c; }
 ATOMIC_QUEUE_SINLINE constexpr unsigned long long as_unsigned(long long c) noexcept { return c; }
+ATOMIC_QUEUE_SINLINE constexpr unsigned long      as_unsigned(unsigned long c) noexcept { return c; }
+ATOMIC_QUEUE_SINLINE constexpr unsigned long      as_unsigned(long c) noexcept { return c; }
 
 // Do not allow integral promotion, numeric conversions or any other conversions for arguments of as_signed and as_unsigned.
 template<class T> T as_signed(T) = delete;

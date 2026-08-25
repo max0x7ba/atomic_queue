@@ -86,7 +86,7 @@ endif
 SHELL := /bin/bash
 .SHELLFLAGS := --norc -o pipefail -e -c
 
-export TIME='Elapsed time %E, user %Us, system %Ss, CPU %P, RSS %MkB, exit-status %x.\n'
+export TIME:=Elapsed time %E, user %Us, system %Ss, CPU %P, RSS %MkB, exit-status %x.\n
 
 # Don't try loading localized messages for anything.
 undefine LANG
@@ -156,7 +156,7 @@ cxxflags.gcc := -march=native -f{no-plt,no-math-errno,finite-math-only,message-l
 ldflags.gcc.sanitize := ${ldflags.gcc.debug} -fsanitize=thread
 ldflags.gcc.sanitize2 := ${ldflags.gcc.debug} -fsanitize=undefined,address
 # ldflags.gcc := -fuse-ld=${use-ld.gcc} -Wl,--compress-debug-sections=zstd,-O2,--gc-sections ${ldflags.gcc.${BUILD}}
-ldflags.gcc := -g ${ldflags.gcc.${BUILD}}
+ldflags.gcc := -g ${use_ld} ${ldflags.gcc.${BUILD}}
 
 # clang-14 for arm doesn't support -march=native.
 has_native := $(if $(and $(findstring clang,${CXX}), $(findstring aarch64,${uname_m}), $(shell ${CXX} -march=native -c -xc++ -o/dev/null /dev/null 2>&1)),,1)
@@ -165,10 +165,10 @@ cxxflags.clang.release := -O3 -fno-stack-protector -falign-functions=64 -DNDEBUG
 cxxflags.clang.sanitize := ${cxxflags.clang.debug} -fsanitize=thread
 cxxflags.clang.sanitize2 := ${cxxflags.clang.debug} -fsanitize=undefined,address
 cxxflags.clang := -stdlib=libstdc++ -f{no-plt,no-math-errno,finite-math-only,message-length=0} -W{all,extra,error} ${cxxflags.clang.${BUILD}}
-ldflags.clang.debug := -latomic # A work-around for clang bug.
+# ldflags.clang.debug := -latomic # A work-around for clang bug.
 ldflags.clang.sanitize := ${ldflags.clang.debug} -fsanitize=thread
 ldflags.clang.sanitize2 := ${ldflags.clang.debug} -fsanitize=undefined,address
-ldflags.clang := -g -stdlib=libstdc++ ${ldflags.clang.${BUILD}}
+ldflags.clang := -g ${use_ld} -stdlib=libstdc++ -latomic ${ldflags.clang.${BUILD}}
 
 # Additional CPPFLAGS, CXXFLAGS, LDLIBS, LDFLAGS can come from the command line, e.g. make CPPFLAGS='-I<my-include-dir>', or from environment variables.
 cxxflags := -std=c++14 -pthread -g $(call toolset_flags,cxxflags) ${cxxflags.${uname_m}} ${CXXFLAGS}
@@ -208,7 +208,7 @@ endif
 ################################################################################################################################
 # Build targets definitions begin.
 
-exes := example tests benchmarks
+exes := tests benchmarks benchmarks_min example
 test_exes := example tests
 
 example_src := example.cc
@@ -220,7 +220,10 @@ ${build_dir}/tests :   ldlibs += -lboost_unit_test_framework
 benchmarks_src := benchmarks.cc cpu_base_frequency.cc huge_pages.cc
 ${build_dir}/benchmarks.o : cppflags += ${cppflags.tbb} ${cppflags.moodycamel} ${cppflags.xenium}
 ${build_dir}/benchmarks.o : cxxflags += -std=c++17 ${cxxflags.tbb} ${cxxflags.moodycamel} ${cxxflags.xenium} # benchmarks.cc uses c++17 features.
-${build_dir}/benchmarks   : ldlibs += ${ldlibs.tbb} ${ldlibs.moodycamel} ${ldlibs.xenium} -ldl
+${build_dir}/benchmarks   : private ldlibs += ${ldlibs.tbb} ${ldlibs.moodycamel} ${ldlibs.xenium} -ldl
+
+benchmarks_min_src := benchmarks_min.cc cpu_base_frequency.cc huge_pages.cc
+${build_dir}/benchmarks_min : private ldlibs += -ldl
 
 # Build targets definitions end.
 ################################################################################################################################
@@ -286,14 +289,19 @@ run_benchmarks_n : results/$${new_filename}.${N}.txt
 run_benchmarks_perf : perf/$${new_filename}.txt
 	@printf "%(%F %T)T $@ saved \e[32m$(abspath $<)\e[0m\n\n"
 
-run_benchmarks_quick : ${build_dir}/benchmarks
-	@echo -n "$@ "; set -x; AQB=1 taskset -c 4-7 ${chrt_fifo} $<
+run_benchmarks_quick : ${build_dir}/benchmarks_min
+	@echo -n "$@ "; set -x; AQB=1 taskset -c 4-7 /bin/time ${chrt_fifo} ${lb} $<
+
+# GitHub runners have 4 CPUs.
+# https://docs.github.com/en/actions/how-tos/write-workflows/choose-where-workflows-run/choose-the-runner-for-a-job#standard-github-hosted-runners-for-public-repositories
+run_benchmarks_ci : ${build_dir}/benchmarks_min
+	taskset -c 0-3 /bin/time ${chrt_fifo} ${lb} $<
 
 run_tests : ${build_dir}/tests
-	@echo -n "$@ "; set -x; $< --log_level=unit_scope --report_level=short
+	$< --log_level=unit_scope --report_level=short
 
 run_% : ${build_dir}/% force
-	@echo -n "$@ "; set -x; $<
+	$<
 
 # Build tests in parallel, but execute serially.
 run_ci : ${test_exes}
@@ -340,7 +348,7 @@ asm_% : scripts/util.sh ${build_dir}/benchmarks $$(if $${symbol_regex},force,$$(
 -include $(sort ${auto_generated_header_d}) # Remove duplicates and include.
 endif # Not cleanining.
 
-.PHONY : update_env_txt env versions run_benchmarks_quick clean distclean all compile_commands compile_commands.json make_commands.txt TAGS TAGS2 run_tests run_benchmarks_n run_benchmarks_perf env2 run_ci
+.PHONY : update_env_txt env versions run_benchmarks_quick clean distclean all compile_commands compile_commands.json make_commands.txt TAGS TAGS2 run_tests run_benchmarks_n run_benchmarks_perf env2 run_ci run_benchmarks_ci
 
 endif # Build with a single toolset.
 
@@ -360,7 +368,9 @@ ${BUILD_ROOT}/ :
 
 env :
 	uname --all; echo
-	ulimit -a; echo
+	nproc; echo
+	ulimit -Ha; echo
+	ulimit -Sa; echo
 	env | sort --ignore-case; echo
 
 # Prerequisites of .PHONY are always interpreted as literal target names, never as patterns (even if they contain ‘%’ characters). To always rebuild a pattern rule consider using a "force target".

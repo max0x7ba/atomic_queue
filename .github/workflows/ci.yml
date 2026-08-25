@@ -20,6 +20,10 @@ defaults:
   run:
     shell: bash
 
+env:
+  # Enable printf thousand separators.
+  LC_NUMERIC: en_US.UTF-8
+
 jobs:
   unit-test:
     strategy:
@@ -30,6 +34,9 @@ jobs:
 
     name: ${{ matrix.os }}, ${{ matrix.toolset }}
     runs-on: ${{ matrix.os }}
+
+    # The worst empirical run-time of this job is about 2m30s.
+    timeout-minutes: 5
 
     env:
       make: make -R TOOLSET=${{ matrix.toolset }}
@@ -42,17 +49,28 @@ jobs:
         sudo apt-get update
         sudo apt-get install --yes -qq libboost-test-dev
 
-    - name: Environment variables
-      run: ${{ env.make }} env
+    - name: Environment info
+      id: ei
+      run: |
+        ${{ env.make }} env
+        echo "n_proc=$(nproc)" >> "$GITHUB_OUTPUT"
+        cat /proc/cpuinfo
 
     - name: Toolset versions
       run: ${{ env.make }} versions
 
-    - name: Build and run unit tests
-      run: ${{ env.make }} -j2 run_ci
+    - name: Unit-test
+      run: ${{ env.make }} -j${{ steps.ei.outputs.n_proc }} run_ci
 
-    - name: Build and run unit tests with address sanitizer
-      run: ${{ env.make }} -j2 BUILD=sanitize2 run_ci
+    - name: Unit-test with address sanitizer
+      run: ${{ env.make }} -j${{ steps.ei.outputs.n_proc }} BUILD=sanitize2 run_ci
 
-    - name: Build and run unit tests with thread sanitizer
-      run: ${{ env.make }} -j2 BUILD=sanitize run_ci
+    - name: Unit-test with thread sanitizer
+      run: ${{ env.make }} -j${{ steps.ei.outputs.n_proc }} BUILD=sanitize run_ci
+
+    - name: Benchmark
+      if: ${{ steps.ei.outputs.n_proc > 1 }}
+      run: |
+        ulimit -Sl unlimited
+        sudo sysctl kernel.sched_rt_runtime_us=-1
+        ${{ env.make }} -j${{ steps.ei.outputs.n_proc }} run_benchmarks_ci

@@ -6,28 +6,33 @@
 #include "atomic_queue/atomic_queue_mutex.h"
 #include "atomic_queue/barrier.h"
 
+#include <boost/lockfree/queue.hpp>
+#include <boost/lockfree/spsc_queue.hpp>
+
+#if ! ATOMIC_QUEUE_BENCHMARKS_MIN
+
 #include <xenium/michael_scott_queue.hpp>
 #include <xenium/ramalhete_queue.hpp>
 #include <xenium/vyukov_bounded_queue.hpp>
 #include <xenium/reclamation/generic_epoch_based.hpp>
 
-#include <boost/lockfree/queue.hpp>
-#include <boost/lockfree/spsc_queue.hpp>
-
 #include <tbb/concurrent_queue.h>
 #include <tbb/spin_mutex.h>
 
+#include "moodycamel.h"
+
+#endif // ATOMIC_QUEUE_BENCHMARKS_MIN
+
 #include "cpu_base_frequency.h"
 #include "huge_pages.h"
-#include "moodycamel.h"
 #include "benchmarks.h"
-
 
 #include <algorithm>
 #include <clocale>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <climits>
 #include <limits>
 #include <stdexcept>
 #include <thread>
@@ -55,6 +60,8 @@ int constexpr N_MSG = 1'000'000;
 int constexpr RUNS = 3;
 
 struct Options : EnvBits64 {
+    using EnvBits64::EnvBits64;
+
     ATOMIC_QUEUE_INLINE constexpr auto       minimal() const noexcept { return value & 1; };
 
     ATOMIC_QUEUE_INLINE constexpr auto  no_ping_pong() const noexcept { return value & 2; };
@@ -101,11 +108,19 @@ template<class P> Range<P> as_range(P p, size_t n) noexcept { return {p, p + n};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-using cycles_t = decltype(__rdtsc());
-static_assert(std::is_unsigned<cycles_t>::value);
+#ifndef ATOMIC_QUEUE_TSC
+#if (defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86))
+#define ATOMIC_QUEUE_TSC 1
+#else
+#define ATOMIC_QUEUE_TSC 0
+#endif
+#endif
 
-using icycles_t = std::make_signed<cycles_t>::type; // Signed integers convert into double with one AVX instruction, unlike unsigned.
-cycles_t constexpr CYCLES_MAX = -1;
+#if ATOMIC_QUEUE_TSC
+
+using cycles_t = decltype(__rdtsc());
+
+char const clock_name[] = "rdtsc";
 
 ATOMIC_QUEUE_SINLINE cycles_t cycles() noexcept {
     // If software requires RDTSC to be executed only after all previous instructions have executed and all previous loads are
@@ -114,10 +129,29 @@ ATOMIC_QUEUE_SINLINE cycles_t cycles() noexcept {
     return __rdtsc();
 }
 
-double TSC_TO_SECONDS = 0; // Set in main.
+#else
+
+using cycles_t = uint64_t;
+
+char const clock_name[] = "CLOCK_MONOTONIC_RAW";
+
+ATOMIC_QUEUE_SINLINE cycles_t cycles() noexcept {
+    timespec t;
+    clock_gettime(CLOCK_MONOTONIC_RAW, &t);
+    constexpr cycles_t n_nsec = 1'000'000'000;
+    return as_unsigned(t.tv_sec) * n_nsec + as_unsigned(t.tv_nsec);
+}
+
+#endif
+
+static_assert(std::is_unsigned<cycles_t>::value, "Invalid cycles_t.");
+using icycles_t = std::make_signed<cycles_t>::type; // Signed integers convert into double with one AVX instruction, unlike unsigned.
+cycles_t constexpr CYCLES_MAX = -1;
+
+double TSC_TO_SECONDS = 1e9; // Updated in main.
 
 ATOMIC_QUEUE_INLINE double to_seconds(icycles_t cycles) noexcept {
-    return cycles * TSC_TO_SECONDS;
+    return cycles / TSC_TO_SECONDS;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -151,6 +185,16 @@ struct BoostQueueAdapter : BoostSpScAdapter<Queue> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+template <class T>
+struct region_guard_traits{
+    struct region_guard { constexpr region_guard() noexcept = default; };
+};
+
+template <class T>
+using region_guard_t = typename region_guard_traits<T>::region_guard;
+
+#if ! ATOMIC_QUEUE_BENCHMARKS_MIN
+
 using Reclaimer = xenium::reclamation::new_epoch_based<>;
 
 template<class Queue>
@@ -165,10 +209,6 @@ struct XeniumQueueAdapter : Queue {
     }
 };
 
-template <class T>
-struct region_guard_traits{
-    struct region_guard { constexpr region_guard() noexcept = default; };
-};
 template <class T, class... Policies>
 struct region_guard_traits<xenium::michael_scott_queue<T, Policies...>> {
     using region_guard = typename xenium::michael_scott_queue<T, Policies...>::region_guard;
@@ -178,8 +218,7 @@ struct region_guard_traits<xenium::ramalhete_queue<T, Policies...>> {
     using region_guard = typename xenium::ramalhete_queue<T, Policies...>::region_guard;
 };
 
-template <class T>
-using region_guard_t = typename region_guard_traits<T>::region_guard;
+#endif // ATOMIC_QUEUE_BENCHMARKS_MIN
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -265,7 +304,7 @@ struct SharedState {
         : n_producer_msg((params->n_msg + (n_threads - 1)) / n_threads)
         , threads(consumer_sums)
         , hw_thread_ids{params->hw_thread_ids.data()}
-        , barrier{n_threads * 2}
+        , barrier{{n_threads * 2u}}
     {
         assert(is_suitably_aligned(this));
     }
@@ -459,7 +498,7 @@ ATOMIC_QUEUE_NOINLINE void time_throughput(char const* name, Params const* param
 
             double n_seconds_best = to_seconds(n_cycles_best);
             double msg_per_sec = n_msg / n_seconds_best;
-            printf("%32s,%2u,%c: %'11.0f msg/sec\n", name, n_threads, alternative_placement ? 'i' : 's', msg_per_sec);
+            printf("%32s,%2u,%c: %'14.0f msg/sec\n", name, n_threads, alternative_placement ? 'i' : 's', msg_per_sec);
         }
     }
 }
@@ -534,6 +573,7 @@ ATOMIC_QUEUE_NOINLINE void run_throughput_benchmarks(Params const* params) {
     }
 
     if(ATOMIC_QUEUE_LIKELY(!params->options.minimal())) {
+#if ! ATOMIC_QUEUE_BENCHMARKS_MIN
         time_throughput_spsc("moodycamel::ReaderWriterQueue", params, Type<MoodyCamelReaderWriterQueue<unsigned, C>>{});
         time_throughput_mpmc("moodycamel::ConcurrentQueue", params, Type<MoodyCamelQueue<unsigned, C>>{});
 
@@ -545,15 +585,18 @@ ATOMIC_QUEUE_NOINLINE void run_throughput_benchmarks(Params const* params) {
             Type<XeniumQueueAdapter<xenium::ramalhete_queue<unsigned, xenium::policy::reclaimer<Reclaimer>>>>{});
         time_throughput_mpmc("xenium::vyukov_bounded_queue", params,
             Type<RetryDecorator<CapacityArgAdaptor<xenium::vyukov_bounded_queue<unsigned>, C>>>{});
+#endif // ATOMIC_QUEUE_BENCHMARKS_MIN
 
         unsigned constexpr BLQ_C_MAX = 0x10000 - 2;
         unsigned constexpr BLQ_C = min_value(C, BLQ_C_MAX);
         time_throughput_mpmc("boost::lockfree::queue", params,
             Type<BoostQueueAdapter<boost::lockfree::queue<unsigned, BoostAllocator, boost::lockfree::capacity<BLQ_C>>>>{});
 
+#if ! ATOMIC_QUEUE_BENCHMARKS_MIN
         time_throughput_mpmc("pthread_spinlock", params, Type<RetryDecorator<AtomicQueueSpinlock<unsigned, C>>>{});
         time_throughput_mpmc("std::mutex", params, Type<RetryDecorator<AtomicQueueMutex<unsigned, C, std::mutex>>>{});
         time_throughput_mpmc("tbb::spin_mutex", params, Type<RetryDecorator<AtomicQueueMutex<unsigned, C, tbb::spin_mutex>>>{});
+#endif // ATOMIC_QUEUE_BENCHMARKS_MIN
         // time_throughput_mpmc("TicketSpinlock", params, Type<RetryDecorator<AtomicQueueMutex<unsigned, C, TicketSpinlock>>>{});
         // run_throughput_mpmc_benchmark("UnfairSpinlock", params, Type<RetryDecorator<AtomicQueueMutex<unsigned, C, UnfairSpinlock>>>{});
         // run_throughput_mpmc_benchmark<RetryDecorator<AtomicQueueSpinlockHle<unsigned, C>>>("SpinlockHle");
@@ -711,6 +754,7 @@ void run_ping_pong_benchmarks(Params const* params) {
     }
 
     if(ATOMIC_QUEUE_LIKELY(!params->options.minimal())) {
+#if ! ATOMIC_QUEUE_BENCHMARKS_MIN
         time_ping_pong<MoodyCamelReaderWriterQueue<unsigned, C>>("moodycamel::ReaderWriterQueue", params);
         time_ping_pong<MoodyCamelQueue<unsigned, C>>("moodycamel::ConcurrentQueue", params);
 
@@ -719,13 +763,16 @@ void run_ping_pong_benchmarks(Params const* params) {
         time_ping_pong<XeniumQueueAdapter<xenium::michael_scott_queue<unsigned, xenium::policy::reclaimer<Reclaimer>>>>("xenium::michael_scott_queue", params);
         time_ping_pong<XeniumQueueAdapter<xenium::ramalhete_queue<unsigned, xenium::policy::reclaimer<Reclaimer>>>>("xenium::ramalhete_queue", params);
         time_ping_pong<RetryDecorator<CapacityArgAdaptor<xenium::vyukov_bounded_queue<unsigned>, C>>>("xenium::vyukov_bounded_queue", params);
+#endif // ATOMIC_QUEUE_BENCHMARKS_MIN
 
         time_ping_pong<BoostQueueAdapter<boost::lockfree::queue<unsigned, BoostAllocator, boost::lockfree::capacity<C>>>>(
             "boost::lockfree::queue", params);
 
+#if ! ATOMIC_QUEUE_BENCHMARKS_MIN
         time_ping_pong<RetryDecorator<AtomicQueueSpinlock<unsigned, C>>>("pthread_spinlock", params);
         time_ping_pong<RetryDecorator<AtomicQueueMutex<unsigned, C, std::mutex>>>("std::mutex", params);
         time_ping_pong<RetryDecorator<AtomicQueueMutex<unsigned, C, tbb::spin_mutex>>>("tbb::spin_mutex", params);
+#endif // ATOMIC_QUEUE_BENCHMARKS_MIN
         // run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, C, AdaptiveMutex>>>("adaptive_mutex", params);
         // run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, C, tbb::speculative_spin_mutex>>>("tbb::speculative_spin_mutex", params);
         // time_ping_pong<RetryDecorator<AtomicQueueMutex<unsigned, C, TicketSpinlock>>>("TicketSpinlock", hp, hw_thread_ids);
@@ -747,9 +794,13 @@ int main() {
 
     std::setlocale(LC_NUMERIC, ""); // Enable thousand separator, if set in user's locale.
 
-    TSC_TO_SECONDS = 1e-9 / cpu_base_frequency();
+    double const cpu_ghz = cpu_base_frequency();
+#if ATOMIC_QUEUE_TSC
+    TSC_TO_SECONDS *= cpu_ghz;
+#endif
 
     auto const cpu_topology = get_available_cpu_topology_info();
+    printf("CPU GHz: %.1lf, clock: %s, ", cpu_ghz, clock_name);
     log_cpus(cpu_topology);
     if(cpu_topology.size() < 2)
         throw std::runtime_error("A CPU with at least 2 hardware threads is required.");

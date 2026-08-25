@@ -3,6 +3,7 @@
 // Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file LICENSE.
 
 #include "cpu_base_frequency.h"
+#include "atomic_queue/defs.h"
 
 #include <stdexcept>
 #include <fstream>
@@ -11,19 +12,24 @@
 #include <cstdio>
 #include <cstdlib>
 #include <climits>
+#include <cctype>
 #include <string>
 #include <thread>
 #include <system_error>
+#include <unordered_map>
 
 #include <pthread.h>
 #include <dlfcn.h>
 #include <sched.h>
 
 using namespace atomic_queue;
+using std::printf;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 namespace {
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct CpuSet : cpu_set_t {
     CpuSet() noexcept { CPU_ZERO(this); }
@@ -39,17 +45,45 @@ struct CpuSet : cpu_set_t {
     }
 };
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+ATOMIC_QUEUE_NOINLINE std::istream& getline_lowercase(std::istream& s, std::string& line) noexcept {
+    if(getline(s, line))
+        for(auto& c : line)
+            c = std::tolower(c);
+    return s;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+double bogomips_to_ghz(double bogomips, double n_cpu_cores, double n_siblings) noexcept {
+    auto n_threads_per_cpu_core = n_siblings / n_cpu_cores; // 2 for SMT, 1 otherwise.
+    return bogomips / (1e3 * n_threads_per_cpu_core);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 } // namespace
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 double atomic_queue::cpu_base_frequency() {
-    std::regex const re("model name\\s*:[^@]+@\\s*([0-9.]+)\\s*GHz");
+    std::regex const re("(siblings|cpu cores|bogomips)\\s*:\\s+([0-9.]+)");
+    constexpr int n_kv = 3;
+    std::unordered_map<std::string, double> kv;
+
     std::ifstream cpuinfo("/proc/cpuinfo");
     std::smatch m;
-    for(std::string line; getline(cpuinfo, line);)
-        if(regex_match(line, m, re))
-            return std::stod(m[1]);
+    for(std::string line; getline_lowercase(cpuinfo, line);)
+        if(regex_match(line, m, re)) {
+            kv[m[1]] = std::stod(m[2]);
+            if(kv.size() == n_kv)
+                return bogomips_to_ghz(kv["bogomips"], kv["cpu cores"], kv["siblings"]);
+        }
+
+    if(auto b = kv["bogomips"])
+        return bogomips_to_ghz(b, b, b);
+
     return 1; // Fallback to cycles, should it fail to parse.
 }
 
@@ -61,31 +95,27 @@ std::vector<atomic_queue::CpuTopologyInfo> atomic_queue::get_cpu_topology_info()
     unsigned constexpr M = 3;
     using MemberPtr = unsigned CpuTopologyInfo::*;
     MemberPtr const member_ptrs[M] = {
+        &CpuTopologyInfo::hw_thread_id,
         &CpuTopologyInfo::socket_id,
-        &CpuTopologyInfo::core_id,
-        &CpuTopologyInfo::hw_thread_id
+        &CpuTopologyInfo::core_id
     };
     std::regex const res[M] = {
+        std::regex("processor\\s+:\\s+([0-9]+)"),
         std::regex("physical id\\s+:\\s+([0-9]+)"),
-        std::regex("core id\\s+:\\s+([0-9]+)"),
-        std::regex("processor\\s+:\\s+([0-9]+)")
+        std::regex("core id\\s+:\\s+([0-9]+)")
     };
 
     std::ifstream cpuinfo("/proc/cpuinfo");
-    std::smatch m;
-    CpuTopologyInfo element;
-    unsigned valid_members = 0;
-    for(std::string line; getline(cpuinfo, line);) {
-        for(unsigned i = 0, mask = 1; i < M; ++i, mask <<= 1) {
-            if(valid_members & mask || !regex_match(line, m, res[i]))
-                continue;
-            (element.*member_ptrs[i]) = std::stoul(m[1]);
-            valid_members |= mask;
-            if(valid_members == ((1u << M) - 1)) {
-                cpus.push_back(element);
-                valid_members = 0;
+    for(std::string line; getline_lowercase(cpuinfo, line);) {
+        for(unsigned i = 0; i < M; ++i) {
+            std::smatch m;
+            if(regex_match(line, m, res[i])) {
+                unsigned v = std::stoul(m[1]);
+                if(!i)
+                    cpus.push_back({0, v, v});
+                else
+                    (cpus.back().*member_ptrs[i]) = v;
             }
-            break;
         }
     }
 
@@ -133,13 +163,13 @@ std::vector<unsigned> atomic_queue::hw_thread_id(std::vector<atomic_queue::CpuTo
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void atomic_queue::log_cpus(std::vector<CpuTopologyInfo> const& cpu_topology) noexcept {
-    std::printf("Using %zu available CPUs: ", cpu_topology.size());
+    printf("using %zu available CPUs: ", cpu_topology.size());
     char sep = '[';
     for(auto& cpu : cpu_topology) {
-        std::printf("%c%u", sep, cpu.hw_thread_id);
+        printf("%c%u", sep, cpu.hw_thread_id);
         sep = ',';
     }
-    std::printf("].\n");
+    printf("].\n");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
