@@ -104,6 +104,7 @@ jobs:
         -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
         -DATOMIC_QUEUE_BUILD_TESTS=ON
         -DATOMIC_QUEUE_BUILD_EXAMPLES=ON
+        -DATOMIC_QUEUE_BUILD_BENCHMARKS_MIN=${{ case(startsWith(matrix.os, 'ubuntu'), 'ON', 'OFF') }}
         -S ${{ github.workspace }}
 
     - name: Configure CMake Windows - MSVC
@@ -122,4 +123,4 @@ jobs:
     - name: Test
       # Execute tests defined by the CMake configuration. Note that --build-config is needed because the default Windows generator is a multi-config generator (Visual Studio generator).
       # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
-      run: ctest -V --build-config ${{ matrix.build_type }} --test-dir ${{ steps.strings.outputs.build-output-dir }}
+      run: ctest -j1 --timeout 300 -V --build-config ${{ matrix.build_type }} --test-dir ${{ steps.strings.outputs.build-output-dir }}

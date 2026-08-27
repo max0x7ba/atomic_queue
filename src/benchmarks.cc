@@ -3,13 +3,14 @@
 // Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file LICENSE.
 
 #include "atomic_queue/atomic_queue.h"
-#include "atomic_queue/atomic_queue_mutex.h"
 #include "atomic_queue/barrier.h"
 
 #include <boost/lockfree/queue.hpp>
 #include <boost/lockfree/spsc_queue.hpp>
 
 #if ! ATOMIC_QUEUE_BENCHMARKS_MIN
+
+#include "atomic_queue/atomic_queue_mutex.h"
 
 #include <xenium/michael_scott_queue.hpp>
 #include <xenium/ramalhete_queue.hpp>

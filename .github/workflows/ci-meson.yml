@@ -16,6 +16,14 @@ on:
       - 'meson*'
       - .github/workflows/ci-meson.yml
 
+defaults:
+  run:
+    shell: bash
+
+env:
+  # Enable printf thousand separators.
+  LC_NUMERIC: en_US.UTF-8
+
 jobs:
   build-and-test:
     strategy:
@@ -23,10 +31,12 @@ jobs:
       matrix:
         os: [ubuntu-latest, ubuntu-24.04-arm, ubuntu-26.04, ubuntu-26.04-arm]
         cpp_compiler: [g++, clang++]
-        sanitize: [address, undefined, thread]
 
-    name: ${{ matrix.os }}, ${{ matrix.cpp_compiler }}, ${{ matrix.sanitize }}
+    name: ${{ matrix.os }}, ${{ matrix.cpp_compiler }}
     runs-on: ${{ matrix.os }}
+
+    env:
+      CXX: ${{ matrix.cpp_compiler }}
 
     steps:
       - uses: actions/checkout@v7
@@ -36,13 +46,41 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes -qq meson libboost-test-dev
 
-      - name: Setup
-        env:
-          CXX: ${{ matrix.cpp_compiler }}
-        run: meson setup build -Dwerror=true -Dwarning_level=3 -Db_sanitize=${{ matrix.sanitize }}
+      - name: Environment info
+        run: |
+          env | sort --ignore-case
+          echo "n_proc=$(nproc)" >> "$GITHUB_ENV"
+          cat /proc/cpuinfo
 
-      - name: Compile
-        run: meson compile -C build
+      - name: Unit-test
+        run: |
+          meson setup build1 -Dwerror=true -Dwarning_level=3
+          meson compile -vC build1
+          meson test -vC build1
 
-      - name: Test
-        run: meson test -v -C build
+      - name: Unit-test with address sanitizer
+        run: |
+          meson setup build2 -Dwerror=true -Dwarning_level=3 -Db_sanitize=address
+          meson compile -vC build2
+          meson test -vC build2
+
+      - name: Unit-test with undefined sanitizer
+        run: |
+          meson setup build3 -Dwerror=true -Dwarning_level=3 -Db_sanitize=undefined
+          meson compile -vC build3
+          meson test -vC build3
+
+      - name: Unit-test with thread sanitizer
+        run: |
+          meson setup build4 -Dwerror=true -Dwarning_level=3 -Db_sanitize=thread
+          meson compile -vC build4
+          meson test -vC build4
+
+      - name: Benchmark
+        if: ${{ env.n_proc > 1 }}
+        run: |
+          ulimit -Sl unlimited
+          sudo sysctl kernel.sched_rt_runtime_us=-1
+          meson setup build5 -Dwerror=true -Dwarning_level=2 -Dbenchmarks_min=true -Dtests=false
+          meson compile -vC build5
+          sudo chrt -f 50 meson test -vC build5 --benchmark

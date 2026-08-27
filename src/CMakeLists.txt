@@ -36,3 +36,25 @@ if ( ATOMIC_QUEUE_BUILD_TESTS )
         COMMAND atomic_queue_tests --log_level=unit_scope --report_level=short
     )
 endif()
+
+if ( ATOMIC_QUEUE_BUILD_BENCHMARKS_MIN )
+    find_package(Boost REQUIRED COMPONENTS headers)
+
+    add_executable(
+        atomic_queue_benchmarks_min
+        ${CMAKE_CURRENT_SOURCE_DIR}/benchmarks_min.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/huge_pages.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/cpu_base_frequency.cc
+    )
+
+    target_link_libraries(
+        atomic_queue_benchmarks_min
+        atomic_queue
+        Boost::headers
+    )
+
+    add_test(
+        NAME atomic_queue_benchmarks_min
+        COMMAND atomic_queue_benchmarks_min
+    )
+endif()

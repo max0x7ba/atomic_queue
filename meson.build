@@ -15,7 +15,13 @@ cxx = meson.get_compiler('cpp')
 
 threads_dep = dependency('threads')
 
-atomic_queue_dep = declare_dependency(include_directories : ['include'], dependencies : threads_dep)
+# clang++ does not always inline atomic operations and may emit calls to libatomic, so link with it explicitly.
+atomic_queue_deps = [threads_dep]
+if cxx.get_id() == 'clang'
+  atomic_queue_deps += cxx.find_library('atomic')
+endif
+
+atomic_queue_dep = declare_dependency(include_directories : ['include'], dependencies : atomic_queue_deps)
 meson.override_dependency('atomic_queue', atomic_queue_dep)
 
 if get_option('tests')
@@ -26,14 +32,14 @@ if get_option('tests')
     'src/tests.cc',
     dependencies : [atomic_queue_dep, unit_test_framework_dep],
   )
-  test('tests', tests_exe, args : ['--log_level=unit_scope', '--report_level=short'])
+  test('tests', tests_exe, args : ['--log_level=unit_scope', '--report_level=short'], is_parallel : false)
 
   example_exe = executable(
     'example',
     'src/example.cc',
     dependencies : [atomic_queue_dep],
   )
-  test('example', example_exe)
+  test('example', example_exe, is_parallel : false)
 endif
 
 if get_option('benchmarks')
@@ -51,11 +57,21 @@ if get_option('benchmarks')
   benchmarks_exe = executable(
     'benchmarks',
     ['src/benchmarks.cc', 'src/cpu_base_frequency.cc', 'src/huge_pages.cc'],
-    include_directories : ['src'],
     dependencies : [atomic_queue_dep, dl_dep, xenium_dep, boost_dep, tbb_dep, moodycamel_dep],
     override_options : ['cpp_std=c++17'] # Benchmarks require C++17 or higher
   )
-  benchmark('benchmarks', benchmarks_exe)
+  benchmark('benchmarks', benchmarks_exe, timeout: 3600)
+endif
+
+if get_option('benchmarks_min')
+  dl_dep = cxx.find_library('dl', required : false)
+  boost_dep = dependency('boost')
+  benchmarks_min_exe = executable(
+    'benchmarks_min',
+    ['src/benchmarks_min.cc', 'src/cpu_base_frequency.cc', 'src/huge_pages.cc'],
+    dependencies : [atomic_queue_dep, dl_dep]
+  )
+  benchmark('benchmarks_min', benchmarks_min_exe, timeout: 300)
 endif
 
 install_headers(

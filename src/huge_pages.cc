@@ -4,6 +4,7 @@
 #include <system_error>
 #include <cstdio>
 
+#include <string.h>
 #include <unistd.h>
 #include <sys/mman.h>
 
@@ -37,16 +38,22 @@ atomic_queue::HugePages::HugePages(Type t, size_t size) {
     void* p;
     size_t total_size;
 
+#if ! MAP_HUGETLB
+    t = PAGE_DEFAULT;
+#endif
+
     for(;;) {
         unsigned flags = 0;
         size_t page_size = default_page_size;
+#if MAP_HUGETLB
         if(t != PAGE_DEFAULT) {
             page_size = 1u << t;
             flags = (t << MAP_HUGE_SHIFT) | MAP_HUGETLB;
         }
+#endif
         total_size = (size + (page_size - 1)) & ~(page_size - 1); // Round up to the page size.
 
-        p = ::mmap(nullptr, total_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_LOCKED | flags, -1, 0);
+        p = ::mmap(nullptr, total_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | flags, -1, 0);
         if(p != MAP_FAILED)
             break;
 
@@ -68,6 +75,9 @@ atomic_queue::HugePages::HugePages(Type t, size_t size) {
         else
             throw std::system_error(errno, std::system_category(), "mmap");
     }
+
+    if(::mlock(p, total_size))
+        fprintf(stderr, "Warning: mlock error: (%d)%s.\n", errno, strerror(errno));
 
     beg_ = static_cast<unsigned char*>(p);
     cur_ = beg_;

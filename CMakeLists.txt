@@ -7,6 +7,11 @@ OPTION( ATOMIC_QUEUE_BUILD_TESTS
     OFF
 )
 
+OPTION( ATOMIC_QUEUE_BUILD_BENCHMARKS_MIN
+    "If the minimal benchmarks should be built."
+    OFF
+)
+
 OPTION( ATOMIC_QUEUE_BUILD_EXAMPLES
     "If examples should be built."
     OFF
@@ -24,10 +29,10 @@ endif()
 
 add_subdirectory( include )
 
-if ( ATOMIC_QUEUE_BUILD_TESTS )
+if ( ATOMIC_QUEUE_BUILD_TESTS OR ATOMIC_QUEUE_BUILD_BENCHMARKS_MIN )
     enable_testing()
 endif()
 
-if ( ATOMIC_QUEUE_BUILD_TESTS OR ATOMIC_QUEUE_BUILD_EXAMPLES)
+if ( ATOMIC_QUEUE_BUILD_TESTS OR ATOMIC_QUEUE_BUILD_EXAMPLES OR ATOMIC_QUEUE_BUILD_BENCHMARKS_MIN )
     add_subdirectory( src )
 endif()
