@@ -20,16 +20,16 @@ It has been developed, tested and benchmarked on Linux x86_64. Yet, any C++14 pl
 
 GitHub Actions run continuous integrations unit-tests on the following platforms:
 
-| OS | Arch | CI |
-|--------|---------------|-------------|
-Linux | x86_64 | [Makefile][22], [Meson][24], [CMake][23] |
-Linux | ARM | [Makefile][22], [Meson][24], [CMake][23] |
-Linux | RISC-V | [Cross-architecture][25] |
-Linux | PowerPC | [Cross-architecture][25] |
-Linux | IBM System/390 | [Cross-architecture][25] |
-Linux | LoongArch | [Cross-architecture][25] |
-Windows | x86_64 | [CMake][23] |
-macOS | ARM | [CMake][23] |
+| OS | Arch | CI | Notes |
+|--------|---------------|-------------|-------------|
+Linux | x86_64 | [Makefile][22], [Meson][24], [CMake][23] | Runs a minimal benchmark |
+Linux | ARM | [Makefile][22], [Meson][24], [CMake][23] | Runs a minimal benchmark |
+Linux | RISC-V | [Cross-architecture][25] | Runs in QEMU |
+Linux | PowerPC | [Cross-architecture][25] | Runs in QEMU |
+Linux | IBM System/390 | [Cross-architecture][25] | Runs in QEMU |
+Linux | LoongArch | [Cross-architecture][25] | Runs in QEMU |
+Windows | x86_64 | [CMake][23] | |
+macOS | ARM | [CMake][23] | |
 
 Pull requests to extend the [continuous integrations][18] to run on other architectures/platforms are most welcome.
 
