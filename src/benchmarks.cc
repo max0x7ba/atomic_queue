@@ -109,19 +109,20 @@ template<class P> Range<P> as_range(P p, size_t n) noexcept { return {p, p + n};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#ifndef ATOMIC_QUEUE_TSC
-#if (defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86))
-#define ATOMIC_QUEUE_TSC 1
-#else
-#define ATOMIC_QUEUE_TSC 0
-#endif
+// #define ATOMIC_QUEUE_RDTSC 0
+#ifndef ATOMIC_QUEUE_RDTSC
+#   if __x86_64__ || _M_X64 || __i386__ || _M_IX86
+#       define ATOMIC_QUEUE_RDTSC 1
+#   else
+#       define ATOMIC_QUEUE_RDTSC 0
+#   endif
 #endif
 
-#if ATOMIC_QUEUE_TSC
+#if ATOMIC_QUEUE_RDTSC
 
 using cycles_t = decltype(__rdtsc());
 
-char const clock_name[] = "rdtsc";
+char const clock_name[] = "RDTSC";
 
 ATOMIC_QUEUE_SINLINE cycles_t cycles() noexcept {
     // If software requires RDTSC to be executed only after all previous instructions have executed and all previous loads are
@@ -140,7 +141,7 @@ ATOMIC_QUEUE_SINLINE cycles_t cycles() noexcept {
     timespec t;
     clock_gettime(CLOCK_MONOTONIC_RAW, &t);
     constexpr cycles_t n_nsec = 1'000'000'000;
-    return as_unsigned(t.tv_sec) * n_nsec + as_unsigned(t.tv_nsec);
+    return as_unsigned(t.tv_sec) * n_nsec + as_unsigned(t.tv_nsec); // Never sign-extend anything here.
 }
 
 #endif
@@ -151,7 +152,7 @@ cycles_t constexpr CYCLES_MAX = -1;
 
 double TSC_TO_SECONDS = 1e9; // Updated in main.
 
-ATOMIC_QUEUE_INLINE double to_seconds(icycles_t cycles) noexcept {
+ATOMIC_QUEUE_SINLINE double to_seconds(icycles_t cycles) noexcept {
     return cycles / TSC_TO_SECONDS;
 }
 
@@ -795,18 +796,15 @@ int main() {
 
     std::setlocale(LC_NUMERIC, ""); // Enable thousand separator, if set in user's locale.
 
-    double const cpu_ghz = cpu_base_frequency();
-#if ATOMIC_QUEUE_TSC
-    TSC_TO_SECONDS *= cpu_ghz;
+    CpuInfo cpu_info;
+    cpu_info.log(clock_name);
+#if ATOMIC_QUEUE_RDTSC
+    TSC_TO_SECONDS *= cpu_info.ghz;
 #endif
-
-    auto const cpu_topology = get_available_cpu_topology_info();
-    printf("CPU GHz: %.1lf, clock: %s, ", cpu_ghz, clock_name);
-    log_cpus(cpu_topology);
-    if(cpu_topology.size() < 2)
+    if(cpu_info.cores.size() < 2)
         throw std::runtime_error("A CPU with at least 2 hardware threads is required.");
 
-    params.hw_thread_ids = hw_thread_id(cpu_topology); // Sorted by hw_thread_id.
+    params.hw_thread_ids = cpu_info.hw_thread_ids(); // Sorted by hw_thread_id.
     set_thread_affinity(params.hw_thread_ids[0]); // Pin the main thread#0 to CPU#0 prior to allocating memory.
 
     size_t constexpr MB = 1024 * 1024;

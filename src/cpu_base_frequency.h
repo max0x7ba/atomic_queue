@@ -5,6 +5,7 @@
 // Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file LICENSE.
 
 #include <vector>
+#include <string>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -12,24 +13,23 @@ namespace atomic_queue {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-double cpu_base_frequency();
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-struct CpuTopologyInfo {
+struct CoreInfo {
+    unsigned hw_thread_id;
     unsigned socket_id;
     unsigned core_id;
-    unsigned hw_thread_id;
 };
-std::vector<CpuTopologyInfo> get_cpu_topology_info();
-std::vector<CpuTopologyInfo> get_available_cpu_topology_info();
 
-std::vector<CpuTopologyInfo> sort_by_core_id(std::vector<CpuTopologyInfo> const&);
-std::vector<CpuTopologyInfo> sort_by_hw_thread_id(std::vector<CpuTopologyInfo> const&);
+struct CpuInfo {
+    std::string model_name;
+    double ghz;
+    std::vector<CoreInfo> cores;
 
-std::vector<unsigned> hw_thread_id(std::vector<CpuTopologyInfo> const&);
+    CpuInfo();
 
-void log_cpus(std::vector<CpuTopologyInfo> const&) noexcept;
+    void log(char const* clock_name) const;
+
+    std::vector<unsigned> hw_thread_ids() const;
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
