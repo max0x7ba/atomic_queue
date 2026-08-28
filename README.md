@@ -22,8 +22,8 @@ GitHub Actions run continuous integrations unit-tests on the following platforms
 
 | OS | Arch | CI | Notes |
 |--------|---------------|-------------|-------------|
-Linux | x86_64 | [Makefile][22], [Meson][24], [CMake][23] | Runs a minimal benchmark |
-Linux | ARM | [Makefile][22], [Meson][24], [CMake][23] | Runs a minimal benchmark |
+Linux | x86_64 | [Makefile][22], [Meson][24], [CMake][23] | Also runs a minimal benchmark |
+Linux | ARM | [Makefile][22], [Meson][24], [CMake][23] | Also runs a minimal benchmark |
 Linux | RISC-V | [Cross-architecture][25] | Runs in QEMU |
 Linux | PowerPC | [Cross-architecture][25] | Runs in QEMU |
 Linux | IBM System/390 | [Cross-architecture][25] | Runs in QEMU |
