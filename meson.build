@@ -2,21 +2,20 @@
 
 # (rm -rf build; meson setup build; time ninja -C build -v)
 #
-# cd ~/src/atomic_queue && rm -rf build && meson setup build -Dwerror=true -Dwarning_level=2 -Dbenchmarks=true && meson compile -C build && meson test -C build --print-errorlogs
+# export CXX=g++; rm -rf /tmp/build; cd ~/src/atomic_queue && meson setup /tmp/build -Dwerror=true -Dwarning_level=2 -Dbenchmarks=true && meson compile -vC /tmp/build && meson test -vC /tmp/build --print-errorlogs
 
 project(
   'atomic_queue', 'cpp',
   version : '1.9.2',
-  license : 'MIT License',
+  license : 'MIT',
   default_options : ['cpp_std=c++14', 'buildtype=release', 'b_ndebug=if-release']
 )
 
 cxx = meson.get_compiler('cpp')
 
-threads_dep = dependency('threads')
+atomic_queue_deps = [dependency('threads')]
 
 # clang++ does not always inline atomic operations and may emit calls to libatomic, so link with it explicitly.
-atomic_queue_deps = [threads_dep]
 if cxx.get_id() == 'clang'
   atomic_queue_deps += cxx.find_library('atomic')
 endif
@@ -88,6 +87,7 @@ pkg = import('pkgconfig')
 pkg.generate(
   name: 'atomic_queue',
   description: 'C++14 concurrent lock-free low-latency queue',
+  url: 'https://github.com/max0x7ba/atomic_queue/',
   version: meson.project_version(),
-  libraries: [threads_dep]
+  libraries: [atomic_queue_deps],
 )
