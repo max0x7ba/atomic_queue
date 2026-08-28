@@ -18,6 +18,10 @@ on:
       - '**/CMakeLists.txt'
       - .github/workflows/cmake-gcc-clang.yml
 
+env:
+  # Enable printf thousand separators.
+  LC_NUMERIC: en_US.UTF-8
+
 jobs:
   build:
     name: ${{ matrix.os }}, ${{ matrix.compiler.cpp }}
@@ -120,7 +124,7 @@ jobs:
       # Build your program with the given configuration. Note that --config is needed because the default Windows generator is a multi-config generator (Visual Studio generator).
       run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --verbose --config ${{ matrix.build_type }}
 
-    - name: Test
+    - name: Unit-test${{ case(startsWith(matrix.os, 'ubuntu'), ' and benchmark', '') }}
       # Execute tests defined by the CMake configuration. Note that --build-config is needed because the default Windows generator is a multi-config generator (Visual Studio generator).
       # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
       run: ctest -j1 --timeout 300 -V --build-config ${{ matrix.build_type }} --test-dir ${{ steps.strings.outputs.build-output-dir }}
