@@ -106,6 +106,7 @@ jobs:
         -DCMAKE_CXX_COMPILER=${{ matrix.compiler.cpp }}
         -DCMAKE_C_COMPILER=${{ matrix.compiler.c }}
         -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+        -DCMAKE_RULE_MESSAGES=OFF
         -DATOMIC_QUEUE_BUILD_TESTS=ON
         -DATOMIC_QUEUE_BUILD_EXAMPLES=ON
         -DATOMIC_QUEUE_BUILD_BENCHMARKS_MIN=${{ case(startsWith(matrix.os, 'ubuntu'), 'ON', 'OFF') }}
@@ -115,6 +116,7 @@ jobs:
       if: startsWith(matrix.os, 'windows') && matrix.compiler.cpp == 'cl'
       run: >
         cmake -B ${{ steps.strings.outputs.build-output-dir }}
+        -DCMAKE_RULE_MESSAGES=OFF
         -DATOMIC_QUEUE_BUILD_TESTS=ON
         -DATOMIC_QUEUE_BUILD_EXAMPLES=ON
         -S ${{ github.workspace }}
