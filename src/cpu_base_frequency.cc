@@ -68,7 +68,7 @@ inline double bogomips_to_ghz(double bogomips, double n_cpu_cores, double n_sibl
 struct CpuInfoParser {
     // The key-value separator is colon-space (: ).
     // Strip any whitespace off keys and values.
-    std::regex const re_kv{"\\s*([^:]+?)\\s*:\\s+(.+?)\\s*"};
+    std::regex const re_kv{R"(\s*([^:]+?)\s*:\s+(.+?)\s*)"};
 
     std::ifstream cpuinfo{"/proc/cpuinfo"};
 
@@ -131,7 +131,7 @@ CpuInfo::CpuInfo() {
     CpuSet::get_available().filter(cores);
 }
 
-void CpuInfo::log(char const* clock_name) const {
+void CpuInfo::log(char const* clock_name) const noexcept {
     if(!model_name.empty())
         printf("CPU Model: %s, ", model_name.c_str());
 
@@ -187,7 +187,7 @@ void atomic_queue::set_thread_affinity(unsigned hw_thread_id) {
 //     set_thread_affinity_(cpuset);
 // }
 
-void atomic_queue::set_default_thread_affinity(unsigned hw_thread_id) {
+void atomic_queue::set_default_thread_affinity(unsigned hw_thread_id) noexcept {
     default_thread_affinity = hw_thread_id;
 }
 

@@ -26,7 +26,7 @@ struct CpuInfo {
 
     CpuInfo();
 
-    void log(char const* clock_name) const;
+    void log(char const* clock_name) const noexcept;
 
     std::vector<unsigned> hw_thread_ids() const;
 };
@@ -36,7 +36,7 @@ struct CpuInfo {
 void set_thread_affinity(unsigned hw_thread_id);
 // void reset_thread_affinity();
 
-void set_default_thread_affinity(unsigned hw_thread_id);
+void set_default_thread_affinity(unsigned hw_thread_id) noexcept;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
