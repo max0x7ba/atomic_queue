@@ -210,12 +210,26 @@ ATOMIC_QUEUE_SINLINE constexpr uint64_t round_up_to_power_of_2(uint64_t a) noexc
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<class T>
-constexpr T nil() noexcept {
+ATOMIC_QUEUE_SINLINE constexpr void static_assert_lock_free() noexcept {
 #if __cpp_lib_atomic_is_always_lock_free // Better compile-time error message requires C++17.
     static_assert(std::atomic<T>::is_always_lock_free, "Queue element type T is not atomic. Use AtomicQueue2/AtomicQueueB2 for such element types.");
 #endif
+}
+
+template<class T>
+ATOMIC_QUEUE_SINLINE constexpr T nil() noexcept {
+    static_assert_lock_free<T>();
     return {};
 }
+
+template<class T>
+ATOMIC_QUEUE_SINLINE void assert_lock_free(T NIL) noexcept {
+    static_assert_lock_free<T>();
+    assert(std::atomic<T>{NIL}.is_lock_free());
+    static_cast<void>(NIL); // Mark NIL as used.
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<class T>
 ATOMIC_QUEUE_SINLINE void destroy_n(T* ATOMIC_QUEUE_RESTRICT p, unsigned n) noexcept {
@@ -508,7 +522,7 @@ public:
     using value_type = T;
 
     AtomicQueue() noexcept {
-        assert(std::atomic<T>{NIL}.is_lock_free()); // Queue element type T is not atomic. Use AtomicQueue2/AtomicQueueB2 for such element types.
+        details::assert_lock_free(NIL); // Queue element type T is not atomic. Use AtomicQueue2/AtomicQueueB2 for such element types.
         for(auto p = elements_, q = elements_ + size_; p != q; ++p)
             p->store(NIL, X);
     }
@@ -605,7 +619,7 @@ public:
         : AllocatorElements(allocator)
         , size_(max_value(details::round_up_to_power_of_2(size), 1u << (SHUFFLE_BITS * 2)))
         , elements_(AllocatorElements::allocate(size_)) {
-        assert(std::atomic<T>{NIL}.is_lock_free()); // Queue element type T is not atomic. Use AtomicQueue2/AtomicQueueB2 for such element types.
+        details::assert_lock_free(NIL); // Queue element type T is not atomic. Use AtomicQueue2/AtomicQueueB2 for such element types.
         std::uninitialized_fill_n(elements_, size_, NIL);
         assert(get_allocator() == allocator); // The standard requires the original and rebound allocators to manage the same state.
     }
