@@ -233,8 +233,8 @@ ATOMIC_QUEUE_SINLINE void assert_lock_free(T NIL) noexcept {
 
 template<class T>
 ATOMIC_QUEUE_SINLINE void destroy_n(T* ATOMIC_QUEUE_RESTRICT p, unsigned n) noexcept {
-    for(auto q = p + n; p != q;)
-        (p++)->~T();
+    while(n--) // Destroy in reverse order.
+        p[n].~T();
 }
 
 template<class T>
@@ -620,8 +620,8 @@ public:
         , size_(max_value(details::round_up_to_power_of_2(size), 1u << (SHUFFLE_BITS * 2)))
         , elements_(AllocatorElements::allocate(size_)) {
         details::assert_lock_free(NIL); // Queue element type T is not atomic. Use AtomicQueue2/AtomicQueueB2 for such element types.
-        std::uninitialized_fill_n(elements_, size_, NIL);
         assert(get_allocator() == allocator); // The standard requires the original and rebound allocators to manage the same state.
+        std::uninitialized_fill_n(elements_, size_, NIL);
     }
 
     AtomicQueueB(AtomicQueueB&& b) noexcept
@@ -715,6 +715,33 @@ class AtomicQueueB2 : private std::allocator_traits<A>::template rebind_alloc<un
         StorageAllocator::deallocate(reinterpret_cast<unsigned char*>(p), size_ * sizeof(U)); // TODO: This must be noexcept, static_assert that.
     }
 
+    void destroy_(unsigned n_constructed) noexcept { // TODO: Destruction and deallocation must be noexcept, static_assert that.
+        if(elements_) {
+            A a = get_allocator();
+            for(auto n = n_constructed; n--;)
+                std::allocator_traits<A>::destroy(a, elements_ + n); // Destroy in reverse order.
+            deallocate_(elements_);
+        }
+
+        if(states_) {
+            details::destroy_n(states_, size_); // Destroy in reverse order.
+            deallocate_(states_);
+        }
+    }
+
+    struct Rollback {
+        AtomicQueueB2* that;
+        unsigned n_constructed;
+
+        Rollback(Rollback const&) = delete;
+        Rollback& operator=(Rollback const&) = delete;
+
+        ~Rollback() noexcept {
+            if(ATOMIC_QUEUE_UNLIKELY(that))
+                that->destroy_(n_constructed);
+        }
+    };
+
 public:
     using value_type = T;
     using allocator_type = A;
@@ -724,13 +751,21 @@ public:
     AtomicQueueB2(unsigned size, A const& allocator = A{})
         : StorageAllocator(allocator)
         , size_(max_value(details::round_up_to_power_of_2(size), 1u << (SHUFFLE_BITS * 2)))
-        , states_(allocate_<AtomicState>())
-        , elements_(allocate_<T>()) {
-        std::uninitialized_fill_n(states_, size_, EMPTY);
+        , states_{}
+        , elements_{} {
         A a = get_allocator();
         assert(a == allocator); // The standard requires the original and rebound allocators to manage the same state.
-        for(auto p = elements_, q = elements_ + size_; p < q; ++p)
-            std::allocator_traits<A>::construct(a, p);
+
+        Rollback rollback{this, 0}; // Strong exception safety: destroy and deallocate on exception.
+
+        states_ = allocate_<AtomicState>();
+        std::uninitialized_fill_n(states_, size_, EMPTY);
+
+        elements_ = allocate_<T>();
+        for(; rollback.n_constructed < size_; ++rollback.n_constructed)
+            std::allocator_traits<A>::construct(a, elements_ + rollback.n_constructed);
+
+        rollback.that = 0; // No exception was thrown, disable rollback.
     }
 
     AtomicQueueB2(AtomicQueueB2&& b) noexcept
@@ -747,14 +782,7 @@ public:
     }
 
     ~AtomicQueueB2() noexcept {
-        if(elements_) {
-            A a = get_allocator();
-            for(auto p = elements_, q = elements_ + size_; p < q; ++p)
-                std::allocator_traits<A>::destroy(a, p);
-            deallocate_(elements_);
-            details::destroy_n(states_, size_);
-            deallocate_(states_);
-        }
+        destroy_(size_);
     }
 
     A get_allocator() const noexcept {
