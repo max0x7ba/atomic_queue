@@ -404,6 +404,7 @@ protected:
 
 public:
     template<class T>
+    ATOMIC_QUEUE_NODISCARD
     ATOMIC_QUEUE_INLINE bool try_push(T&& element) noexcept {
         auto head = head_.load(X);
         if(Derived::spsc_) {
@@ -423,6 +424,7 @@ public:
     }
 
     template<class T>
+    ATOMIC_QUEUE_NODISCARD
     ATOMIC_QUEUE_INLINE bool try_pop(T& element) noexcept {
         auto tail = tail_.load(X);
         if(Derived::spsc_) {
