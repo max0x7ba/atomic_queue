@@ -4,13 +4,12 @@
 
 #include "atomic_queue/atomic_queue.h"
 #include "atomic_queue/barrier.h"
+#include "atomic_queue/atomic_queue_mutex.h"
 
 #include <boost/lockfree/queue.hpp>
 #include <boost/lockfree/spsc_queue.hpp>
 
 #if ! ATOMIC_QUEUE_BENCHMARKS_MIN
-
-#include "atomic_queue/atomic_queue_mutex.h"
 
 #include <xenium/michael_scott_queue.hpp>
 #include <xenium/ramalhete_queue.hpp>
@@ -29,11 +28,11 @@
 #include "benchmarks.h"
 
 #include <algorithm>
+#include <climits>
 #include <clocale>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
-#include <climits>
 #include <limits>
 #include <stdexcept>
 #include <thread>
@@ -593,10 +592,10 @@ ATOMIC_QUEUE_NOINLINE void run_throughput_benchmarks(Params const* params) {
         unsigned constexpr BLQ_C = min_value(C, BLQ_C_MAX);
         time_throughput_mpmc("boost::lockfree::queue", params,
             Type<BoostQueueAdapter<boost::lockfree::queue<unsigned, BoostAllocator, boost::lockfree::capacity<BLQ_C>>>>{});
+        time_throughput_mpmc("std::mutex", params, Type<RetryDecorator<AtomicQueueMutex<unsigned, C, std::mutex>>>{});
 
 #if ! ATOMIC_QUEUE_BENCHMARKS_MIN
         time_throughput_mpmc("pthread_spinlock", params, Type<RetryDecorator<AtomicQueueSpinlock<unsigned, C>>>{});
-        time_throughput_mpmc("std::mutex", params, Type<RetryDecorator<AtomicQueueMutex<unsigned, C, std::mutex>>>{});
         time_throughput_mpmc("tbb::spin_mutex", params, Type<RetryDecorator<AtomicQueueMutex<unsigned, C, tbb::spin_mutex>>>{});
 #endif // ATOMIC_QUEUE_BENCHMARKS_MIN
         // time_throughput_mpmc("TicketSpinlock", params, Type<RetryDecorator<AtomicQueueMutex<unsigned, C, TicketSpinlock>>>{});
@@ -769,10 +768,10 @@ void run_ping_pong_benchmarks(Params const* params) {
 
         time_ping_pong<BoostQueueAdapter<boost::lockfree::queue<unsigned, BoostAllocator, boost::lockfree::capacity<C>>>>(
             "boost::lockfree::queue", params);
+        time_ping_pong<RetryDecorator<AtomicQueueMutex<unsigned, C, std::mutex>>>("std::mutex", params);
 
 #if ! ATOMIC_QUEUE_BENCHMARKS_MIN
         time_ping_pong<RetryDecorator<AtomicQueueSpinlock<unsigned, C>>>("pthread_spinlock", params);
-        time_ping_pong<RetryDecorator<AtomicQueueMutex<unsigned, C, std::mutex>>>("std::mutex", params);
         time_ping_pong<RetryDecorator<AtomicQueueMutex<unsigned, C, tbb::spin_mutex>>>("tbb::spin_mutex", params);
 #endif // ATOMIC_QUEUE_BENCHMARKS_MIN
         // run_ping_pong_benchmark<RetryDecorator<AtomicQueueMutex<unsigned, C, AdaptiveMutex>>>("adaptive_mutex", params);
