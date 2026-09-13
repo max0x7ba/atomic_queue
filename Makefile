@@ -146,13 +146,14 @@ LD := $(call toolset_exe,ld)
 AR := $(call toolset_exe,ar,ar)
 
 cxxflags.x86_64 := -fcf-protection=none -masm=intel
+cxxflags.gcc.x86_64 := -fno-move-loop-invariants -falign-functions=64
 
 cxxflags.gcc.asm.1 := -save-temps=obj -fverbose-asm
 cxxflags.gcc.debug := -Og -f{stack-protector-all,no-omit-frame-pointer} # -D_GLIBCXX_DEBUG
-cxxflags.gcc.release := -O3 -mtune=native -fno-{stack-protector,stack-clash-protection,move-loop-invariants} -falign-functions=64 -DNDEBUG ${cxxflags.gcc.asm.${ASM}}
+cxxflags.gcc.release := -O3 -mtune=native -fno-{stack-protector,stack-clash-protection,tree-ch} -DNDEBUG ${cxxflags.gcc.asm.${ASM}}
 cxxflags.gcc.sanitize := ${cxxflags.gcc.debug} -fsanitize=thread
 cxxflags.gcc.sanitize2 := ${cxxflags.gcc.debug} -fsanitize=undefined,address
-cxxflags.gcc := -march=native -f{no-plt,no-math-errno,finite-math-only,message-length=0} -W{all,extra,error,no-maybe-uninitialized} ${cxxflags.gcc.${BUILD}}
+cxxflags.gcc := -march=native -f{no-plt,no-math-errno,finite-math-only,message-length=0} -W{all,extra,error,no-maybe-uninitialized} ${cxxflags.gcc.${BUILD}} ${cxxflags.gcc.${uname_m}}
 ldflags.gcc.sanitize := ${ldflags.gcc.debug} -fsanitize=thread
 ldflags.gcc.sanitize2 := ${ldflags.gcc.debug} -fsanitize=undefined,address
 # ldflags.gcc := -fuse-ld=${use-ld.gcc} -Wl,--compress-debug-sections=zstd,-O2,--gc-sections ${ldflags.gcc.${BUILD}}
