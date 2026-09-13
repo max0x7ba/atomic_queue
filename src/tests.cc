@@ -247,7 +247,7 @@ template<class T>
 struct CountingAllocator {
     using value_type = T;
 
-    static size_t n_allocated_bytes;
+    static size_t n_allocated_bytes, n_allocated_bytes_max;
 
     CountingAllocator() noexcept = default;
 
@@ -257,6 +257,7 @@ struct CountingAllocator {
     T* allocate(size_t n) {
         auto p = static_cast<T*>(::operator new(n));
         n_allocated_bytes += n;
+        n_allocated_bytes_max = max_value(n_allocated_bytes, n_allocated_bytes_max);
         return p;
     }
 
@@ -269,6 +270,7 @@ struct CountingAllocator {
     template<class U> friend bool operator!=(CountingAllocator const&, CountingAllocator<U> const&) noexcept { return false; }
 };
 template<class T> size_t CountingAllocator<T>::n_allocated_bytes;
+template<class T> size_t CountingAllocator<T>::n_allocated_bytes_max;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -279,20 +281,28 @@ template<class T> size_t CountingAllocator<T>::n_allocated_bytes;
 BOOST_AUTO_TEST_CASE(constructor_strong_exception_safety) {
     using Queue = AtomicQueueB2<ThrowingElement, CountingAllocator<ThrowingElement>>;
     using StorageAllocator = std::allocator_traits<Queue::allocator_type>::rebind_alloc<unsigned char>;
-    int constexpr CAPACITY = 8;
+
+    auto constexpr CAPACITY = Queue::round_up_capacity(8);
+    static_assert(CAPACITY >= 8, "Invalid CAPACITY.");
+
+    auto constexpr n_required_bytes = CAPACITY * (sizeof(Queue::value_type) + sizeof(AtomicState));
+    static_assert(n_required_bytes >= CAPACITY * 2, "Invalid n_required_bytes.");
 
     // An exception thrown while constructing the elements must leave no constructed elements alive and leak no memory.
-    for(auto throw_at : {1, CAPACITY/2, CAPACITY}) {
+    for(auto throw_at : {1u, CAPACITY/2, CAPACITY}) {
         BOOST_CHECK_LE(throw_at, CAPACITY);
         ThrowingElement::throw_at = throw_at;
         ThrowingElement::n_live = 0;
         ThrowingElement::n_attempts = 0;
         StorageAllocator::n_allocated_bytes = 0;
+        StorageAllocator::n_allocated_bytes_max = 0;
 
         BOOST_CHECK_THROW(Queue q{CAPACITY}, ConstructorError);
 
         BOOST_CHECK_EQUAL(ThrowingElement::n_attempts, throw_at); // Expected number of elements must have been constructed.
         BOOST_CHECK_EQUAL(ThrowingElement::n_live, 0); // Successfully constructed elements must have been destroyed.
+
+        BOOST_CHECK_EQUAL(StorageAllocator::n_allocated_bytes_max, n_required_bytes); // States and elements arrays must have been allocated.
         BOOST_CHECK_EQUAL(StorageAllocator::n_allocated_bytes, 0); // States and elements arrays must have been deallocated.
     }
 }

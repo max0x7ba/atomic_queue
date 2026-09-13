@@ -769,11 +769,15 @@ public:
     using value_type = T;
     using allocator_type = A;
 
+    ATOMIC_QUEUE_SINLINE constexpr auto round_up_capacity(unsigned size) noexcept {
+        return max_value(details::round_up_to_power_of_2(size), 1u << (SHUFFLE_BITS * 2));
+    }
+
     // The special member functions are not thread-safe.
 
     AtomicQueueB2(unsigned size, A const& allocator = A{})
         : StorageAllocator(allocator)
-        , capacity_(details::assert_valid_capacity(max_value(details::round_up_to_power_of_2(size), 1u << (SHUFFLE_BITS * 2))))
+        , capacity_(details::assert_valid_capacity(round_up_capacity(size)))
     {
         A a = get_allocator();
         assert(a == allocator); // The standard requires the original and rebound allocators to manage the same state.

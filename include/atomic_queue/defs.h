@@ -200,8 +200,9 @@ template<class T> T as_unsigned(T) = delete;
 
 // std::min/max reference parameters may require spilling registers to stack in order to make the value addressable.
 // These take by value only, with no implicit conversions.
+// The definitions match the semantics of minsd/maxsd in order to compile into these instructions for floating point arguments.
 template<class T> ATOMIC_QUEUE_SINLINE constexpr T min_value(T a, T b) noexcept { return b < a ? b : a; }
-template<class T> ATOMIC_QUEUE_SINLINE constexpr T max_value(T a, T b) noexcept { return a < b ? b : a; }
+template<class T> ATOMIC_QUEUE_SINLINE constexpr T max_value(T a, T b) noexcept { return a > b ? a : b; }
 
 // Let the caller resolve any ambiguity.
 template<class T, class U> T min_value(T, U) = delete;
