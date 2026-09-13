@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <thread>
 #include <string>
+#include <new>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -210,6 +211,90 @@ BOOST_AUTO_TEST_CASE(allocator_constructor_only_b2) {
     BOOST_CHECK_EQUAL(q.get_allocator(), allocator);
     auto q2 = std::move(q);
     BOOST_CHECK_EQUAL(q2.get_allocator(), allocator);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+namespace {
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct ConstructorError {};
+
+struct ThrowingElement {
+    static unsigned n_live; // Number of currently alive instances.
+    static unsigned n_attempts; // Number of default-constructions attempted.
+    static unsigned throw_at; // Throw on the throw_at'th attempt.
+
+    ThrowingElement() {
+        if(++n_attempts == throw_at)
+            throw ConstructorError{};
+        ++n_live;
+    }
+
+    ~ThrowingElement() noexcept {
+        --n_live;
+    }
+
+    ThrowingElement(ThrowingElement const&) = delete;
+    ThrowingElement& operator=(ThrowingElement const&) = delete;
+};
+unsigned ThrowingElement::n_live;
+unsigned ThrowingElement::n_attempts;
+unsigned ThrowingElement::throw_at;
+
+template<class T>
+struct CountingAllocator {
+    using value_type = T;
+
+    static size_t n_allocated_bytes;
+
+    CountingAllocator() noexcept = default;
+
+    template<class U>
+    CountingAllocator(CountingAllocator<U> const&) noexcept {}
+
+    T* allocate(size_t n) {
+        auto p = static_cast<T*>(::operator new(n));
+        n_allocated_bytes += n;
+        return p;
+    }
+
+    void deallocate(T* p, size_t n) noexcept {
+        ::operator delete(p);
+        n_allocated_bytes -= n;
+    }
+
+    template<class U> friend bool operator==(CountingAllocator const&, CountingAllocator<U> const&) noexcept { return true; }
+    template<class U> friend bool operator!=(CountingAllocator const&, CountingAllocator<U> const&) noexcept { return false; }
+};
+template<class T> size_t CountingAllocator<T>::n_allocated_bytes;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+} // namespace
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+BOOST_AUTO_TEST_CASE(constructor_strong_exception_safety) {
+    using Queue = AtomicQueueB2<ThrowingElement, CountingAllocator<ThrowingElement>>;
+    using StorageAllocator = std::allocator_traits<Queue::allocator_type>::rebind_alloc<unsigned char>;
+    int constexpr CAPACITY = 8;
+
+    // An exception thrown while constructing the elements must leave no constructed elements alive and leak no memory.
+    for(auto throw_at : {1, CAPACITY/2, CAPACITY}) {
+        BOOST_CHECK_LE(throw_at, CAPACITY);
+        ThrowingElement::throw_at = throw_at;
+        ThrowingElement::n_live = 0;
+        ThrowingElement::n_attempts = 0;
+        StorageAllocator::n_allocated_bytes = 0;
+
+        BOOST_CHECK_THROW(Queue q{CAPACITY}, ConstructorError);
+
+        BOOST_CHECK_EQUAL(ThrowingElement::n_attempts, throw_at); // Expected number of elements must have been constructed.
+        BOOST_CHECK_EQUAL(ThrowingElement::n_live, 0); // Successfully constructed elements must have been destroyed.
+        BOOST_CHECK_EQUAL(StorageAllocator::n_allocated_bytes, 0); // States and elements arrays must have been deallocated.
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
