@@ -295,7 +295,7 @@ run_benchmarks_quick : ${build_dir}/benchmarks_min
 # GitHub runners have 4 CPUs.
 # https://docs.github.com/en/actions/how-tos/write-workflows/choose-where-workflows-run/choose-the-runner-for-a-job#standard-github-hosted-runners-for-public-repositories
 run_benchmarks_ci : ${build_dir}/benchmarks_min
-	${chrt_fifo} taskset -c 0-3 stdbuf -eL /bin/time -f '${TIME}' $<
+	${chrt_fifo} taskset -c 0-3 /bin/time -f '${TIME}' $< 2>&1
 
 run_tests : ${build_dir}/tests
 	$< --log_level=unit_scope --report_level=short
