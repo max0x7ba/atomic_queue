@@ -39,15 +39,15 @@ jobs:
     timeout-minutes: 5
 
     env:
-      make: make -RO TOOLSET=${{ matrix.toolset }}
+      make: make -R TOOLSET=${{ matrix.toolset }}
 
     steps:
     - uses: actions/checkout@v7
 
-    - name: Install Boost.Test
+    - name: Install Boost.Test and hugeadm
       run: |
         sudo apt-get update
-        sudo apt-get install --yes -qq libboost-test-dev
+        sudo apt-get install --yes -qq libboost-test-dev libhugetlbfs-bin
 
     - name: Environment info
       run: |
@@ -72,4 +72,5 @@ jobs:
       run: |
         ulimit -Sl unlimited
         sudo sysctl kernel.sched_rt_runtime_us=-1
+        sudo hugeadm --pool-pages-min 1GB:1 --pool-pages-max 1GB:1
         ${{ env.make }} -j${{ env.n_proc }} run_benchmarks_ci

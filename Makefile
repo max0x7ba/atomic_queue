@@ -290,12 +290,12 @@ run_benchmarks_perf : perf/$${new_filename}.txt
 	@printf "%(%F %T)T $@ saved \e[32m$(abspath $<)\e[0m\n\n"
 
 run_benchmarks_quick : ${build_dir}/benchmarks_min
-	@echo -n "$@ "; set -x; AQB=1 taskset -c 4-7 /bin/time ${chrt_fifo} $<
+	@echo -n "$@ "; set -x; AQB=1 ${chrt_fifo} taskset -c 4-7 /bin/time $<
 
 # GitHub runners have 4 CPUs.
 # https://docs.github.com/en/actions/how-tos/write-workflows/choose-where-workflows-run/choose-the-runner-for-a-job#standard-github-hosted-runners-for-public-repositories
 run_benchmarks_ci : ${build_dir}/benchmarks_min
-	taskset -c 0-3 /bin/time ${chrt_fifo} $<
+	${chrt_fifo} taskset -c 0-3 /bin/time $<
 
 run_tests : ${build_dir}/tests
 	$< --log_level=unit_scope --report_level=short
