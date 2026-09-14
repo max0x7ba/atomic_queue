@@ -48,8 +48,8 @@
       <p>There are no dependency chains on messages in producer and consumer threads in this benchmark in order to let the queues demonstrate their highest possible throughputs. The reported throughputs are higher than the inverse of latencies because of no dependency chains stalling CPU pipe-lining and out-of-order execution (as intended).</p>
       <p>This benchmark measures the total time taken to send and receive a total of 1,000,000 messages through one queue. The charts report mean, stdev, min and max of msg/sec throughput across 33 benchmark runs.</p>
 
-      <h3 class="view-toggle">Scalability (with SMT) on AMD Ryzen 5950X</h3><div><div class="chart" id="smt_scalability_ryzen_5950x" data-ylim="20e6;500e6"></div></div>
-      <h3 class="view-toggle">Cross-core (no SMT) scalability on AMD Ryzen 5950X</h3><div><div class="chart" id="cc_scalability_ryzen_5950x" data-ylim="20e6;500e6"></div></div>
+      <h3 class="view-toggle">Scalability (with SMT) on AMD Ryzen 5950X</h3><div><div class="chart" id="smt_scalability_ryzen_5950x" data-ylim="60e6;500e6"></div></div>
+      <h3 class="view-toggle">Cross-core (no SMT) scalability on AMD Ryzen 5950X</h3><div><div class="chart" id="cc_scalability_ryzen_5950x" data-ylim="60e6;500e6"></div></div>
 
       <h3 class="view-toggle">Scalability (with SMT) on AMD Ryzen 5825U</h3><div><div class="chart" id="smt_scalability_ryzen_5825u" data-ylim="60e6;1e9"></div></div>
       <h3 class="view-toggle">Cross-core (no SMT) scalability on AMD Ryzen 5825U</h3><div><div class="chart" id="cc_scalability_ryzen_5825u" data-ylim="60e6;1e9"></div></div>
@@ -66,7 +66,7 @@
         <ul>
           <li>OS: KDE Neon / Ubuntu 24.04 LTS, kernel 6.8.0-1051-nvidia-lowlatency (mitigations=off norandmaps noautogroup transparent_hugepage=always)
           <li>Compiler: gcc-14.2.0
-          <li>atomic_queue version: commit 1a3774a89c86ecfdf08753dbd41018ace5a833a4
+          <li>atomic_queue version: commit 632bae18198d551c41020491deb45c82c55a9dc6
           <li>Boost version: 1.83.0
           <li>TBB version: 2021.11.0-2ubuntu2
           <li>moodycamel concurrentqueue version: commit dea078cf5b6e742cd67a0d725e36f872feca4de4
@@ -77,7 +77,7 @@
         <ul>
           <li>OS: KDE Neon / Ubuntu 24.04 LTS, kernel 6.8.0-110-lowlatency (mitigations=off norandmaps noautogroup transparent_hugepage=always)
           <li>Compiler: gcc-14.2.0
-          <li>atomic_queue version: commit 1a3774a89c86ecfdf08753dbd41018ace5a833a4
+          <li>atomic_queue version: commit adea69293652d1d58aaaa25ac6a5ae3cff85cd30
           <li>Boost version: 1.83.0
           <li>TBB version: 2021.11.0-2ubuntu2
           <li>moodycamel concurrentqueue version: commit dea078cf5b6e742cd67a0d725e36f872feca4de4
