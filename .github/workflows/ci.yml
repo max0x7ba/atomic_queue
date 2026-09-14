@@ -44,10 +44,10 @@ jobs:
     steps:
     - uses: actions/checkout@v7
 
-    - name: Install Boost.Test and hugeadm
+    - name: Install Boost.Test
       run: |
         sudo apt-get update
-        sudo apt-get install --yes -qq libboost-test-dev libhugetlbfs-bin
+        sudo apt-get install --yes -qq libboost-test-dev
 
     - name: Environment info
       run: |
@@ -72,5 +72,4 @@ jobs:
       run: |
         ulimit -Sl unlimited
         sudo sysctl kernel.sched_rt_runtime_us=-1
-        sudo hugeadm --pool-pages-min 1GB:1 --pool-pages-max 1GB:1
         ${{ env.make }} -j${{ env.n_proc }} run_benchmarks_ci
