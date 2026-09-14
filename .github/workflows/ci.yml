@@ -39,7 +39,7 @@ jobs:
     timeout-minutes: 5
 
     env:
-      make: make -R TOOLSET=${{ matrix.toolset }}
+      make: make -RO TOOLSET=${{ matrix.toolset }}
 
     steps:
     - uses: actions/checkout@v7

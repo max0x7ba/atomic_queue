@@ -133,7 +133,6 @@ ld.clang := clang++
 ar.clang := ar
 
 head1 := /bin/awk 'FNR<2'
-lb := /bin/stdbuf -oL
 
 toolset_family := $(or $(findstring gcc,${TOOLSET}),$(findstring clang,${TOOLSET}))
 toolset_suffix := $(subst ${toolset_family},,${TOOLSET})
@@ -277,10 +276,10 @@ ${recompile} ${relink} : ${build_dir}/.make/% : $$(shell /bin/cmp --quiet $$@ <(
 new_filename = $(shell date "+${TAG}.%Y%m%dT%H%M%S.${TOOLSET}.$$(nproc)")
 
 results/%.txt : ${build_dir}/benchmarks | $$(dir $$@)
-	{ for((i=1;i<=${N};++i)); do printf "\n%(%F %T)T [$$i/${N}] "; ${chrt_fifo} ${lb} /bin/time -v $<; echo; done; } |& tee -i $@
+	{ for((i=1;i<=${N};++i)); do printf "\n%(%F %T)T [$$i/${N}] "; ${chrt_fifo} /bin/time -v $<; echo; done; } |& tee -i $@
 
 perf/%.txt : ${build_dir}/benchmarks | $$(dir $$@)
-	{ printf "\n%(%F %T)T "; ${chrt_fifo} ${lb} perf stat -dd $< ; echo; } |& tee -i $@
+	{ printf "\n%(%F %T)T "; ${chrt_fifo} perf stat -dd $< ; echo; } |& tee -i $@
 
 .PRECIOUS : perf/%.txt results/%.txt # Don't delete these on error.
 
@@ -291,7 +290,7 @@ run_benchmarks_perf : perf/$${new_filename}.txt
 	@printf "%(%F %T)T $@ saved \e[32m$(abspath $<)\e[0m\n\n"
 
 run_benchmarks_quick : ${build_dir}/benchmarks_min
-	@echo -n "$@ "; set -x; AQB=1 taskset -c 4-7 /bin/time ${chrt_fifo} ${lb} $<
+	@echo -n "$@ "; set -x; AQB=1 taskset -c 4-7 /bin/time ${chrt_fifo} $<
 
 # GitHub runners have 4 CPUs.
 # https://docs.github.com/en/actions/how-tos/write-workflows/choose-where-workflows-run/choose-the-runner-for-a-job#standard-github-hosted-runners-for-public-repositories
