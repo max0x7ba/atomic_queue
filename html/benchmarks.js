@@ -137,7 +137,7 @@ $(function() {
         },
         yAxis: {
             min: 0,
-            max: 1000,
+            max: 500,
             tickInterval: 100,
             title: { text: 'latency, nanoseconds/round-trip' }
         },
