@@ -44,6 +44,9 @@ jobs:
     steps:
     - uses: actions/checkout@v7
 
+    - name: Enable transparent huge pages
+      run: source scripts/util.sh && enable_thp
+
     - name: Install Boost.Test
       run: |
         sudo apt-get update

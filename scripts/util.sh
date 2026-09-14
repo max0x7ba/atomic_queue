@@ -107,3 +107,11 @@ function format_benchmark {(
         done
     done
 )}
+
+function enable_thp {
+	sudo bash <<-EOF
+		echo 1 > /proc/sys/vm/overcommit_memory
+		echo always > /sys/kernel/mm/transparent_hugepage/enabled
+		echo always > /sys/kernel/mm/transparent_hugepage/defrag
+	EOF
+}
