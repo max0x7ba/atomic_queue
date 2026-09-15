@@ -66,7 +66,7 @@ int main() {
     }
 
     // Verify that each element has been pop'ed exactly once; not corrupted, dropped or duplicated.
-    uint64_t constexpr expected_total_sum = (N_PRODUCER_MSG + 1) * .5 * N_PRODUCER_MSG * N_PRODUCERS;
+    uint64_t constexpr expected_total_sum = (N_PRODUCER_MSG + 1) * .5 * (N_PRODUCER_MSG * N_PRODUCERS);
     if(int64_t total_sum_diff = total_sum - expected_total_sum) {
         std::cerr << "ERROR: unexpected total_sum difference " << total_sum_diff << '\n';
         return EXIT_FAILURE;
