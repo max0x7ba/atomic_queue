@@ -756,6 +756,11 @@ class AtomicQueueB2 : private std::allocator_traits<A>::template rebind_alloc<un
         AtomicQueueB2* that;
         unsigned n_constructed;
 
+        ATOMIC_QUEUE_INLINE Rollback(AtomicQueueB2* that) noexcept
+            : that(that)
+            , n_constructed()
+        {}
+
         Rollback(Rollback const&) = delete;
         Rollback& operator=(Rollback const&) = delete;
 
@@ -782,7 +787,7 @@ public:
         A a = get_allocator();
         assert(a == allocator); // The standard requires the original and rebound allocators to manage the same state.
 
-        Rollback rollback{this, 0}; // Strong exception safety: destroy and deallocate on exception.
+        Rollback rollback{this}; // Strong exception safety: destroy and deallocate on exception.
 
         states_ = allocate_<AtomicState>();
         std::uninitialized_fill_n(states_, capacity_, EMPTY);
