@@ -756,6 +756,7 @@ class AtomicQueueB2 : private std::allocator_traits<A>::template rebind_alloc<un
         AtomicQueueB2* that;
         unsigned n_constructed;
 
+        Rollback(AtomicQueueB2* _that, unsigned _n_constructed) : that(_that), n_constructed(_n_constructed) {}
         Rollback(Rollback const&) = delete;
         Rollback& operator=(Rollback const&) = delete;
 
