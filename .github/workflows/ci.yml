@@ -61,6 +61,10 @@ jobs:
     - name: Toolset versions
       run: ${{ env.make }} versions
 
+    - name: Compile in C++20 mode
+      if: ${{ ! startsWith(matrix.os, 'ubuntu-22') }}
+      run: ${{ env.make }} -j${{ env.n_proc }} CXXFLAGS=-std=c++20 example tests benchmarks_min
+
     - name: Unit-test
       run: ${{ env.make }} -j${{ env.n_proc }} run_ci
 
