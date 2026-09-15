@@ -17,7 +17,7 @@ atomic_queue_deps = [dependency('threads')]
 
 # clang++ does not always inline atomic operations and may emit calls to libatomic, so link with it explicitly.
 if cxx.get_id() == 'clang'
-  atomic_queue_deps += cxx.find_library('atomic')
+  atomic_queue_deps += cxx.find_library('atomic', required : false)
 endif
 
 atomic_queue_dep = declare_dependency(include_directories : ['include'], dependencies : atomic_queue_deps)
