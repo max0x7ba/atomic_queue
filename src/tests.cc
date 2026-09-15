@@ -22,7 +22,7 @@ using namespace ::atomic_queue;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-enum { N_STRESS_MSG = 1000000 };
+enum { N_STRESS_MSG = 1'000'000 };
 enum { STOP_MSG = -1 };
 enum { CAPACITY = 4096 };
 
@@ -85,7 +85,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(stress, Queue, stress_queues) {
     for(auto& t : consumers)
         t.join();
 
-    constexpr uint64_t expected_result = (N_STRESS_MSG + 1) * .5 * N_STRESS_MSG * PRODUCERS;
+    constexpr uint64_t expected_result = (N_STRESS_MSG + 1) * .5 * (+N_STRESS_MSG * +PRODUCERS);
     constexpr uint64_t consumer_result_min = expected_result / CONSUMERS / 10;
     uint64_t result = 0;
     for(auto& r : results) {
