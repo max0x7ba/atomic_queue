@@ -29,17 +29,79 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        toolset: [gcc, clang]
-        os: [ubuntu-22.04, ubuntu-22.04-arm, ubuntu-24.04, ubuntu-24.04-arm, ubuntu-26.04, ubuntu-26.04-arm]
+        include:
+          - os: ubuntu-22.04
+            toolset: gcc
+            std: c++14
 
-    name: ${{ matrix.os }}, ${{ matrix.toolset }}
+          - os: ubuntu-24.04
+            toolset: gcc
+            std: c++14
+
+          - os: ubuntu-24.04
+            toolset: gcc
+            std: c++20
+
+          - os: ubuntu-26.04
+            toolset: gcc
+            std: c++14
+
+          - os: ubuntu-22.04-arm
+            toolset: gcc
+            std: c++14
+
+          - os: ubuntu-24.04-arm
+            toolset: gcc
+            std: c++14
+
+          - os: ubuntu-24.04-arm
+            toolset: gcc
+            std: c++20
+
+          - os: ubuntu-26.04-arm
+            toolset: gcc
+            std: c++14
+
+          - os: ubuntu-22.04
+            toolset: clang
+            std: c++14
+
+          - os: ubuntu-24.04
+            toolset: clang
+            std: c++14
+
+          - os: ubuntu-24.04
+            toolset: clang
+            std: c++20
+
+          - os: ubuntu-26.04
+            toolset: clang
+            std: c++14
+
+          - os: ubuntu-22.04-arm
+            toolset: clang
+            std: c++14
+
+          - os: ubuntu-24.04-arm
+            toolset: clang
+            std: c++14
+
+          - os: ubuntu-24.04-arm
+            toolset: clang
+            std: c++20
+
+          - os: ubuntu-26.04-arm
+            toolset: clang
+            std: c++14
+
+    name: ${{ matrix.toolset }}, ${{ matrix.std }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
 
     # The worst empirical run-time of this job is about 2m30s.
     timeout-minutes: 5
 
     env:
-      make: make -R TOOLSET=${{ matrix.toolset }}
+      make: make -R TOOLSET=${{ matrix.toolset }} CXXFLAGS=-std=${{ matrix.std }}
 
     steps:
     - uses: actions/checkout@v7
