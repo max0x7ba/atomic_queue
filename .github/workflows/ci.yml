@@ -30,10 +30,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-22.04
-            toolset: gcc
-            std: c++14
-
           - os: ubuntu-24.04
             toolset: gcc
             std: c++14
@@ -46,9 +42,9 @@ jobs:
             toolset: gcc
             std: c++14
 
-          - os: ubuntu-22.04-arm
+          - os: ubuntu-26.04
             toolset: gcc
-            std: c++14
+            std: c++23
 
           - os: ubuntu-24.04-arm
             toolset: gcc
@@ -62,9 +58,9 @@ jobs:
             toolset: gcc
             std: c++14
 
-          - os: ubuntu-22.04
-            toolset: clang
-            std: c++14
+          - os: ubuntu-26.04-arm
+            toolset: gcc
+            std: c++23
 
           - os: ubuntu-24.04
             toolset: clang
@@ -78,9 +74,9 @@ jobs:
             toolset: clang
             std: c++14
 
-          - os: ubuntu-22.04-arm
+          - os: ubuntu-26.04
             toolset: clang
-            std: c++14
+            std: c++23
 
           - os: ubuntu-24.04-arm
             toolset: clang
@@ -93,6 +89,10 @@ jobs:
           - os: ubuntu-26.04-arm
             toolset: clang
             std: c++14
+
+          - os: ubuntu-26.04-arm
+            toolset: clang
+            std: c++23
 
     name: ${{ matrix.toolset }}, ${{ matrix.std }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
