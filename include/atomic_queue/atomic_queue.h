@@ -264,6 +264,22 @@ ATOMIC_QUEUE_SINLINE void copy_relaxed(std::atomic<T>& a, std::atomic<T> const& 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+struct RollbackState {
+    void* that;
+    unsigned n_constructed = 0;
+
+    // C++20 requires this constructor.
+    ATOMIC_QUEUE_INLINE constexpr RollbackState(void* that) noexcept
+        : that(that)
+    {}
+
+    // Non-copyable and non-movable.
+    RollbackState& operator=(RollbackState const&) = delete;
+    RollbackState(RollbackState const&) = delete;
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 } // namespace details
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -752,17 +768,11 @@ class AtomicQueueB2 : private std::allocator_traits<A>::template rebind_alloc<un
         }
     }
 
-    struct Rollback {
-        AtomicQueueB2* that;
-        unsigned n_constructed;
-
-        Rollback(AtomicQueueB2* _that, unsigned _n_constructed) : that(_that), n_constructed(_n_constructed) {}
-        Rollback(Rollback const&) = delete;
-        Rollback& operator=(Rollback const&) = delete;
-
+    struct Rollback : details::RollbackState {
+        using RollbackState::RollbackState;
         ~Rollback() noexcept {
             if(ATOMIC_QUEUE_UNLIKELY(that))
-                that->destroy_(n_constructed);
+                static_cast<AtomicQueueB2*>(that)->destroy_(n_constructed);
         }
     };
 
@@ -783,7 +793,7 @@ public:
         A a = get_allocator();
         assert(a == allocator); // The standard requires the original and rebound allocators to manage the same state.
 
-        Rollback rollback{this, 0}; // Strong exception safety: destroy and deallocate on exception.
+        Rollback rollback{this}; // Strong exception safety: destroy and deallocate on exception.
 
         states_ = allocate_<AtomicState>();
         std::uninitialized_fill_n(states_, capacity_, EMPTY);
