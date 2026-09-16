@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.9.4] - 2026-09-16
+
+### Fixed
+- Compilation errors with `-std=c++20` and `-std=c++23`.
+- Meson build with Apple clang, which has no libatomic (#108).
+- `AtomicQueueB2` rollback helper C++20 constructor error (#110).
+
+### Changed
+- Makefile CI now compiles with C++14, C++20 and C++23 standards.
+- Makefile CI retired ubuntu-22.04 runners.
+
 ## [1.9.3] - 2026-09-15
 
 ### Fixed
@@ -31,4 +42,5 @@ All notable changes to this project are documented in this file.
 ### Dependencies
 - Bump `actions/checkout` from 6 to 7 (#105).
 
+[1.9.4]: https://github.com/max0x7ba/atomic_queue/compare/v1.9.3...v1.9.4
 [1.9.3]: https://github.com/max0x7ba/atomic_queue/compare/v1.9.2...v1.9.3
