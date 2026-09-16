@@ -135,7 +135,7 @@ void CpuInfo::log(char const* clock_name) const noexcept {
     if(!model_name.empty())
         printf("CPU Model: %s, ", model_name.c_str());
 
-    printf("base GHz: %.1lf, clock: %s, ", ghz, clock_name);
+    printf("base GHz: %.2lf, clock: %s, ", ghz, clock_name);
 
     printf("%zu available CPUs: ", cores.size());
     char sep = '[';
