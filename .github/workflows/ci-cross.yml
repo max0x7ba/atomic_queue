@@ -31,21 +31,16 @@ jobs:
       matrix:
         include:
           # Weakly-ordered, 128-byte cache line.
-          - arch: ppc64el
-            triplet: powerpc64le-linux-gnu
-            qemu: qemu-ppc64le
+          - { arch: ppc64el,  triplet: powerpc64le-linux-gnu, qemu: qemu-ppc64le }
+
           # Weakly-ordered, spin_loop_pause() is a hand-encoded PAUSE hint.
-          - arch: riscv64
-            triplet: riscv64-linux-gnu
-            qemu: qemu-riscv64
+          - { arch: riscv64,  triplet: riscv64-linux-gnu,     qemu: qemu-riscv64 }
+
           # Big-endian, 256-byte cache line, no pause instruction.
-          - arch: s390x
-            triplet: s390x-linux-gnu
-            qemu: qemu-s390x
+          - { arch: s390x,    triplet: s390x-linux-gnu,       qemu: qemu-s390x }
+
           # spin_loop_pause() is 8 nops.
-          - arch: loong64
-            triplet: loongarch64-linux-gnu
-            qemu: qemu-loongarch64
+          - { arch: loong64,  triplet: loongarch64-linux-gnu, qemu: qemu-loongarch64 }
 
     steps:
     - name: Install git for actions/checkout
