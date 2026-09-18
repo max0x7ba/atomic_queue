@@ -30,69 +30,22 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-24.04
-            toolset: gcc
-            std: c++14
-
-          - os: ubuntu-24.04
-            toolset: gcc
-            std: c++20
-
-          - os: ubuntu-26.04
-            toolset: gcc
-            std: c++14
-
-          - os: ubuntu-26.04
-            toolset: gcc
-            std: c++23
-
-          - os: ubuntu-24.04-arm
-            toolset: gcc
-            std: c++14
-
-          - os: ubuntu-24.04-arm
-            toolset: gcc
-            std: c++20
-
-          - os: ubuntu-26.04-arm
-            toolset: gcc
-            std: c++14
-
-          - os: ubuntu-26.04-arm
-            toolset: gcc
-            std: c++23
-
-          - os: ubuntu-24.04
-            toolset: clang
-            std: c++14
-
-          - os: ubuntu-24.04
-            toolset: clang
-            std: c++20
-
-          - os: ubuntu-26.04
-            toolset: clang
-            std: c++14
-
-          - os: ubuntu-26.04
-            toolset: clang
-            std: c++23
-
-          - os: ubuntu-24.04-arm
-            toolset: clang
-            std: c++14
-
-          - os: ubuntu-24.04-arm
-            toolset: clang
-            std: c++20
-
-          - os: ubuntu-26.04-arm
-            toolset: clang
-            std: c++14
-
-          - os: ubuntu-26.04-arm
-            toolset: clang
-            std: c++23
+          - { os: ubuntu-24.04,     toolset: gcc,   std: c++14 }
+          - { os: ubuntu-24.04,     toolset: gcc,   std: c++20 }
+          - { os: ubuntu-26.04,     toolset: gcc,   std: c++14 }
+          - { os: ubuntu-26.04,     toolset: gcc,   std: c++23 }
+          - { os: ubuntu-24.04-arm, toolset: gcc,   std: c++14 }
+          - { os: ubuntu-24.04-arm, toolset: gcc,   std: c++20 }
+          - { os: ubuntu-26.04-arm, toolset: gcc,   std: c++14 }
+          - { os: ubuntu-26.04-arm, toolset: gcc,   std: c++23 }
+          - { os: ubuntu-24.04,     toolset: clang, std: c++14 }
+          - { os: ubuntu-24.04,     toolset: clang, std: c++20 }
+          - { os: ubuntu-26.04,     toolset: clang, std: c++14 }
+          - { os: ubuntu-26.04,     toolset: clang, std: c++23 }
+          - { os: ubuntu-24.04-arm, toolset: clang, std: c++14 }
+          - { os: ubuntu-24.04-arm, toolset: clang, std: c++20 }
+          - { os: ubuntu-26.04-arm, toolset: clang, std: c++14 }
+          - { os: ubuntu-26.04-arm, toolset: clang, std: c++23 }
 
     name: ${{ matrix.toolset }}, ${{ matrix.std }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
