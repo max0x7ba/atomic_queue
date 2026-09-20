@@ -54,7 +54,7 @@ jobs:
     timeout-minutes: 5
 
     env:
-      make: make -R TOOLSET=${{ matrix.toolset }} CXXFLAGS=-std=${{ matrix.std }}
+      make: make --no-print-directory -R TOOLSET=${{ matrix.toolset }} CXXFLAGS=-std=${{ matrix.std }}
 
     steps:
     - uses: actions/checkout@v7

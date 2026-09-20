@@ -110,9 +110,15 @@ all :
 
 ################################################################################################################################
 
-colors := $(shell printf "\033[97m \033[0m")
-c7 := $(word 1,${colors})
-c0 := $(word 2,${colors})
+colors := $(shell printf '\e[%dm ' {91..97} 0)
+# c1 := $(word 1, ${colors})
+# c2 := $(word 2, ${colors})
+# c3 := $(word 3, ${colors})
+# c4 := $(word 4, ${colors})
+# c5 := $(word 5, ${colors})
+# c6 := $(word 6, ${colors})
+c7 := $(word 7, ${colors})
+c0 := $(word 8, ${colors})
 
 log_src := $(firstword ${MAKEFILE_LIST})
 log = $(info ${log_src}: ${c7}${1}${c0})
@@ -327,8 +333,8 @@ distclean :
 	rm -rf ${BUILD_ROOT} compile_commands.json make_commands.txt
 
 versions:
-	${MAKE} --version | ${head1}
-	${CXX} --version | ${head1}
+	-@${MAKE} --version | ${head1}
+	-@${CXX} --version | ${head1}
 
 ${build_dir}/.make/ perf/ results/ :
 	mkdir -p $@
