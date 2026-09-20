@@ -10,7 +10,7 @@
 [![Cross-architecture CI](https://github.com/max0x7ba/atomic_queue/actions/workflows/ci-cross.yml/badge.svg)](https://github.com/max0x7ba/atomic_queue/actions/workflows/ci-cross.yml)
 
 # atomic_queue
-C++14 multiple-producer-multiple-consumer *lock-free* queues based on circular buffers and [`std::atomic`][3].
+C++14 multiple-producer-multiple-consumer *lock-free* queues based on ring-buffers and [`std::atomic`][3].
 
 Designed with a goal to minimize the latency between one thread pushing an element into a queue and another thread popping it from the queue.
 
@@ -40,16 +40,16 @@ Minimizing latency naturally maximizes throughput. Low latency reciprocal is hig
 
 The main design principle these queues follow is _minimalism_, which results in such design choices as:
 
-* Bare minimum of atomic instructions. Inlinable by default push and pop functions can hardly be any cheaper in terms of CPU instruction number / L1i cache pressure.
-* Explicit contention/false-sharing avoidance for queue data members and its elements.
-* Linear fixed size ring-buffer array. No heap memory allocations after a queue object has constructed. It doesn't get any more CPU L1d or TLB cache friendly than that.
-* Value semantics. Meaning that the queues make a copy/move upon `push`/`pop` and keep no references/pointers to its function arguments after returning, and that no reference/pointer to elements in the queue ring-buffer can be obtained. Simplest to use, hard to misuse, best machine code due to no pointer aliasing possible.
+* **Bare minimum of atomic instructions**. Inlinable by default push and pop functions can hardly be any cheaper in terms of CPU instruction number / L1i cache pressure.
+* **Explicit contention/false-sharing avoidance** for queue data members and its elements.
+* **Linear fixed size ring-buffer array**. No heap memory allocations after a queue object has constructed. It doesn't get any more CPU L1d or TLB cache friendly than that.
+* **Value semantics**. Meaning that the queues make a copy/move upon `push`/`pop` and keep no references/pointers to its function arguments after returning, and that no reference/pointer to elements in the queue ring-buffer can be obtained. Simplest to use, hard to misuse, best machine code due to no pointer aliasing possible.
 
 The impact of each of these small design choices on their own is barely measurable, but their total impact is much greater than a simple sum of the constituents' impacts, aka super-scalar compounding or synergy. The synergy emerging from combining multiple of these small design choices together is what allows CPUs to perform at their peak capacities least impeded.
 
 These design choices are also limitations:
 
-* **The maximum queue size must be set at compile time or construction time.** The circular buffer side-steps the memory reclamation problem inherent in linked-list based queues for the price of fixed buffer size. See [Effective memory reclamation for lock-free data structures in C++][4] for more details. Fixed buffer size may not be that much of a limitation, since once the queue gets larger than the maximum expected size that indicates a problem that elements aren't consumed fast enough, and if the queue keeps growing it may eventually consume all available memory which may affect the entire system, rather than the problematic process only. The only apparent inconvenience is that one has to do an upfront calculation on what would be the largest expected/acceptable number of unconsumed elements in the queue.
+* **The maximum queue size must be set at compile time or construction time.** The ring-buffer side-steps the memory reclamation problem inherent in linked-list based queues for the price of fixed buffer size. See [Effective memory reclamation for lock-free data structures in C++][4] for more details. Fixed buffer size may not be that much of a limitation, since once the queue gets larger than the maximum expected size that indicates a problem that elements aren't consumed fast enough, and if the queue keeps growing it may eventually consume all available memory which may affect the entire system, rather than the problematic process only. The only apparent inconvenience is that one has to do an upfront calculation on what would be the largest expected/acceptable number of unconsumed elements in the queue.
 * **There are no OS-blocking push/pop functions.** This queue is designed for ultra-low-latency scenarios and using an OS blocking primitive would be sacrificing push-to-pop latency. For lowest possible latency one cannot afford calling the OS kernel or blocking in the OS kernel because the wake-up latency of a blocked thread is about 1-3 microseconds, whereas this queue's round-trip time (push a message to another thread and pop its reply) can be below 100 nanoseconds. CPU vulnerability mitigations made system calls dramatically more expensive, crippling performance even worse. In general, handing off spin-waiting to an OS blocking primitive is a problem with no satisfactory low-latency solutions.
 
 Ultra-low-latency applications need just that and nothing more. The minimalism pays off, see the [throughput and latency benchmarks][1].
