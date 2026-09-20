@@ -1,20 +1,17 @@
-/* -*- mode: c++; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 4 -*- */
-
 // Copyright (c) 2019 Maxim Egorushkin. MIT License. See the full licence in file LICENSE.
-
-#define BOOST_TEST_MODULE atomic_queue
-#include <boost/test/unit_test.hpp>
-
 #include "atomic_queue/atomic_queue.h"
 #include "atomic_queue/barrier.h"
 #include "benchmarks.h"
 
+#define BOOST_TEST_MODULE atomic_queue
+#include <boost/test/unit_test.hpp>
 #include <boost/mpl/list.hpp>
+
 #include <bitset>
 #include <cstdint>
-#include <thread>
-#include <string>
 #include <new>
+#include <string>
+#include <thread>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -395,6 +392,8 @@ BOOST_AUTO_TEST_CASE(size) {
 
 BOOST_AUTO_TEST_CASE(power_of_2) {
     using atomic_queue::details::round_up_to_power_of_2;
+
+    // These are compile-time only tests.
     static_assert(round_up_to_power_of_2(0u) == 0u, "");
     static_assert(round_up_to_power_of_2(1u) == 1u, "");
     static_assert(round_up_to_power_of_2(2u) == 2u, "");
@@ -405,6 +404,9 @@ BOOST_AUTO_TEST_CASE(power_of_2) {
     static_assert(round_up_to_power_of_2(0x40000000u - 1) == 0x40000000u, "");
     static_assert(round_up_to_power_of_2(0x40000000u    ) == 0x40000000u, "");
     static_assert(round_up_to_power_of_2(0x40000000u + 1) == 0x80000000u, "");
+
+    // Silence "Test case power_of_2 did not check any assertions" Boost.Test warning.
+    BOOST_CHECK(1);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -476,3 +478,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(remap_index, Remap, remap_index_fns) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Local Variables:
+// compile-command: "/bin/time make -C ~/src/atomic_queue -Rj$(($(nproc)/2)) T=1 run_tests"
+// End:
