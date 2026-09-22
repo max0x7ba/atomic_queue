@@ -85,6 +85,50 @@ Several other well established and popular thread-safe containers are used for r
 | `tbb::spin_mutex` | MPMC | A locked fixed size ring-buffer with `tbb::spin_mutex` from Intel Threading Building Blocks. |
 | `tbb::concurrent_bounded_queue` | MPMC | Eponymous queue used in non-blocking mode from Intel Threading Building Blocks. |
 
+## Library contents
+### Available queues
+* `AtomicQueue` - a fixed size ring-buffer for atomic elements.
+* `OptimistAtomicQueue` - a faster fixed size ring-buffer for atomic elements which busy-waits when empty or full. It is `AtomicQueue` used with `push`/`pop` instead of `try_push`/`try_pop`.
+* `AtomicQueue2` - a fixed size ring-buffer for non-atomic elements.
+* `OptimistAtomicQueue2` - a faster fixed size ring-buffer for non-atomic elements which busy-waits when empty or full. It is `AtomicQueue2` used with `push`/`pop` instead of `try_push`/`try_pop`.
+
+These containers maintain their ring-buffers as array data members with size specified at compile-time and have no pointer data members. That makes them position-independent, allows allocating them into process-shared memory with a plain C++ placement new statement, and mapping at arbitrary addresses in different processes using the same queue objects in shared memory. The queue elements must be position-independent too to support this particular use-case (unlike classes with process-position-dependent pointers such as `std::unique_ptr`, `std::string` and all the C++ standard containers with default allocators).
+
+There are corresponding `B` variants (`AtomicQueueB`, `OptimistAtomicQueueB`, `AtomicQueueB2`, `OptimistAtomicQueueB2`) that use `std::allocator` or user-specified (stateful) allocator for allocating the ring-buffers, where the buffer size is specified as an argument to the constructor at run-time.
+
+Totally ordered mode is supported. In this mode consumers receive messages in the same FIFO order the messages were posted. This mode is supported for `push` and `pop` functions, but not for the `try_` versions. On Intel x86 the totally ordered mode has 0 cost, as of 2019.
+
+Single-producer-single-consumer mode is supported. In this mode, no expensive atomic read-modify-write CPU instructions are necessary, only the cheapest atomic loads and stores. That improves queue throughput significantly.
+
+Move-only queue element types are fully supported. For example, a queue of `std::unique_ptr<T>` elements would be `AtomicQueueB2<std::unique_ptr<T>>` or `AtomicQueue2<std::unique_ptr<T>, CAPACITY>`.
+
+### Queue schematics
+```
+[oldest-element, ..., newest-element]
+[queue-front   , ...,     queue-back]
+[Queue.beg_    , ...,     Queue.end_)
+ Queue.pop                Queue.push
+```
+
+### Queue API
+The queue class templates provide the following member functions:
+* `try_push` - Appends an element to the end of the queue. Returns `false` when the queue is full.
+* `try_pop` - Removes an element from the front of the queue. Returns `false` when the queue is empty.
+* `push` (optimist) - Appends an element to the end of the queue. Busy waits when the queue is full. Faster than `try_push` when the queue is not full. Optional FIFO producer queuing and total order.
+* `pop` (optimist) - Removes an element from the front of the queue. Busy waits when the queue is empty. Faster than `try_pop` when the queue is not empty. Optional FIFO consumer queuing and total order.
+* `was_size` - Returns the number of unconsumed elements during the call. The state may have changed by the time the return value is examined.
+* `was_empty` - Returns `true` if the container was empty during the call. The state may have changed by the time the return value is examined.
+* `was_full` - Returns `true` if the container was full during the call. The state may have changed by the time the return value is examined.
+* `capacity` - Returns the maximum number of elements the queue can possibly hold.
+
+_Atomic elements_ are those, for which [`std::atomic<T>{T{}}.is_lock_free()`][10] returns `true`, and, when C++17 features are available, [`std::atomic<T>::is_always_lock_free`][16] evaluates to `true` at compile time. In other words, the CPU can load, store and compare-and-exchange such elements atomically natively. On x86-64 such elements are all the [C++ standard arithmetic and pointer types][11].
+
+The queues for atomic elements reserve one value to serve as an empty element marker `NIL`, its default value is `0`. `NIL` value must not be pushed into a queue and there is an [`assert`][13] statement in `push` functions to guard against that in debug mode builds. Pushing `NIL` element into a queue in release mode builds results in undefined behaviour, such as deadlocks and/or lost queue elements.
+
+Note that _optimism_ is a choice of a queue modification operation control flow, rather than a queue type. An _optimist_ `push` is fastest when the queue is not full most of the time, an optimistic `pop` - when the queue is not empty most of the time. Optimistic and not so operations can be mixed with no restrictions. The `OptimistAtomicQueue`s in [the benchmarks][1] use only _optimist_ `push` and `pop`.
+
+See [example.cc](src/example.cc) for a usage example.
+
 ## Using the library
 The containers provided are header-only class templates, no building/installing is necessary.
 
@@ -179,50 +223,6 @@ make -R -j$(($(nproc)/2)) TOOLSET=clang-20 run_benchmarks_n  # Build with clang-
 
 taskset --cpu-list 0,1,14,15 make -R -j$(($(nproc)/2)) TOOLSET=gcc-14 run_benchmarks_n  # Use only cpus [0,1,14,15] to build with gcc-14 and run the benchmarks 3 times.
 ```
-
-## Library contents
-### Available queues
-* `AtomicQueue` - a fixed size ring-buffer for atomic elements.
-* `OptimistAtomicQueue` - a faster fixed size ring-buffer for atomic elements which busy-waits when empty or full. It is `AtomicQueue` used with `push`/`pop` instead of `try_push`/`try_pop`.
-* `AtomicQueue2` - a fixed size ring-buffer for non-atomic elements.
-* `OptimistAtomicQueue2` - a faster fixed size ring-buffer for non-atomic elements which busy-waits when empty or full. It is `AtomicQueue2` used with `push`/`pop` instead of `try_push`/`try_pop`.
-
-These containers maintain their ring-buffers as array data members with size specified at compile-time and have no pointer data members. That makes them position-independent, allows allocating them into process-shared memory with a plain C++ placement new statement, and mapping at arbitrary addresses in different processes using the same queue objects in shared memory. The queue elements must be position-independent too to support this particular use-case (unlike classes with process-position-dependent pointers such as `std::unique_ptr`, `std::string` and all the C++ standard containers with default allocators).
-
-There are corresponding `B` variants (`AtomicQueueB`, `OptimistAtomicQueueB`, `AtomicQueueB2`, `OptimistAtomicQueueB2`) that use `std::allocator` or user-specified (stateful) allocator for allocating the ring-buffers, where the buffer size is specified as an argument to the constructor at run-time.
-
-Totally ordered mode is supported. In this mode consumers receive messages in the same FIFO order the messages were posted. This mode is supported for `push` and `pop` functions, but not for the `try_` versions. On Intel x86 the totally ordered mode has 0 cost, as of 2019.
-
-Single-producer-single-consumer mode is supported. In this mode, no expensive atomic read-modify-write CPU instructions are necessary, only the cheapest atomic loads and stores. That improves queue throughput significantly.
-
-Move-only queue element types are fully supported. For example, a queue of `std::unique_ptr<T>` elements would be `AtomicQueueB2<std::unique_ptr<T>>` or `AtomicQueue2<std::unique_ptr<T>, CAPACITY>`.
-
-### Queue schematics
-
-```
-queue-end                 queue-front
-[newest-element, ..., oldest-element]
-push()                          pop()
-```
-
-### Queue API
-The queue class templates provide the following member functions:
-* `try_push` - Appends an element to the end of the queue. Returns `false` when the queue is full.
-* `try_pop` - Removes an element from the front of the queue. Returns `false` when the queue is empty.
-* `push` (optimist) - Appends an element to the end of the queue. Busy waits when the queue is full. Faster than `try_push` when the queue is not full. Optional FIFO producer queuing and total order.
-* `pop` (optimist) - Removes an element from the front of the queue. Busy waits when the queue is empty. Faster than `try_pop` when the queue is not empty. Optional FIFO consumer queuing and total order.
-* `was_size` - Returns the number of unconsumed elements during the call. The state may have changed by the time the return value is examined.
-* `was_empty` - Returns `true` if the container was empty during the call. The state may have changed by the time the return value is examined.
-* `was_full` - Returns `true` if the container was full during the call. The state may have changed by the time the return value is examined.
-* `capacity` - Returns the maximum number of elements the queue can possibly hold.
-
-_Atomic elements_ are those, for which [`std::atomic<T>{T{}}.is_lock_free()`][10] returns `true`, and, when C++17 features are available, [`std::atomic<T>::is_always_lock_free`][16] evaluates to `true` at compile time. In other words, the CPU can load, store and compare-and-exchange such elements atomically natively. On x86-64 such elements are all the [C++ standard arithmetic and pointer types][11].
-
-The queues for atomic elements reserve one value to serve as an empty element marker `NIL`, its default value is `0`. `NIL` value must not be pushed into a queue and there is an [`assert`][13] statement in `push` functions to guard against that in debug mode builds. Pushing `NIL` element into a queue in release mode builds results in undefined behaviour, such as deadlocks and/or lost queue elements.
-
-Note that _optimism_ is a choice of a queue modification operation control flow, rather than a queue type. An _optimist_ `push` is fastest when the queue is not full most of the time, an optimistic `pop` - when the queue is not empty most of the time. Optimistic and not so operations can be mixed with no restrictions. The `OptimistAtomicQueue`s in [the benchmarks][1] use only _optimist_ `push` and `pop`.
-
-See [example.cc](src/example.cc) for a usage example.
 
 ## Implementation Notes
 ### Memory order of non-atomic loads and stores

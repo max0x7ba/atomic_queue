@@ -24,7 +24,7 @@
 #
 # Build and run with multiple toolsets in parallel:
 #
-#   cd ~/src/atomic_queue && make T=3 distclean && /bin/time make -k -Rj$(nproc) T=3 TOOLSET=gcc-11,gcc-12,gcc-13,gcc-14,clang-18,clang-19,clang-20
+#   cd ~/src/atomic_queue && make T=3 distclean && /bin/time make -kRj$(nproc) T=3 CXXFLAGS=-std=c++23 TOOLSET=gcc-11,gcc-12,gcc-13,gcc-14,clang-18,clang-19,clang-20
 #   /bin/time make -C ~/src/atomic_queue -Rj$(nproc) T=3 TOOLSET=gcc-11,gcc-12,gcc-13,gcc-14,clang-18,clang-19,clang-20 BUILD=debug all run_tests
 #
 # Additional CPPFLAGS, CXXFLAGS, LDLIBS, LDFLAGS can come from the command line, e.g. make CPPFLAGS='-I<my-include-dir>', or from environment variables.  For example, also produce assembly outputs:

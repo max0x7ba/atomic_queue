@@ -303,32 +303,32 @@ class AtomicQueueCommon {
 
 protected:
     // Put these on different cache lines to avoid false sharing between readers and writers.
-    alignas(CACHE_LINE_SIZE) std::atomic<unsigned> head_ = {};
-    alignas(CACHE_LINE_SIZE) std::atomic<unsigned> tail_ = {};
+    alignas(CACHE_LINE_SIZE) std::atomic<unsigned> end_{}; // One past the latest queue element to push into.
+    alignas(CACHE_LINE_SIZE) std::atomic<unsigned> beg_{}; // The oldest queue element to pop from.
 
     // The special member functions are not thread-safe.
 
     AtomicQueueCommon() noexcept {
-        assert(is_suitably_aligned(&downcast()));
+        assert(is_suitably_aligned(&downcast())); // Storage must be suitably aligned for the derived Queue object.
     }
 
     AtomicQueueCommon(AtomicQueueCommon const& b) noexcept
-        : head_(b.head_.load(X))
-        , tail_(b.tail_.load(X))
+        : end_(b.end_.load(X))
+        , beg_(b.beg_.load(X))
     {
-        assert(is_suitably_aligned(&downcast()));
+        assert(is_suitably_aligned(&downcast())); // Storage must be suitably aligned for the derived Queue object.
     }
 
     AtomicQueueCommon& operator=(AtomicQueueCommon const& b) noexcept {
-        details::copy_relaxed(head_, b.head_);
-        details::copy_relaxed(tail_, b.tail_);
+        details::copy_relaxed(end_, b.end_);
+        details::copy_relaxed(beg_, b.beg_);
         return *this;
     }
 
     // Relatively semi-special swap is not thread-safe either.
     void swap(AtomicQueueCommon& b) noexcept {
-        details::swap_relaxed(head_, b.head_);
-        details::swap_relaxed(tail_, b.tail_);
+        details::swap_relaxed(end_, b.end_);
+        details::swap_relaxed(beg_, b.beg_);
     }
 
     template<class T>
@@ -435,68 +435,68 @@ public:
     template<class T>
     ATOMIC_QUEUE_NODISCARD
     ATOMIC_QUEUE_INLINE bool try_push(T&& element) noexcept {
-        auto head = head_.load(X);
+        auto end = end_.load(X);
         if(Derived::spsc_) {
-            if(ATOMIC_QUEUE_UNLIKELY(as_signed(head - tail_.load(X)) >= as_signed(downcast().capacity_)))
+            if(ATOMIC_QUEUE_UNLIKELY(as_signed(end - beg_.load(X)) >= as_signed(capacity())))
                 return false;
-            head_.store(head + 1, X);
+            end_.store(end + 1, X);
         }
         else {
             do {
-                if(ATOMIC_QUEUE_UNLIKELY(as_signed(head - tail_.load(X)) >= as_signed(downcast().capacity_)))
+                if(ATOMIC_QUEUE_UNLIKELY(as_signed(end - beg_.load(X)) >= as_signed(capacity())))
                     return false;
-            } while(ATOMIC_QUEUE_UNLIKELY(!head_.compare_exchange_weak(head, head + 1, X, X))); // This loop is not FIFO.
+            } while(ATOMIC_QUEUE_UNLIKELY(!end_.compare_exchange_weak(end, end + 1, X, X))); // This loop is not FIFO.
         }
 
-        downcast().do_push(std::forward<T>(element), head);
+        downcast().do_push(std::forward<T>(element), end);
         return true;
     }
 
     template<class T>
     ATOMIC_QUEUE_NODISCARD
     ATOMIC_QUEUE_INLINE bool try_pop(T& element) noexcept {
-        auto tail = tail_.load(X);
+        auto beg = beg_.load(X);
         if(Derived::spsc_) {
-            if(ATOMIC_QUEUE_UNLIKELY(as_signed(head_.load(X) - tail) <= 0))
+            if(ATOMIC_QUEUE_UNLIKELY(as_signed(end_.load(X) - beg) <= 0))
                 return false;
-            tail_.store(tail + 1, X);
+            beg_.store(beg + 1, X);
         }
         else {
             do {
-                if(ATOMIC_QUEUE_UNLIKELY(as_signed(head_.load(X) - tail) <= 0))
+                if(ATOMIC_QUEUE_UNLIKELY(as_signed(end_.load(X) - beg) <= 0))
                     return false;
-            } while(ATOMIC_QUEUE_UNLIKELY(!tail_.compare_exchange_weak(tail, tail + 1, X, X))); // This loop is not FIFO.
+            } while(ATOMIC_QUEUE_UNLIKELY(!beg_.compare_exchange_weak(beg, beg + 1, X, X))); // This loop is not FIFO.
         }
 
-        element = downcast().do_pop(tail);
+        element = downcast().do_pop(beg);
         return true;
     }
 
     template<class T>
     ATOMIC_QUEUE_INLINE void push(T&& element) noexcept {
-        unsigned head;
+        unsigned end;
         if(Derived::spsc_) {
-            head = head_.load(X);
-            head_.store(head + 1, X);
+            end = end_.load(X);
+            end_.store(end + 1, X);
         }
         else {
             constexpr auto memory_order = Derived::total_order_ ? std::memory_order_seq_cst : std::memory_order_relaxed;
-            head = head_.fetch_add(1, memory_order); // FIFO and total order on Intel regardless, as of 2019.
+            end = end_.fetch_add(1, memory_order); // FIFO and total order on Intel regardless, as of 2019.
         }
-        downcast().do_push(std::forward<T>(element), head);
+        downcast().do_push(std::forward<T>(element), end);
     }
 
     ATOMIC_QUEUE_INLINE auto pop() noexcept {
-        unsigned tail;
+        unsigned beg;
         if(Derived::spsc_) {
-            tail = tail_.load(X);
-            tail_.store(tail + 1, X);
+            beg = beg_.load(X);
+            beg_.store(beg + 1, X);
         }
         else {
             constexpr auto memory_order = Derived::total_order_ ? std::memory_order_seq_cst : std::memory_order_relaxed;
-            tail = tail_.fetch_add(1, memory_order); // FIFO and total order on Intel regardless, as of 2019.
+            beg = beg_.fetch_add(1, memory_order); // FIFO and total order on Intel regardless, as of 2019.
         }
-        return downcast().do_pop(tail);
+        return downcast().do_pop(beg);
     }
 
     ATOMIC_QUEUE_INLINE bool was_empty() const noexcept {
@@ -508,9 +508,8 @@ public:
     }
 
     ATOMIC_QUEUE_INLINE unsigned was_size() const noexcept {
-        // tail_ can be greater than head_ because of consumers doing pop, rather that try_pop, when the queue is empty.
-        unsigned n{head_.load(X) - tail_.load(X)};
-        return max_value(as_signed(n), 0);
+        // beg_ can be greater than end_ because of consumers doing pop, rather that try_pop, when the queue is empty.
+        return max_value(as_signed(end_.load(X) - beg_.load(X)), 0);
     }
 
     ATOMIC_QUEUE_INLINE unsigned capacity() const noexcept {
@@ -541,13 +540,13 @@ class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, CAPACITY, NIL, MINIM
 
     alignas(CACHE_LINE_SIZE) std::atomic<T> elements_[capacity_];
 
-    ATOMIC_QUEUE_INLINE T do_pop(unsigned tail) noexcept {
-        auto index = remap(tail, capacity_, B{});
+    ATOMIC_QUEUE_INLINE T do_pop(unsigned beg) noexcept {
+        auto index = remap(beg, capacity_, B{});
         return Base::do_pop(elements_, index);
     }
 
-    ATOMIC_QUEUE_INLINE void do_push(T element, unsigned head) noexcept {
-        auto index = remap(head, capacity_, B{});
+    ATOMIC_QUEUE_INLINE void do_push(T element, unsigned end) noexcept {
+        auto index = remap(end, capacity_, B{});
         Base::do_push(element, elements_, index);
     }
 
@@ -583,14 +582,14 @@ class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, CAPACITY, MINIMIZE
     alignas(CACHE_LINE_SIZE) AtomicState states_[capacity_] = {};
     alignas(CACHE_LINE_SIZE) T elements_[capacity_] = {};
 
-    ATOMIC_QUEUE_INLINE T do_pop(unsigned tail) noexcept {
-        auto index = remap(tail, capacity_, B{});
+    ATOMIC_QUEUE_INLINE T do_pop(unsigned beg) noexcept {
+        auto index = remap(beg, capacity_, B{});
         return Base::do_pop(states_, elements_, index);
     }
 
     template<class U>
-    ATOMIC_QUEUE_INLINE void do_push(U&& element, unsigned head) noexcept {
-        auto index = remap(head, capacity_, B{});
+    ATOMIC_QUEUE_INLINE void do_push(U&& element, unsigned end) noexcept {
+        auto index = remap(end, capacity_, B{});
         Base::do_push(std::forward<U>(element), states_, elements_, index);
     }
 
@@ -634,13 +633,13 @@ class AtomicQueueB : private std::allocator_traits<A>::template rebind_alloc<std
     // Explicitly annotate the circular buffer array pointer as not aliasing anything else with restrict keyword.
     std::atomic<T>* ATOMIC_QUEUE_RESTRICT elements_;
 
-    ATOMIC_QUEUE_INLINE T do_pop(unsigned tail) noexcept {
-        auto index = remap(tail, capacity_, B{});
+    ATOMIC_QUEUE_INLINE T do_pop(unsigned beg) noexcept {
+        auto index = remap(beg, capacity_, B{});
         return Base::do_pop(elements_, index);
     }
 
-    ATOMIC_QUEUE_INLINE void do_push(T element, unsigned head) noexcept {
-        auto index = remap(head, capacity_, B{});
+    ATOMIC_QUEUE_INLINE void do_push(T element, unsigned end) noexcept {
+        auto index = remap(end, capacity_, B{});
         Base::do_push(element, elements_, index);
     }
 
@@ -729,14 +728,14 @@ class AtomicQueueB2 : private std::allocator_traits<A>::template rebind_alloc<un
     static_assert(SHUFFLE_BITS, "Unexpected SHUFFLE_BITS.");
     using B = details::IndexBits<SHUFFLE_BITS>;
 
-    ATOMIC_QUEUE_INLINE T do_pop(unsigned tail) noexcept {
-        auto index = remap(tail, capacity_, B{});
+    ATOMIC_QUEUE_INLINE T do_pop(unsigned beg) noexcept {
+        auto index = remap(beg, capacity_, B{});
         return Base::do_pop(states_, elements_, index);
     }
 
     template<class U>
-    ATOMIC_QUEUE_INLINE void do_push(U&& element, unsigned head) noexcept {
-        auto index = remap(head, capacity_, B{});
+    ATOMIC_QUEUE_INLINE void do_push(U&& element, unsigned end) noexcept {
+        auto index = remap(end, capacity_, B{});
         Base::do_push(std::forward<U>(element), states_, elements_, index);
     }
 
@@ -786,9 +785,9 @@ public:
 
     // The special member functions are not thread-safe.
 
-    AtomicQueueB2(unsigned size, A const& allocator = A{})
+    AtomicQueueB2(unsigned capacity, A const& allocator = A{})
         : StorageAllocator(allocator)
-        , capacity_(details::assert_valid_capacity(round_up_capacity(size)))
+        , capacity_(details::assert_valid_capacity(round_up_capacity(capacity)))
     {
         A a = get_allocator();
         assert(a == allocator); // The standard requires the original and rebound allocators to manage the same state.
