@@ -42,7 +42,7 @@ The main design principle these queues follow is _minimalism_, which results in 
 
 * **Bare minimum of atomic instructions**. Inlinable by default push and pop functions can hardly be any cheaper in terms of CPU instruction number / L1i cache pressure.
 * **Explicit contention/false-sharing avoidance** for queue data members and its elements.
-* **Linear fixed size ring-buffer array**. No heap memory allocations after a queue object has constructed. It doesn't get any more CPU L1d or TLB cache friendly than that.
+* **Linear fixed capacity ring-buffer array**. No heap memory allocations after a queue object has constructed. It doesn't get any more CPU L1d or TLB cache friendly than that.
 * **Value semantics**. Meaning that the queues make a copy/move upon `push`/`pop` and keep no references/pointers to its function arguments after returning, and that no reference/pointer to elements in the queue ring-buffer can be obtained. Simplest to use, hard to misuse, best machine code due to no pointer aliasing possible.
 
 The impact of each of these small design choices on their own is barely measurable, but their total impact is much greater than a simple sum of the constituents' impacts, aka super-scalar compounding or synergy. The synergy emerging from combining multiple of these small design choices together is what allows CPUs to perform at their peak capacities least impeded.
@@ -57,14 +57,14 @@ Ultra-low-latency applications need just that and nothing more. The minimalism p
 ## Common Use-Cases
 These queues fit any scenario where threads hand off small, copyable/movable messages and the number of in-flight elements has a sensible upper bound. Some typical uses:
 
-* **Low-latency messaging hot paths.** Passing market data updates, orders, or events between threads in trading and other latency-sensitive systems, where the sub-100ns push-to-pop round-trip and preserved global time order matter.
-* **Producer/consumer pipelines.** Decoupling a fast producer from a slower consumer (or vice versa) using a bounded buffer that applies natural back-pressure: `try_push` failing signals the consumer can't keep up, rather than letting the queue grow unbounded and exhaust memory.
-* **Work/task distribution.** Fanning out units of work from one or more producers to a pool of worker threads (MPMC), or feeding a single dedicated worker (MPSC/SPSC). Push lightweight task handles or indices rather than large payloads.
-* **SPSC channels.** A single-producer/single-consumer wire between two threads (e.g. a network I/O thread feeding a processing thread) using the SPSC-tuned configuration for the lowest overhead.
-* **Object/index pools.** Recycling reusable objects, buffer slots, or free-list indices between threads by pushing/popping small integer handles.
+* **Low-latency messaging hot paths.** Passing market data updates, orders, or events between threads/processes in trading and other latency-sensitive systems, where the sub-100ns push-to-pop latency and preserved global time order matter.
 * **Logging and telemetry offload.** Handing log records or metrics off the hot path to a background thread that does the formatting and I/O, keeping the latency-critical thread free of syscalls and allocations.
+* **Inter-process communication via shared memory.** Non-`B` variants are _position-independent_ fixed-capacity queues with no heap allocations and no internal pointers/references, designed to be constructed in a shared-memory segment (e.g. `mmap`/`shm_open`) and used to pass trivially-copyable messages between separate processes lock-free. Use a trivially-copyable element type for the best results.
+* **Producer/consumer pipelines.** Decoupling a fast producer from a slower consumer (or vice versa) using a bounded/fixed-capacity buffer that applies natural back-pressure: `try_push` failure signals the consumer can't keep up, rather than letting the queue grow unbounded and exhaust memory.
+* **Work/task distribution.** Fanning out units of work from one or more producers to a pool of worker threads (MPMC), or feeding a single dedicated worker (MPSC/SPSC).
+* **SPSC channels.** A single-producer/single-consumer queue between two threads (e.g. a network I/O thread feeding a processing thread) using the SPSC-tuned configuration for the lowest overhead.
 * **Passing ownership across threads.** The `2` variants store non-atomic element types such as `std::unique_ptr`, allowing ownership of heap objects to be transferred between threads through the queue.
-* **Inter-process communication via shared memory.** Because a fixed-size queue is a flat, self-contained ring-buffer array with no heap allocations and no internal pointers/references, it can be constructed in a shared-memory segment (e.g. `mmap`/`shm_open`) and used to pass trivially-copyable messages between separate processes lock-free. Use the non-`2` or `2` fixed-size variants with a trivially-copyable element type; avoid `std::unique_ptr` and other elements holding process-local pointers.
+* **Object/index pools.** Recycling reusable objects, buffer slots, or free-list indices between threads by pushing/popping small integer handles.
 
 These queues are a poor fit when you need unbounded capacity, OS-level blocking (condition-variable-style waiting) instead of spin-waiting, per-element priorities, or when elements are large enough that copying/moving them on `push`/`pop` dominates -- in those cases prefer a different data structure.
 
@@ -73,8 +73,8 @@ Several other well established and popular thread-safe containers are used for r
 
 | Queue | Type | Description |
 |-------|------|-------------|
-| `std::mutex` | MPMC | A fixed size ring-buffer with `std::mutex`. |
-| `pthread_spinlock` | MPMC | A fixed size ring-buffer with `pthread_spinlock_t`. |
+| `std::mutex` | MPMC | A fixed capacity ring-buffer with `std::mutex`. |
+| `pthread_spinlock` | MPMC | A fixed capacity ring-buffer with `pthread_spinlock_t`. |
 | `boost::lockfree::spsc_queue` | SPSC | A wait-free queue from Boost library. |
 | `boost::lockfree::queue` | MPMC | A lock-free queue from Boost library. |
 | `moodycamel::ConcurrentQueue` | quasi-MPMC | A lock-free queue used in non-blocking mode. Designed to maximize throughput at the expense of latency, eschewing global time order, by emulating a MPMC queue with a bunch of SPSC queues under the hood. It is not equivalent to other queues benchmarked here in this respect. |
@@ -82,15 +82,15 @@ Several other well established and popular thread-safe containers are used for r
 | `xenium::michael_scott_queue` | MPMC | A lock-free queue proposed by [Michael and Scott](http://www.cs.rochester.edu/~scott/papers/1996_PODC_queues.pdf) (similar to `boost::lockfree::queue` which is also based on the same proposal). |
 | `xenium::ramalhete_queue` | MPMC | A lock-free queue proposed by [Ramalhete and Correia](http://concurrencyfreaks.blogspot.com/2016/11/faaarrayqueue-mpmc-lock-free-queue-part.html). |
 | `xenium::vyukov_bounded_queue` | MPMC | A bounded queue based on the version proposed by [Vyukov](https://groups.google.com/forum/#!topic/lock-free/-bqYlfbQmH0). |
-| `tbb::spin_mutex` | MPMC | A locked fixed size ring-buffer with `tbb::spin_mutex` from Intel Threading Building Blocks. |
+| `tbb::spin_mutex` | MPMC | A locked fixed capacity ring-buffer with `tbb::spin_mutex` from Intel Threading Building Blocks. |
 | `tbb::concurrent_bounded_queue` | MPMC | Eponymous queue used in non-blocking mode from Intel Threading Building Blocks. |
 
 ## Library contents
 ### Available queues
-* `AtomicQueue` - a fixed size ring-buffer for atomic elements.
-* `OptimistAtomicQueue` - a faster fixed size ring-buffer for atomic elements which busy-waits when empty or full. It is `AtomicQueue` used with `push`/`pop` instead of `try_push`/`try_pop`.
-* `AtomicQueue2` - a fixed size ring-buffer for non-atomic elements.
-* `OptimistAtomicQueue2` - a faster fixed size ring-buffer for non-atomic elements which busy-waits when empty or full. It is `AtomicQueue2` used with `push`/`pop` instead of `try_push`/`try_pop`.
+* `AtomicQueue` - a fixed capacity ring-buffer for atomic elements.
+* `OptimistAtomicQueue` - a faster fixed capacity ring-buffer for atomic elements which busy-waits when empty or full. It is `AtomicQueue` used with `push`/`pop` instead of `try_push`/`try_pop`.
+* `AtomicQueue2` - a fixed capacity ring-buffer for non-atomic elements.
+* `OptimistAtomicQueue2` - a faster fixed capacity ring-buffer for non-atomic elements which busy-waits when empty or full. It is `AtomicQueue2` used with `push`/`pop` instead of `try_push`/`try_pop`.
 
 These containers maintain their ring-buffers as array data members with size specified at compile-time and have no pointer data members. That makes them position-independent, allows allocating them into process-shared memory with a plain C++ placement new statement, and mapping at arbitrary addresses in different processes using the same queue objects in shared memory. The queue elements must be position-independent too to support this particular use-case (unlike classes with process-position-dependent pointers such as `std::unique_ptr`, `std::string` and all the C++ standard containers with default allocators).
 
@@ -102,7 +102,7 @@ Single-producer-single-consumer mode is supported. In this mode, no expensive at
 
 Move-only queue element types are fully supported. For example, a queue of `std::unique_ptr<T>` elements would be `AtomicQueueB2<std::unique_ptr<T>>` or `AtomicQueue2<std::unique_ptr<T>, CAPACITY>`.
 
-### Queue schematics
+### Queue Schematics
 ```
 [oldest-element, ..., newest-element]
 [queue-front   , ...,     queue-back]
@@ -110,11 +110,19 @@ Move-only queue element types are fully supported. For example, a queue of `std:
  Queue.pop                Queue.push
 ```
 
+### Queue Types
+The ring-buffer can be stored as an _array_ data member (capacity fixed at compile-time) or on the _heap_ (allocated via an allocator, capacity specified at run-time). The element type can be _atomic_ or _non-atomic_. These choices yield the following queue types:
+
+| | array buffer | heap buffer |
+| --- | --- | --- |
+| **atomic elements**     | `AtomicQueue`  | `AtomicQueueB`  |
+| **non-atomic elements** | `AtomicQueue2` | `AtomicQueueB2` |
+
 ### Queue API
 The queue class templates provide the following member functions:
-* `try_push` - Appends an element to the end of the queue. Returns `false` when the queue is full.
+* `try_push` - Appends an element to the back of the queue. Returns `false` when the queue is full.
 * `try_pop` - Removes an element from the front of the queue. Returns `false` when the queue is empty.
-* `push` (optimist) - Appends an element to the end of the queue. Busy waits when the queue is full. Faster than `try_push` when the queue is not full. Optional FIFO producer queuing and total order.
+* `push` (optimist) - Appends an element to the back of the queue. Busy waits when the queue is full. Faster than `try_push` when the queue is not full. Optional FIFO producer queuing and total order.
 * `pop` (optimist) - Removes an element from the front of the queue. Busy waits when the queue is empty. Faster than `try_pop` when the queue is not empty. Optional FIFO consumer queuing and total order.
 * `was_size` - Returns the number of unconsumed elements during the call. The state may have changed by the time the return value is examined.
 * `was_empty` - Returns `true` if the container was empty during the call. The state may have changed by the time the return value is examined.
