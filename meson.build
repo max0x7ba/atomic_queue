@@ -20,8 +20,8 @@ if cxx.get_id() == 'clang'
   atomic_queue_deps += cxx.find_library('atomic', required : false)
 endif
 
-atomic_queue_dep = declare_dependency(include_directories : ['include'], dependencies : atomic_queue_deps)
-meson.override_dependency('atomic_queue', atomic_queue_dep)
+build_deps = declare_dependency(include_directories : ['include', 'src'], dependencies : atomic_queue_deps)
+meson.override_dependency('atomic_queue', build_deps)
 
 if get_option('tests')
   unit_test_framework_dep = dependency('boost', modules : ['unit_test_framework'])
@@ -29,14 +29,16 @@ if get_option('tests')
   tests_exe = executable(
     'tests',
     'src/tests.cc',
-    dependencies : [atomic_queue_dep, unit_test_framework_dep],
+    dependencies : [build_deps, unit_test_framework_dep],
+    implicit_include_directories: false,
   )
   test('tests', tests_exe, args : ['--log_level=unit_scope', '--report_level=short'], is_parallel : false)
 
   example_exe = executable(
     'example',
     'src/example.cc',
-    dependencies : [atomic_queue_dep],
+    dependencies : [build_deps],
+    implicit_include_directories: false,
   )
   test('example', example_exe, is_parallel : false)
 endif
@@ -56,7 +58,8 @@ if get_option('benchmarks')
   benchmarks_exe = executable(
     'benchmarks',
     ['src/benchmarks.cc', 'src/cpu_base_frequency.cc', 'src/huge_pages.cc'],
-    dependencies : [atomic_queue_dep, dl_dep, xenium_dep, boost_dep, tbb_dep, moodycamel_dep],
+    dependencies : [build_deps, dl_dep, xenium_dep, boost_dep, tbb_dep, moodycamel_dep],
+    implicit_include_directories: false,
     override_options : ['cpp_std=c++17'] # Benchmarks require C++17 or higher
   )
   benchmark('benchmarks', benchmarks_exe, timeout: 3600)
@@ -68,7 +71,8 @@ if get_option('benchmarks_min')
   benchmarks_min_exe = executable(
     'benchmarks_min',
     ['src/benchmarks_min.cc', 'src/cpu_base_frequency.cc', 'src/huge_pages.cc'],
-    dependencies : [atomic_queue_dep, dl_dep]
+    dependencies : [build_deps, dl_dep],
+    implicit_include_directories: false,
   )
   benchmark('benchmarks_min', benchmarks_min_exe, timeout: 300)
 endif
