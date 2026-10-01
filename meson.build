@@ -20,7 +20,7 @@ if cxx.get_id() == 'clang'
   atomic_queue_deps += cxx.find_library('atomic', required : false)
 endif
 
-build_deps = declare_dependency(include_directories : ['include', 'src'], dependencies : atomic_queue_deps)
+build_deps = declare_dependency(include_directories : ['include'], dependencies : atomic_queue_deps)
 meson.override_dependency('atomic_queue', build_deps)
 
 if get_option('tests')
