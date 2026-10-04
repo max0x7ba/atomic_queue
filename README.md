@@ -185,9 +185,9 @@ Details specific to this library are available in [ConanCenter](https://conan.io
 ### Build and run
 Building is necessary to run the unit-tests and benchmarks.
 
-GNU Make `Makefile` is the original/reference build system this project has been developed, unit-tested and benchmarked with. It is feature-complete and most efficient, but the least portable to anything else than Linux. Linux tools, however, are the ultimate best for development, benchmarking, deep performance analyses and profiling at CPU instruction level.
+GNU Make `Makefile` is the reference build system this project has been developed, unit-tested and benchmarked with.
 
-`CMake` and `Meson` build systems provide the greatest portability and easy usage/consumption of the library, build and run the unit-tests on their supported platforms. They provide the best library user experience, as opposed to best library developer experience.
+`CMake` and `Meson` build systems provide the greatest portability and easy usage/consumption of the library, build and run the unit-tests on their supported platforms.
 
 #### Build and run unit-tests
 Building and running the unit-tests require Boost.Test library (e.g. `libboost-test-dev` on Debian/Ubuntu). Installing the complete set of Boost development libraries is the easiest (e.g. `libboost-all-dev` on Debian/Ubuntu).
