@@ -37,16 +37,12 @@
 
 # Easy BUILD_ROOT selection by setting T variable.
 T := 0
-build_root.0 := build   # T=0 builds into build sub-directory.
+# Default T=0 builds into build sub-directory.
+build_root.0 := build
 
-# Other values for T build into /tmp, which normally mounts a tmpfs. (GCP instances don't).
-# Waste no CPU cycles for file-system encryption and/or RAID mirroring. No wearing-out of HDD/SSD/NVMe disks with writes.
-build_root.1 := /tmp/b1 # T=1 builds into /tmp/b1.
-build_root.2 := /tmp/b2 # T=2 builds into /tmp/b2.
-build_root.3 := /tmp/b3 # T=3 builds into /tmp/b3.
-
-# Tedious BUILD_ROOT selection by setting BUILD_ROOT variable.
-BUILD_ROOT := $(strip $(or ${build_root.${T}},$(error build_root.${T} is undefined.)))
+# Other values for T build into /tmp/build${T}, which normally mounts a tmpfs.
+# The intent is to bypass file-system encryption and/or RAID mirroring. And to reduce wear-and-tear of HDD/SSD/NVMe drives with writes.
+BUILD_ROOT := $(or ${BUILD_ROOT},${build_root.${T}},/tmp/build${T})
 
 BUILD := release
 TOOLSET := gcc
