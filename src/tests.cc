@@ -327,6 +327,48 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(move_constructor_assignment, Queue, move_construct
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Start the push/pop counters just below 2^32 to cross the 32-bit counter wraparound quickly.
+template<class Queue>
+struct CounterWraparound : Queue {
+    CounterWraparound() noexcept {
+        this->end_.store(-1u - this->capacity(), X);
+        this->beg_.store(-1u - this->capacity(), X);
+    }
+};
+
+// Keep the queue full while the counters cross 2^32, so that every ring-buffer slot is occupied across the wraparound.
+template<class Queue>
+void check_counter_wraparound() {
+    CounterWraparound<Queue> q;
+    auto const capacity = q.capacity();
+    unsigned pushed = 0, popped = 0;
+    for(unsigned i = 0; i < 3 * capacity; ++i) {
+        while(q.try_push(++pushed)) // Must not block, even in a slot used both before and after the wraparound.
+            ;
+        --pushed;
+        BOOST_CHECK_EQUAL(q.was_size(), capacity);
+        unsigned element = 0;
+        BOOST_CHECK(q.try_pop(element));
+        BOOST_CHECK_EQUAL(element, ++popped); // FIFO order across the wraparound.
+    }
+}
+
+// The timeout turns a try_push spinning on an occupied slot into a test failure, rather than a hang.
+BOOST_AUTO_TEST_CASE(counter_wraparound, *boost::unit_test::timeout(10)) {
+    // Non-power-of-2 capacities, with no rounding up because MINIMIZE_CONTENTION is false.
+    check_counter_wraparound<AtomicQueue<unsigned, 3, 0u, false>>();
+    check_counter_wraparound<AtomicQueue<unsigned, 5, 0u, false, false, false, true>>();
+    check_counter_wraparound<AtomicQueue2<unsigned, 3, false>>();
+    check_counter_wraparound<AtomicQueue2<unsigned, 7, false, false, false, true>>();
+    // Power-of-2 capacities.
+    check_counter_wraparound<AtomicQueue<unsigned, 4, 0u, false>>();
+    check_counter_wraparound<AtomicQueue2<unsigned, 3>>();
+    check_counter_wraparound<CapacityArgAdaptor<AtomicQueueB<unsigned>, 3>>();
+    check_counter_wraparound<CapacityArgAdaptor<AtomicQueueB2<unsigned>, 3>>();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 BOOST_AUTO_TEST_CASE(try_push_pop) {
     using Queue = atomic_queue::AtomicQueueB2<
       /* T = */ float,
