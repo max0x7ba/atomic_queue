@@ -91,7 +91,7 @@ public:
     }
 
     ATOMIC_QUEUE_INLINE void unlock() noexcept {
-        unlock(next_.load(std::memory_order_relaxed) + 1);
+        unlock(next_.load(std::memory_order_relaxed)); // next_ is the ticket of the lock holder.
     }
 
     ATOMIC_QUEUE_INLINE void unlock(unsigned ticket) noexcept {

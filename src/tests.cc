@@ -13,6 +13,12 @@
 #include <string>
 #include <thread>
 
+#if __has_include(<pthread.h>) // spinlock.h requires POSIX threads.
+#include "atomic_queue/spinlock.h"
+#include <mutex>
+#define ATOMIC_QUEUE_TEST_SPINLOCK 1
+#endif
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 using namespace ::atomic_queue;
@@ -383,6 +389,28 @@ BOOST_AUTO_TEST_CASE(size) {
     BOOST_CHECK(q.was_empty());
     BOOST_CHECK(!q.was_full());
 }
+
+#ifdef ATOMIC_QUEUE_TEST_SPINLOCK
+// The timeout turns a lock that never succeeds into a test failure, rather than a hang.
+BOOST_AUTO_TEST_CASE(ticket_spinlock, *boost::unit_test::timeout(10)) {
+    TicketSpinlock m;
+    unsigned ticket = 0;
+
+    // BasicLockable interface: unlock() without the ticket.
+    for(; ticket < 4; ++ticket) {
+        BOOST_CHECK_EQUAL(m.lock(), ticket);
+        m.unlock();
+    }
+
+    { TicketSpinlock::scoped_lock g(m); }
+    { std::lock_guard<TicketSpinlock> g(m); }
+    { std::unique_lock<TicketSpinlock> g(m); }
+    ticket += 3;
+
+    BOOST_CHECK_EQUAL(m.lock(), ticket);
+    m.unlock(ticket);
+}
+#endif
 
 // BOOST_AUTO_TEST_CASE(exper) {
 //     BOOST_CHECK_EQUAL(sizeof(std::thread), 1);
