@@ -13,6 +13,11 @@
 #include <string>
 #include <thread>
 
+#if __has_include(<pthread.h>) // atomic_queue_mutex.h includes spinlock.h, which requires POSIX threads.
+#include "atomic_queue/atomic_queue_mutex.h"
+#define ATOMIC_QUEUE_TEST_SPINLOCK 1
+#endif
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 using namespace ::atomic_queue;
@@ -383,6 +388,29 @@ BOOST_AUTO_TEST_CASE(size) {
     BOOST_CHECK(q.was_empty());
     BOOST_CHECK(!q.was_full());
 }
+
+#ifdef ATOMIC_QUEUE_TEST_SPINLOCK
+BOOST_AUTO_TEST_CASE(unfair_spinlock) {
+    UnfairSpinlock m;
+    unsigned counter = 0;
+    auto work = [&] {
+        for(int i = 0; i < 100000; ++i) {
+            UnfairSpinlock::scoped_lock lock(m);
+            ++counter;
+        }
+    };
+    std::thread a(work), b(work);
+    a.join();
+    b.join();
+    BOOST_CHECK_EQUAL(counter, 200000u);
+
+    AtomicQueueMutex<unsigned, 2, UnfairSpinlock> q;
+    unsigned v = 0;
+    BOOST_CHECK(q.try_push(7u));
+    BOOST_CHECK(q.try_pop(v));
+    BOOST_CHECK_EQUAL(v, 7u);
+}
+#endif
 
 // BOOST_AUTO_TEST_CASE(exper) {
 //     BOOST_CHECK_EQUAL(sizeof(std::thread), 1);

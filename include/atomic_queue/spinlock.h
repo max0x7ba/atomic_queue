@@ -107,6 +107,7 @@ class UnfairSpinlock {
 public:
     using scoped_lock = std::lock_guard<UnfairSpinlock>;
 
+    ATOMIC_QUEUE_INLINE UnfairSpinlock() noexcept = default;
     UnfairSpinlock(UnfairSpinlock const&) = delete;
     UnfairSpinlock& operator=(UnfairSpinlock const&) = delete;
 
