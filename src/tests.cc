@@ -14,9 +14,14 @@
 #include <thread>
 
 #if __has_include(<pthread.h>) // spinlock.h requires POSIX threads.
+// According to the POSIX specification, if an implementation supports spinlocks, it must define the macro _POSIX_SPIN_LOCKS
+// with a value greater than 0 in <pthread.h>.
+#include <pthread.h>
+#if _POSIX_SPIN_LOCKS > 0
 #include "atomic_queue/spinlock.h"
 #include <mutex>
 #define ATOMIC_QUEUE_TEST_SPINLOCK 1
+#endif
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
