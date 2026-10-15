@@ -343,9 +343,16 @@ ifdef not_cleaning # Not cleanining.
 
 asm_throughput : private symbol_regex = '::throughput_(consumer|producer).+atomic_queue::AtomicQueue[B]?[2]?<'
 asm_latency : private symbol_regex = '::ping_pong_(receiver|sender).+atomic_queue::AtomicQueue[B]?[2]?<'
+asm_tests : private symbol_regex = 'q_was_size'
 
-asm_% : scripts/util.sh ${build_dir}/benchmarks $$(if $${symbol_regex},force,$$(error $$@ is not defined))
-	source $< && disassemble-symbol ${symbol_regex} ${build_dir}/benchmarks.o
+asm_throughput.o := ${build_dir}/benchmarks.o
+asm_latency.o := ${build_dir}/benchmarks.o
+asm_tests.o := ${build_dir}/tests.o
+
+util_sh := scripts/util.sh
+asm_% : $${$$@.o} ${util_sh} $$(if $${symbol_regex},force,$$(error $$@ is not defined))
+	source ${util_sh} && disassemble-symbol ${symbol_regex} $<
+
 
 -include $(sort ${auto_generated_header_d}) # Remove duplicates and include.
 endif # Not cleanining.
