@@ -20,7 +20,8 @@
 #include <pthread.h>
 #if _POSIX_SPIN_LOCKS > 0
 #include "atomic_queue/spinlock.h"
-#include <mutex>
+#include "atomic_queue/atomic_queue_mutex.h"
+#define ATOMIC_QUEUE_TEST_MUTEX 1
 #define ATOMIC_QUEUE_TEST_SPINLOCK 1
 #endif
 #endif
