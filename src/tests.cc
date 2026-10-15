@@ -13,7 +13,6 @@
 #include <string>
 #include <thread>
 
-
 #if __has_include(<pthread.h>) // spinlock.h requires POSIX threads.
 // According to the POSIX specification, if an implementation supports spinlocks, it must define the macro _POSIX_SPIN_LOCKS
 // with a value greater than 0 in <pthread.h>.
@@ -439,28 +438,28 @@ BOOST_AUTO_TEST_CASE(size) {
     BOOST_CHECK(!q.was_full());
 }
 
-#ifdef ATOMIC_QUEUE_TEST_MUTEX
-template<class Queue>
-void check_was_empty_was_full() {
-    Queue q;
-    Queue const& c = q; // was_empty and was_full are const member functions.
-    BOOST_CHECK(c.was_empty());
-    BOOST_CHECK(!c.was_full());
-    BOOST_CHECK(q.try_push(1u));
-    BOOST_CHECK(!c.was_empty());
-    BOOST_CHECK(!c.was_full());
-    BOOST_CHECK(q.try_push(2u));
-    BOOST_CHECK(!c.was_empty());
-    BOOST_CHECK(c.was_full());
-}
-
-BOOST_AUTO_TEST_CASE(mutex_queue_was_empty_was_full) {
-    check_was_empty_was_full<AtomicQueueSpinlock<unsigned, 2>>();
-    check_was_empty_was_full<AtomicQueueMutex<unsigned, 2, std::mutex>>();
-}
-#endif
-
 #ifdef ATOMIC_QUEUE_TEST_SPINLOCK
+BOOST_AUTO_TEST_CASE(unfair_spinlock) {
+    UnfairSpinlock m;
+    unsigned counter = 0;
+    auto work = [&] {
+        for(int i = 0; i < 100000; ++i) {
+            UnfairSpinlock::scoped_lock lock(m);
+            ++counter;
+        }
+    };
+    std::thread a(work), b(work);
+    a.join();
+    b.join();
+    BOOST_CHECK_EQUAL(counter, 200000u);
+
+    AtomicQueueMutex<unsigned, 2, UnfairSpinlock> q;
+    unsigned v = 0;
+    BOOST_CHECK(q.try_push(7u));
+    BOOST_CHECK(q.try_pop(v));
+    BOOST_CHECK_EQUAL(v, 7u);
+}
+
 // The timeout turns a lock that never succeeds into a test failure, rather than a hang.
 BOOST_AUTO_TEST_CASE(ticket_spinlock, *boost::unit_test::timeout(10)) {
     TicketSpinlock m;
@@ -480,11 +479,28 @@ BOOST_AUTO_TEST_CASE(ticket_spinlock, *boost::unit_test::timeout(10)) {
     BOOST_CHECK_EQUAL(m.lock(), ticket);
     m.unlock(ticket);
 }
-#endif
+#endif // ATOMIC_QUEUE_TEST_SPINLOCK
 
-// BOOST_AUTO_TEST_CASE(exper) {
-//     BOOST_CHECK_EQUAL(sizeof(std::thread), 1);
-// }
+#ifdef ATOMIC_QUEUE_TEST_MUTEX
+template<class Queue>
+void check_was_empty_was_full() {
+    Queue q;
+    Queue const& c = q; // was_empty and was_full are const member functions.
+    BOOST_CHECK(c.was_empty());
+    BOOST_CHECK(!c.was_full());
+    BOOST_CHECK(q.try_push(1u));
+    BOOST_CHECK(!c.was_empty());
+    BOOST_CHECK(!c.was_full());
+    BOOST_CHECK(q.try_push(2u));
+    BOOST_CHECK(!c.was_empty());
+    BOOST_CHECK(c.was_full());
+}
+
+BOOST_AUTO_TEST_CASE(mutex_queue_was_empty_was_full) {
+    check_was_empty_was_full<AtomicQueueSpinlock<unsigned, 2>>();
+    check_was_empty_was_full<AtomicQueueMutex<unsigned, 2, std::mutex>>();
+}
+#endif // ATOMIC_QUEUE_TEST_MUTEX
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
