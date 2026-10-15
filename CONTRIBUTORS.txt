@@ -38,3 +38,7 @@ Contributors:
 - Li Fenghao (https://github.com/max0x7ba/atomic_queue/pull/107)
 - Daeho Ro (https://github.com/max0x7ba/atomic_queue/pull/108)
 - Stephan Lachnit (https://github.com/max0x7ba/atomic_queue/pull/110)
+- Michiel van Slobbe (https://github.com/max0x7ba/atomic_queue/pull/112)
+- Michiel van Slobbe (https://github.com/max0x7ba/atomic_queue/pull/113)
+- Michiel van Slobbe (https://github.com/max0x7ba/atomic_queue/pull/114)
+- Michiel van Slobbe (https://github.com/max0x7ba/atomic_queue/pull/115)
