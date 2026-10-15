@@ -32,9 +32,11 @@ template<class T, class Mutex, unsigned SIZE, bool MINIMIZE_CONTENTION>
 class AtomicQueueMutexT {
     static constexpr unsigned size_ = MINIMIZE_CONTENTION ? details::round_up_to_power_of_2(SIZE) : SIZE;
 
-    Mutex mutex_;
-    alignas(CACHE_LINE_SIZE) unsigned head_ = 0;
-    alignas(CACHE_LINE_SIZE) unsigned tail_ = 0;
+    using Counter = typename details::GetCounterType<SIZE, MINIMIZE_CONTENTION>::type;
+
+    mutable Mutex mutex_;
+    alignas(CACHE_LINE_SIZE) Counter head_ = 0;
+    alignas(CACHE_LINE_SIZE) Counter tail_ = 0;
     alignas(CACHE_LINE_SIZE) T elements_[size_] = {};
 
     static constexpr int SHUFFLE_BITS = details::GetIndexShuffleBits<MINIMIZE_CONTENTION, size_, CACHE_LINE_SIZE / sizeof(T)>::value;

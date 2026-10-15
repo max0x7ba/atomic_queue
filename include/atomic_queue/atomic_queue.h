@@ -10,6 +10,7 @@
 #include <cassert>
 #include <cstddef>
 #include <memory>
+#include <type_traits>
 #include <utility>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -166,6 +167,22 @@ ATOMIC_QUEUE_SINLINE constexpr unsigned remap(unsigned index, unsigned size, Ind
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// The ring-buffer array index is the push/pop counter modulo the array size. A 32-bit counter wraps around at 2^32, which
+// keeps the array index sequence continuous only when the array size is a power of 2. Otherwise, the array indexes before
+// and after the wraparound collide, e.g. (2^32 - 1) % 3 == 0 % 3 == 0. Non-power-of-2 sizes use 64-bit counters instead,
+// which do not wrap around in practice.
+
+template<unsigned SIZE, bool MINIMIZE_CONTENTION>
+struct GetCounterType {
+    using type = typename std::conditional<MINIMIZE_CONTENTION || !(SIZE & (SIZE - 1)), unsigned, uint64_t>::type;
+};
+
+// 64-bit counters are used only for non-power-of-2 sizes, which never shuffle index bits.
+ATOMIC_QUEUE_SINLINE constexpr unsigned remap(uint64_t index, unsigned size, IndexBits<0>) noexcept {
+    return static_cast<unsigned>(index % size);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Implement a "bit-twiddling hack" for finding the next power of 2 in either 32 bits or 64 bits
 // in C++11 compatible constexpr functions. The library no longer maintains C++11 compatibility.
@@ -296,15 +313,15 @@ enum StateE : State {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<class Derived>
+template<class Derived, class Counter = unsigned>
 class AtomicQueueCommon {
     ATOMIC_QUEUE_INLINE constexpr auto& downcast() noexcept { return static_cast<Derived&>(*this); }
     ATOMIC_QUEUE_INLINE constexpr auto& downcast() const noexcept { return static_cast<Derived const&>(*this); }
 
 protected:
     // Put these on different cache lines to avoid false sharing between readers and writers.
-    alignas(CACHE_LINE_SIZE) std::atomic<unsigned> end_{}; // One past the latest queue element to push into.
-    alignas(CACHE_LINE_SIZE) std::atomic<unsigned> beg_{}; // The oldest queue element to pop from.
+    alignas(CACHE_LINE_SIZE) std::atomic<Counter> end_{}; // One past the latest queue element to push into.
+    alignas(CACHE_LINE_SIZE) std::atomic<Counter> beg_{}; // The oldest queue element to pop from.
 
     // The special member functions are not thread-safe.
 
@@ -474,7 +491,7 @@ public:
 
     template<class T>
     ATOMIC_QUEUE_INLINE void push(T&& element) noexcept {
-        unsigned end;
+        Counter end;
         if(Derived::spsc_) {
             end = end_.load(X);
             end_.store(end + 1, X);
@@ -487,7 +504,7 @@ public:
     }
 
     ATOMIC_QUEUE_INLINE auto pop() noexcept {
-        unsigned beg;
+        Counter beg;
         if(Derived::spsc_) {
             beg = beg_.load(X);
             beg_.store(beg + 1, X);
@@ -509,7 +526,8 @@ public:
 
     ATOMIC_QUEUE_INLINE unsigned was_size() const noexcept {
         // beg_ can be greater than end_ because of consumers doing pop, rather that try_pop, when the queue is empty.
-        return max_value(as_signed(end_.load(X) - beg_.load(X)), 0);
+        auto const size = as_signed(end_.load(X) - beg_.load(X));
+        return static_cast<unsigned>(max_value(size, decltype(size){0}));
     }
 
     ATOMIC_QUEUE_INLINE unsigned capacity() const noexcept {
@@ -524,8 +542,10 @@ public:
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<class T, unsigned CAPACITY, T NIL = details::nil<T>(), bool MINIMIZE_CONTENTION = true, bool MAXIMIZE_THROUGHPUT = true, bool TOTAL_ORDER = false, bool SPSC = false>
-class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, CAPACITY, NIL, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>> {
-    using Base = AtomicQueueCommon<AtomicQueue<T, CAPACITY, NIL, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>>;
+class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, CAPACITY, NIL, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>,
+                                             typename details::GetCounterType<CAPACITY, MINIMIZE_CONTENTION>::type> {
+    using Counter = typename details::GetCounterType<CAPACITY, MINIMIZE_CONTENTION>::type;
+    using Base = AtomicQueueCommon<AtomicQueue<T, CAPACITY, NIL, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>, Counter>;
     friend Base;
 
     static_assert(CAPACITY >= details::CAPACITY_MIN, "CAPACITY is too low.");
@@ -540,12 +560,12 @@ class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, CAPACITY, NIL, MINIM
 
     alignas(CACHE_LINE_SIZE) std::atomic<T> elements_[capacity_];
 
-    ATOMIC_QUEUE_INLINE T do_pop(unsigned beg) noexcept {
+    ATOMIC_QUEUE_INLINE T do_pop(Counter beg) noexcept {
         auto index = remap(beg, capacity_, B{});
         return Base::do_pop(elements_, index);
     }
 
-    ATOMIC_QUEUE_INLINE void do_push(T element, unsigned end) noexcept {
+    ATOMIC_QUEUE_INLINE void do_push(T element, Counter end) noexcept {
         auto index = remap(end, capacity_, B{});
         Base::do_push(element, elements_, index);
     }
@@ -566,8 +586,10 @@ public:
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<class T, unsigned CAPACITY, bool MINIMIZE_CONTENTION = true, bool MAXIMIZE_THROUGHPUT = true, bool TOTAL_ORDER = false, bool SPSC = false>
-class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, CAPACITY, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>> {
-    using Base = AtomicQueueCommon<AtomicQueue2<T, CAPACITY, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>>;
+class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, CAPACITY, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>,
+                                              typename details::GetCounterType<CAPACITY, MINIMIZE_CONTENTION>::type> {
+    using Counter = typename details::GetCounterType<CAPACITY, MINIMIZE_CONTENTION>::type;
+    using Base = AtomicQueueCommon<AtomicQueue2<T, CAPACITY, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>, Counter>;
     friend Base;
 
     static_assert(CAPACITY >= details::CAPACITY_MIN, "CAPACITY is too low.");
@@ -582,13 +604,13 @@ class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, CAPACITY, MINIMIZE
     alignas(CACHE_LINE_SIZE) AtomicState states_[capacity_] = {};
     alignas(CACHE_LINE_SIZE) T elements_[capacity_] = {};
 
-    ATOMIC_QUEUE_INLINE T do_pop(unsigned beg) noexcept {
+    ATOMIC_QUEUE_INLINE T do_pop(Counter beg) noexcept {
         auto index = remap(beg, capacity_, B{});
         return Base::do_pop(states_, elements_, index);
     }
 
     template<class U>
-    ATOMIC_QUEUE_INLINE void do_push(U&& element, unsigned end) noexcept {
+    ATOMIC_QUEUE_INLINE void do_push(U&& element, Counter end) noexcept {
         auto index = remap(end, capacity_, B{});
         Base::do_push(std::forward<U>(element), states_, elements_, index);
     }
