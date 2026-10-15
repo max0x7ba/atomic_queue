@@ -13,6 +13,7 @@
 #include <string>
 #include <thread>
 
+
 #if __has_include(<pthread.h>) // spinlock.h requires POSIX threads.
 // According to the POSIX specification, if an implementation supports spinlocks, it must define the macro _POSIX_SPIN_LOCKS
 // with a value greater than 0 in <pthread.h>.
@@ -436,6 +437,27 @@ BOOST_AUTO_TEST_CASE(size) {
     BOOST_CHECK(q.was_empty());
     BOOST_CHECK(!q.was_full());
 }
+
+#ifdef ATOMIC_QUEUE_TEST_MUTEX
+template<class Queue>
+void check_was_empty_was_full() {
+    Queue q;
+    Queue const& c = q; // was_empty and was_full are const member functions.
+    BOOST_CHECK(c.was_empty());
+    BOOST_CHECK(!c.was_full());
+    BOOST_CHECK(q.try_push(1u));
+    BOOST_CHECK(!c.was_empty());
+    BOOST_CHECK(!c.was_full());
+    BOOST_CHECK(q.try_push(2u));
+    BOOST_CHECK(!c.was_empty());
+    BOOST_CHECK(c.was_full());
+}
+
+BOOST_AUTO_TEST_CASE(mutex_queue_was_empty_was_full) {
+    check_was_empty_was_full<AtomicQueueSpinlock<unsigned, 2>>();
+    check_was_empty_was_full<AtomicQueueMutex<unsigned, 2, std::mutex>>();
+}
+#endif
 
 #ifdef ATOMIC_QUEUE_TEST_SPINLOCK
 // The timeout turns a lock that never succeeds into a test failure, rather than a hang.

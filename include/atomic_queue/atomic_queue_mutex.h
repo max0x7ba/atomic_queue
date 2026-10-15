@@ -34,7 +34,7 @@ class AtomicQueueMutexT {
 
     using Counter = typename details::GetCounterType<SIZE, MINIMIZE_CONTENTION>::type;
 
-    Mutex mutex_;
+    mutable Mutex mutex_;
     alignas(CACHE_LINE_SIZE) Counter head_ = 0;
     alignas(CACHE_LINE_SIZE) Counter tail_ = 0;
     alignas(CACHE_LINE_SIZE) T elements_[size_] = {};
