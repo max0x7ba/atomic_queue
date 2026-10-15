@@ -634,7 +634,7 @@ template<class T, class A = std::allocator<T>, T NIL = details::nil<T>(), bool M
 class AtomicQueueB : private std::allocator_traits<A>::template rebind_alloc<std::atomic<T>>,
                      public AtomicQueueCommon<AtomicQueueB<T, A, NIL, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>> {
     using AllocatorElements = typename std::allocator_traits<A>::template rebind_alloc<std::atomic<T>>;
-    using Base = AtomicQueueCommon<AtomicQueueB<T, A, NIL, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>>;
+    using Base = AtomicQueueCommon<AtomicQueueB>;
     friend Base;
 
     static constexpr bool total_order_ = TOTAL_ORDER;
@@ -729,7 +729,7 @@ template<class T, class A = std::allocator<T>, bool MAXIMIZE_THROUGHPUT = true, 
 class AtomicQueueB2 : private std::allocator_traits<A>::template rebind_alloc<unsigned char>,
                       public AtomicQueueCommon<AtomicQueueB2<T, A, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>> {
     using StorageAllocator = typename std::allocator_traits<A>::template rebind_alloc<unsigned char>;
-    using Base = AtomicQueueCommon<AtomicQueueB2<T, A, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>>;
+    using Base = AtomicQueueCommon<AtomicQueueB2>;
     friend Base;
 
     static constexpr bool total_order_ = TOTAL_ORDER;
