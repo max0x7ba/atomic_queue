@@ -178,6 +178,11 @@ auto constexpr AR = std::memory_order_acq_rel;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+template<class T>
+struct Type { using type = T; };
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 ATOMIC_QUEUE_SINLINE constexpr int       as_signed(unsigned c) noexcept { return c; }
 ATOMIC_QUEUE_SINLINE constexpr int       as_signed(int c) noexcept { return c; }
 ATOMIC_QUEUE_SINLINE constexpr long long as_signed(unsigned long long c) noexcept { return c; }

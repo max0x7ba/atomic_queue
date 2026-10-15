@@ -10,7 +10,6 @@
 #include <cassert>
 #include <cstddef>
 #include <memory>
-#include <type_traits>
 #include <utility>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -51,7 +50,22 @@ struct GetIndexShuffleBits<false, array_size, elements_per_cache_line> {
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Multiple writers/readers contend on the same cache line when storing/loading elements at
+// The ring-buffer array index is the push/pop counter modulo the array size. A 32-bit counter wraps around at 2^32, which
+// keeps the array index sequence continuous only when the array size is a power of 2. Otherwise, the array indexes before
+// and after the wraparound collide, e.g. (2^32 - 1) % 3 == 0 % 3 == 0. Non-power-of-2 sizes use 64-bit counters instead,
+// which do not wrap around in practice.
+
+template<unsigned SIZE, bool MINIMIZE_CONTENTION, bool use_uint32_counter = MINIMIZE_CONTENTION || !(SIZE & (SIZE - 1))>
+struct GetCounterType : Type<unsigned> {};
+
+template<unsigned SIZE, bool MINIMIZE_CONTENTION>
+struct GetCounterType<SIZE, MINIMIZE_CONTENTION, false> : Type<uint64_t> {};
+
+template<unsigned SIZE, bool MINIMIZE_CONTENTION>
+using CounterType = typename GetCounterType<SIZE, MINIMIZE_CONTENTION>::type;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Multiple writers/readers contend on the same cache line when storing/loading elements atxs
 // subsequent indexes, aka false sharing. For power of 2 ring buffer size it is possible to re-map
 // the index in such a way that each subsequent element resides on another cache line, which
 // minimizes contention. This is done by swapping the lowest order N bits (which are the index of
@@ -138,10 +152,6 @@ template<class Remap>
 struct Remap0 : Remap {
     using Remap::remap;
 
-    ATOMIC_QUEUE_SINLINE constexpr unsigned remap(unsigned index, unsigned size, IndexBits<0>) noexcept {
-        return index % size;
-    }
-
     ATOMIC_QUEUE_SINLINE constexpr unsigned remap(unsigned index, IndexBits<0>) noexcept {
         return index;
     }
@@ -162,25 +172,16 @@ using Remap = Remap0<RemapAnd>;
 #endif
 
 template<unsigned N_BITS>
-ATOMIC_QUEUE_SINLINE constexpr unsigned remap(unsigned index, unsigned size, IndexBits<N_BITS> b) noexcept {
-    return Remap::remap(index, size, b);
-}
+ATOMIC_QUEUE_SINLINE constexpr unsigned remap(uint32_t index, unsigned size, IndexBits<N_BITS> b) noexcept { return Remap::remap(index, size, b); }
+ATOMIC_QUEUE_SINLINE constexpr unsigned remap(uint32_t index, unsigned size, IndexBits<0>) noexcept { return index % size; }
+ATOMIC_QUEUE_SINLINE constexpr unsigned remap(uint64_t index, unsigned size, IndexBits<0>) noexcept { return index % size; }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// The ring-buffer array index is the push/pop counter modulo the array size. A 32-bit counter wraps around at 2^32, which
-// keeps the array index sequence continuous only when the array size is a power of 2. Otherwise, the array indexes before
-// and after the wraparound collide, e.g. (2^32 - 1) % 3 == 0 % 3 == 0. Non-power-of-2 sizes use 64-bit counters instead,
-// which do not wrap around in practice.
-
-template<unsigned SIZE, bool MINIMIZE_CONTENTION>
-struct GetCounterType {
-    using type = typename std::conditional<MINIMIZE_CONTENTION || !(SIZE & (SIZE - 1)), unsigned, uint64_t>::type;
-};
-
-// 64-bit counters are used only for non-power-of-2 sizes, which never shuffle index bits.
-ATOMIC_QUEUE_SINLINE constexpr unsigned remap(uint64_t index, unsigned size, IndexBits<0>) noexcept {
-    return static_cast<unsigned>(index % size);
-}
+// For power-of-2 size only, when size is not a compile-time constant.
+template<unsigned N_BITS>
+ATOMIC_QUEUE_SINLINE constexpr unsigned remap2(uint32_t index, unsigned size, IndexBits<N_BITS> b) noexcept { return Remap::remap(index, size, b); }
+ATOMIC_QUEUE_SINLINE constexpr unsigned remap2(uint32_t index, unsigned size, IndexBits<0>) noexcept { return index & (size - 1); }
+ATOMIC_QUEUE_SINLINE constexpr unsigned remap2(uint64_t index, unsigned size, IndexBits<0>) noexcept { return index & (size - 1); }
+template<unsigned N_BITS>      unsigned remap2(uint64_t index, unsigned size, IndexBits<N_BITS> b) noexcept = delete;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -537,15 +538,19 @@ public:
     ATOMIC_QUEUE_SINLINE constexpr bool is_spsc() noexcept {
         return Derived::spsc_;
     }
+
+    ATOMIC_QUEUE_SINLINE constexpr unsigned round_up_capacity(unsigned capacity) noexcept {
+        return max_value(details::round_up_to_power_of_2(capacity), 1u << (Derived::SHUFFLE_BITS * 2));
+    }
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<class T, unsigned CAPACITY, T NIL = details::nil<T>(), bool MINIMIZE_CONTENTION = true, bool MAXIMIZE_THROUGHPUT = true, bool TOTAL_ORDER = false, bool SPSC = false>
 class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, CAPACITY, NIL, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>,
-                                             typename details::GetCounterType<CAPACITY, MINIMIZE_CONTENTION>::type> {
-    using Counter = typename details::GetCounterType<CAPACITY, MINIMIZE_CONTENTION>::type;
-    using Base = AtomicQueueCommon<AtomicQueue<T, CAPACITY, NIL, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>, Counter>;
+                                             details::CounterType<CAPACITY, MINIMIZE_CONTENTION>> {
+    using Counter = details::CounterType<CAPACITY, MINIMIZE_CONTENTION>;
+    using Base = AtomicQueueCommon<AtomicQueue, Counter>;
     friend Base;
 
     static_assert(CAPACITY >= details::CAPACITY_MIN, "CAPACITY is too low.");
@@ -587,9 +592,9 @@ public:
 
 template<class T, unsigned CAPACITY, bool MINIMIZE_CONTENTION = true, bool MAXIMIZE_THROUGHPUT = true, bool TOTAL_ORDER = false, bool SPSC = false>
 class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, CAPACITY, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>,
-                                              typename details::GetCounterType<CAPACITY, MINIMIZE_CONTENTION>::type> {
-    using Counter = typename details::GetCounterType<CAPACITY, MINIMIZE_CONTENTION>::type;
-    using Base = AtomicQueueCommon<AtomicQueue2<T, CAPACITY, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>, Counter>;
+                                              details::CounterType<CAPACITY, MINIMIZE_CONTENTION>> {
+    using Counter = details::CounterType<CAPACITY, MINIMIZE_CONTENTION>;
+    using Base = AtomicQueueCommon<AtomicQueue2, Counter>;
     friend Base;
 
     static_assert(CAPACITY >= details::CAPACITY_MIN, "CAPACITY is too low.");
@@ -656,12 +661,12 @@ class AtomicQueueB : private std::allocator_traits<A>::template rebind_alloc<std
     std::atomic<T>* ATOMIC_QUEUE_RESTRICT elements_;
 
     ATOMIC_QUEUE_INLINE T do_pop(unsigned beg) noexcept {
-        auto index = remap(beg, capacity_, B{});
+        auto index = remap2(beg, capacity_, B{});
         return Base::do_pop(elements_, index);
     }
 
     ATOMIC_QUEUE_INLINE void do_push(T element, unsigned end) noexcept {
-        auto index = remap(end, capacity_, B{});
+        auto index = remap2(end, capacity_, B{});
         Base::do_push(element, elements_, index);
     }
 
@@ -673,7 +678,7 @@ public:
 
     AtomicQueueB(unsigned capacity, A const& allocator = A{})
         : AllocatorElements(allocator)
-        , capacity_(details::assert_valid_capacity(max_value(details::round_up_to_power_of_2(capacity), 1u << (SHUFFLE_BITS * 2))))
+        , capacity_(details::assert_valid_capacity(Base::round_up_capacity(capacity)))
         , elements_(AllocatorElements::allocate(capacity_))
     {
         details::assert_lock_free(NIL); // Queue element type T is not atomic. Use AtomicQueue2/AtomicQueueB2 for such element types.
@@ -751,13 +756,13 @@ class AtomicQueueB2 : private std::allocator_traits<A>::template rebind_alloc<un
     using B = details::IndexBits<SHUFFLE_BITS>;
 
     ATOMIC_QUEUE_INLINE T do_pop(unsigned beg) noexcept {
-        auto index = remap(beg, capacity_, B{});
+        auto index = remap2(beg, capacity_, B{});
         return Base::do_pop(states_, elements_, index);
     }
 
     template<class U>
     ATOMIC_QUEUE_INLINE void do_push(U&& element, unsigned end) noexcept {
-        auto index = remap(end, capacity_, B{});
+        auto index = remap2(end, capacity_, B{});
         Base::do_push(std::forward<U>(element), states_, elements_, index);
     }
 
@@ -801,15 +806,11 @@ public:
     using value_type = T;
     using allocator_type = A;
 
-    ATOMIC_QUEUE_SINLINE constexpr auto round_up_capacity(unsigned size) noexcept {
-        return max_value(details::round_up_to_power_of_2(size), 1u << (SHUFFLE_BITS * 2));
-    }
-
     // The special member functions are not thread-safe.
 
     AtomicQueueB2(unsigned capacity, A const& allocator = A{})
         : StorageAllocator(allocator)
-        , capacity_(details::assert_valid_capacity(round_up_capacity(capacity)))
+        , capacity_(details::assert_valid_capacity(Base::round_up_capacity(capacity)))
     {
         A a = get_allocator();
         assert(a == allocator); // The standard requires the original and rebound allocators to manage the same state.
