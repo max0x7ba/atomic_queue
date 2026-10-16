@@ -16,6 +16,7 @@
 
 namespace atomic_queue {
 
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 namespace details {
@@ -171,6 +172,7 @@ using Remap = Remap0<RemapBmi>;
 using Remap = Remap0<RemapAnd>;
 #endif
 
+// For when size is a compile-time constant.
 template<unsigned N_BITS>
 ATOMIC_QUEUE_SINLINE constexpr unsigned remap(uint32_t index, unsigned size, IndexBits<N_BITS> b) noexcept { return Remap::remap(index, size, b); }
 ATOMIC_QUEUE_SINLINE constexpr unsigned remap(uint32_t index, unsigned size, IndexBits<0>) noexcept { return index % size; }
@@ -181,7 +183,7 @@ template<unsigned N_BITS>
 ATOMIC_QUEUE_SINLINE constexpr unsigned remap2(uint32_t index, unsigned size, IndexBits<N_BITS> b) noexcept { return Remap::remap(index, size, b); }
 ATOMIC_QUEUE_SINLINE constexpr unsigned remap2(uint32_t index, unsigned size, IndexBits<0>) noexcept { return index & (size - 1); }
 ATOMIC_QUEUE_SINLINE constexpr unsigned remap2(uint64_t index, unsigned size, IndexBits<0>) noexcept { return index & (size - 1); }
-template<unsigned N_BITS>      unsigned remap2(uint64_t index, unsigned size, IndexBits<N_BITS> b) noexcept = delete;
+template<unsigned N_BITS>      unsigned remap2(uint64_t index, unsigned size, IndexBits<N_BITS> b) = delete;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -314,7 +316,51 @@ enum StateE : State {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<class Derived, class Counter = unsigned>
+template<
+    class Derived,
+    class Counter = unsigned
+> class AtomicQueueCommon;
+
+
+template<
+    class T,
+    unsigned CAPACITY,
+    T NIL = details::nil<T>(),
+    bool MINIMIZE_CONTENTION = true,
+    bool MAXIMIZE_THROUGHPUT = true,
+    bool TOTAL_ORDER = false,
+    bool SPSC = false
+> class AtomicQueue;
+
+template<
+    class T,
+    unsigned CAPACITY,
+    bool MINIMIZE_CONTENTION = true,
+    bool MAXIMIZE_THROUGHPUT = true,
+    bool TOTAL_ORDER = false,
+    bool SPSC = false
+> class AtomicQueue2;
+
+template<
+    class T,
+    class A = std::allocator<T>,
+    T NIL = details::nil<T>(),
+    bool MAXIMIZE_THROUGHPUT = true,
+    bool TOTAL_ORDER = false,
+    bool SPSC = false
+> class AtomicQueueB;
+
+template<
+    class T,
+    class A = std::allocator<T>,
+    bool MAXIMIZE_THROUGHPUT = true,
+    bool TOTAL_ORDER = false,
+    bool SPSC = false
+> class AtomicQueueB2;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+template<class Derived, class Counter>
 class AtomicQueueCommon {
     ATOMIC_QUEUE_INLINE constexpr auto& downcast() noexcept { return static_cast<Derived&>(*this); }
     ATOMIC_QUEUE_INLINE constexpr auto& downcast() const noexcept { return static_cast<Derived const&>(*this); }
@@ -546,7 +592,7 @@ public:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<class T, unsigned CAPACITY, T NIL = details::nil<T>(), bool MINIMIZE_CONTENTION = true, bool MAXIMIZE_THROUGHPUT = true, bool TOTAL_ORDER = false, bool SPSC = false>
+template<class T, unsigned CAPACITY, T NIL, bool MINIMIZE_CONTENTION, bool MAXIMIZE_THROUGHPUT, bool TOTAL_ORDER, bool SPSC>
 class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, CAPACITY, NIL, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>,
                                              details::CounterType<CAPACITY, MINIMIZE_CONTENTION>> {
     using Counter = details::CounterType<CAPACITY, MINIMIZE_CONTENTION>;
@@ -590,7 +636,7 @@ public:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<class T, unsigned CAPACITY, bool MINIMIZE_CONTENTION = true, bool MAXIMIZE_THROUGHPUT = true, bool TOTAL_ORDER = false, bool SPSC = false>
+template<class T, unsigned CAPACITY, bool MINIMIZE_CONTENTION, bool MAXIMIZE_THROUGHPUT, bool TOTAL_ORDER, bool SPSC>
 class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, CAPACITY, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>,
                                               details::CounterType<CAPACITY, MINIMIZE_CONTENTION>> {
     using Counter = details::CounterType<CAPACITY, MINIMIZE_CONTENTION>;
@@ -630,7 +676,7 @@ public:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<class T, class A = std::allocator<T>, T NIL = details::nil<T>(), bool MAXIMIZE_THROUGHPUT = true, bool TOTAL_ORDER = false, bool SPSC = false>
+template<class T, class A, T NIL, bool MAXIMIZE_THROUGHPUT, bool TOTAL_ORDER, bool SPSC>
 class AtomicQueueB : private std::allocator_traits<A>::template rebind_alloc<std::atomic<T>>,
                      public AtomicQueueCommon<AtomicQueueB<T, A, NIL, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>> {
     using AllocatorElements = typename std::allocator_traits<A>::template rebind_alloc<std::atomic<T>>;
@@ -725,7 +771,7 @@ public:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<class T, class A = std::allocator<T>, bool MAXIMIZE_THROUGHPUT = true, bool TOTAL_ORDER = false, bool SPSC = false>
+template<class T, class A, bool MAXIMIZE_THROUGHPUT, bool TOTAL_ORDER, bool SPSC>
 class AtomicQueueB2 : private std::allocator_traits<A>::template rebind_alloc<unsigned char>,
                       public AtomicQueueCommon<AtomicQueueB2<T, A, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>> {
     using StorageAllocator = typename std::allocator_traits<A>::template rebind_alloc<unsigned char>;
