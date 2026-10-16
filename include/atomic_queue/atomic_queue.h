@@ -51,21 +51,6 @@ struct GetIndexShuffleBits<false, array_size, elements_per_cache_line> {
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// The ring-buffer array index is the push/pop counter modulo the array size. A 32-bit counter wraps around at 2^32, which
-// keeps the array index sequence continuous only when the array size is a power of 2. Otherwise, the array indexes before
-// and after the wraparound collide, e.g. (2^32 - 1) % 3 == 0 % 3 == 0. Non-power-of-2 sizes use 64-bit counters instead,
-// which do not wrap around in practice.
-
-template<unsigned SIZE, bool MINIMIZE_CONTENTION, bool use_uint32_counter = MINIMIZE_CONTENTION || !(SIZE & (SIZE - 1))>
-struct GetCounterType : Type<unsigned> {};
-
-template<unsigned SIZE, bool MINIMIZE_CONTENTION>
-struct GetCounterType<SIZE, MINIMIZE_CONTENTION, false> : Type<u64> {};
-
-template<unsigned SIZE, bool MINIMIZE_CONTENTION>
-using CounterType = typename GetCounterType<SIZE, MINIMIZE_CONTENTION>::type;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Multiple writers/readers contend on the same cache line when storing/loading elements atxs
 // subsequent indexes, aka false sharing. For power of 2 ring buffer size it is possible to re-map
 // the index in such a way that each subsequent element resides on another cache line, which
@@ -316,11 +301,7 @@ enum StateE : State {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<
-    class Derived,
-    class Counter = unsigned
-> class AtomicQueueCommon;
-
+template<class Derived> class AtomicQueueCommon;
 
 template<
     class T,
@@ -360,12 +341,62 @@ template<
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<class Derived, class Counter>
+namespace details {
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// The ring-buffer array index is the push/pop counter modulo the array size. A 32-bit counter wraps around at 2^32, which
+// keeps the array index sequence continuous only when the array size is a power of 2. Otherwise, the array indexes before
+// and after the wraparound collide, e.g. (2^32 - 1) % 3 == 0 % 3 == 0. Non-power-of-2 sizes use 64-bit counters instead,
+// which do not wrap around in practice.
+
+template<unsigned SIZE, bool MINIMIZE_CONTENTION, bool use_uint32_counter = MINIMIZE_CONTENTION || !(SIZE & (SIZE - 1))>
+struct GetCounterType : Type<unsigned> {};
+
+template<unsigned SIZE, bool MINIMIZE_CONTENTION>
+struct GetCounterType<SIZE, MINIMIZE_CONTENTION, false> : Type<u64> {};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+template<class>
+struct CounterType : Type<unsigned> {};
+
+template<
+    class T,
+    unsigned CAPACITY,
+    T NIL,
+    bool MINIMIZE_CONTENTION,
+    bool MAXIMIZE_THROUGHPUT,
+    bool TOTAL_ORDER,
+    bool SPSC
+>
+struct CounterType<AtomicQueue<T, CAPACITY, NIL, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>>
+    : GetCounterType<CAPACITY, MINIMIZE_CONTENTION> {};
+
+template<
+    class T,
+    unsigned CAPACITY,
+    bool MINIMIZE_CONTENTION,
+    bool MAXIMIZE_THROUGHPUT,
+    bool TOTAL_ORDER,
+    bool SPSC
+>
+struct CounterType<AtomicQueue2<T, CAPACITY, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>>
+    : GetCounterType<CAPACITY, MINIMIZE_CONTENTION> {};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+} // details
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+template<class Derived>
 class AtomicQueueCommon {
     ATOMIC_QUEUE_INLINE constexpr auto& downcast() noexcept { return static_cast<Derived&>(*this); }
     ATOMIC_QUEUE_INLINE constexpr auto& downcast() const noexcept { return static_cast<Derived const&>(*this); }
 
 protected:
+    using Counter = typename details::CounterType<Derived>::type;
+
     // Put these on different cache lines to avoid false sharing between readers and writers.
     alignas(CACHE_LINE_SIZE) std::atomic<Counter> end_{}; // One past the latest queue element to push into.
     alignas(CACHE_LINE_SIZE) std::atomic<Counter> beg_{}; // The oldest queue element to pop from.
@@ -593,11 +624,10 @@ public:
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<class T, unsigned CAPACITY, T NIL, bool MINIMIZE_CONTENTION, bool MAXIMIZE_THROUGHPUT, bool TOTAL_ORDER, bool SPSC>
-class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, CAPACITY, NIL, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>,
-                                             details::CounterType<CAPACITY, MINIMIZE_CONTENTION>> {
-    using Counter = details::CounterType<CAPACITY, MINIMIZE_CONTENTION>;
-    using Base = AtomicQueueCommon<AtomicQueue, Counter>;
+class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, CAPACITY, NIL, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>> {
+    using Base = AtomicQueueCommon<AtomicQueue>;
     friend Base;
+    using Counter = typename Base::Counter;
 
     static_assert(CAPACITY >= details::CAPACITY_MIN, "CAPACITY is too low.");
     static_assert(CAPACITY <= details::CAPACITY_MAX, "CAPACITY is too high.");
@@ -637,11 +667,10 @@ public:
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<class T, unsigned CAPACITY, bool MINIMIZE_CONTENTION, bool MAXIMIZE_THROUGHPUT, bool TOTAL_ORDER, bool SPSC>
-class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, CAPACITY, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>,
-                                              details::CounterType<CAPACITY, MINIMIZE_CONTENTION>> {
-    using Counter = details::CounterType<CAPACITY, MINIMIZE_CONTENTION>;
-    using Base = AtomicQueueCommon<AtomicQueue2, Counter>;
+class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, CAPACITY, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>> {
+    using Base = AtomicQueueCommon<AtomicQueue2>;
     friend Base;
+    using Counter = typename Base::Counter;
 
     static_assert(CAPACITY >= details::CAPACITY_MIN, "CAPACITY is too low.");
     static_assert(CAPACITY <= details::CAPACITY_MAX, "CAPACITY is too high.");
