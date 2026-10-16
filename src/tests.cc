@@ -431,12 +431,21 @@ BOOST_AUTO_TEST_CASE(try_push_pop) {
     BOOST_CHECK_EQUAL(v, -1);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+template<class Queue>
+ATOMIC_QUEUE_NOINLINE auto q_was_size(Queue const& q) noexcept { return q.was_size(); }
+
 BOOST_AUTO_TEST_CASE(size) {
     atomic_queue::RetryDecorator<atomic_queue::AtomicQueueB2<float>> q(10);
     BOOST_CHECK_EQUAL(q.capacity(), CACHE_LINE_SIZE * CACHE_LINE_SIZE);
     BOOST_CHECK(q.was_empty());
     BOOST_CHECK(!q.was_full());
+    BOOST_CHECK_EQUAL(q_was_size(q), 0u);
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 
 #ifdef ATOMIC_QUEUE_TEST_SPINLOCK
 BOOST_AUTO_TEST_CASE(unfair_spinlock) {

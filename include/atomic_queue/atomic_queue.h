@@ -603,9 +603,14 @@ public:
     }
 
     ATOMIC_QUEUE_INLINE unsigned was_size() const noexcept {
-        // beg_ can be greater than end_ because of consumers doing pop, rather that try_pop, when the queue is empty.
-        auto const size = as_signed(end_.load(X) - beg_.load(X));
-        return static_cast<unsigned>(max_value(size, decltype(size){0}));
+        // beg_ can be greater than end_ because of consumers doing pop (not try_pop) when the queue is empty.
+        unsigned z = 0;
+        auto end = end_.load(X);
+#if ATOMIC_QUEUE_FULL_THROTTLE
+        asm("": "+r"(end), "+r"(z)); // Preclude gcc from using integer xmm registers here.
+#endif
+        auto size = end - beg_.load(X);
+        return as_signed(size) < 0 ? z : size;
     }
 
     ATOMIC_QUEUE_INLINE unsigned capacity() const noexcept {
