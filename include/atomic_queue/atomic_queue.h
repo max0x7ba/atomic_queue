@@ -632,7 +632,7 @@ template<class T, unsigned CAPACITY, T NIL, bool MINIMIZE_CONTENTION, bool MAXIM
 class AtomicQueue : public AtomicQueueCommon<AtomicQueue<T, CAPACITY, NIL, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>> {
     using Base = AtomicQueueCommon<AtomicQueue>;
     friend Base;
-    using Counter = typename Base::Counter;
+    using typename Base::Counter;
 
     static_assert(CAPACITY >= details::CAPACITY_MIN, "CAPACITY is too low.");
     static_assert(CAPACITY <= details::CAPACITY_MAX, "CAPACITY is too high.");
@@ -675,7 +675,7 @@ template<class T, unsigned CAPACITY, bool MINIMIZE_CONTENTION, bool MAXIMIZE_THR
 class AtomicQueue2 : public AtomicQueueCommon<AtomicQueue2<T, CAPACITY, MINIMIZE_CONTENTION, MAXIMIZE_THROUGHPUT, TOTAL_ORDER, SPSC>> {
     using Base = AtomicQueueCommon<AtomicQueue2>;
     friend Base;
-    using Counter = typename Base::Counter;
+    using typename Base::Counter;
 
     static_assert(CAPACITY >= details::CAPACITY_MIN, "CAPACITY is too low.");
     static_assert(CAPACITY <= details::CAPACITY_MAX, "CAPACITY is too high.");
